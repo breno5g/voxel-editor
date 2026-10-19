@@ -698,6 +698,10 @@
           <button id="project-save" type="button" title="Salvar o documento atual com este nome">Salvar como</button>
         </div>
         <ul id="project-list" class="project-list"></ul>
+        <h2 id="components-title">Componentes do arquivo</h2>
+        <p class="hint">Importe uma parte de outro .vox, exporte uma parte sozinha, ou escolha o que entra ao salvar.</p>
+        <ul id="component-list" class="project-list components" aria-labelledby="components-title"></ul>
+        <input id="component-input" type="file" accept=".vox" hidden />
         <form method="dialog" class="segmented"><button type="submit">Fechar</button></form>
       </div>
     </dialog>
@@ -711,6 +715,7 @@
             <option value="mc">PLY suavizado (mc)</option>
             <option value="cube">PLY de cubos</option>
             <option value="pcl">PLY nuvem de pontos</option>
+            <option value="vox">MagicaVoxel .vox (só os objetos)</option>
             <option value="qb">Qubicle .qb</option>
             <option value="xraw">XRAW</option>
             <option value="slab">Slab6 .vox</option>

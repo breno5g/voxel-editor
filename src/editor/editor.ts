@@ -1,3 +1,5 @@
+import { withComponents } from '../format/components.ts';
+import type { Component } from '../format/components.ts';
 import { createDocument } from '../format/defaults.ts';
 import type { Axis } from '../format/rotation.ts';
 import { MAX_MODEL_SIZE } from '../format/vox.ts';
@@ -143,6 +145,8 @@ export type EditorState = {
   patternUsesPalette: boolean;
   /** Pattern mode `Dir`/`Page`/`Home`: where the stamp sits relative to the pointer, in model cells. */
   patternOffset: Vec3;
+  /** MagicaVoxel `save_pal`, `save_mtl`, `save_render`, `save_camera`, `save_note`: what saving writes into the file. */
+  savedComponents: Record<Component, boolean>;
   /** Shows the previous model frame translucent while editing frame-by-frame animation. */
   onionSkin: boolean;
   display: Display;
@@ -217,6 +221,7 @@ export function createEditor() {
     pattern: null,
     patternUsesPalette: false,
     patternOffset: [0, 0, 0],
+    savedComponents: { palette: true, material: true, render: true, camera: true, note: true },
     autoKey: true,
     pendingKeys: new Map(),
     onionSkin: false,
@@ -479,6 +484,14 @@ export function createEditor() {
       state.patternUsesPalette = enabled;
       emit({ type: 'tool' });
     },
+
+    setSavedComponent(component: Component, saved: boolean) {
+      state.savedComponents = { ...state.savedComponents, [component]: saved };
+      emit({ type: 'tool' });
+    },
+
+    /** The document as saving writes it: only the components chosen in `savedComponents`. */
+    savedDocument: () => withComponents(state.vox, state.savedComponents),
 
     setAutoKey(enabled: boolean) {
       state.autoKey = enabled;

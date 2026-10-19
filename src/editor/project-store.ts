@@ -21,7 +21,7 @@ export function createProjectStore(editor: Editor) {
     /** Saves the document under `name` (the current file name by default) and makes it the document's name. */
     async save(name = state.fileName) {
       const key = keyOf(name);
-      await put(key, writeVox(state.vox));
+      await put(key, writeVox(editor.savedDocument()));
       editor.markSaved(key);
       editor.status(`${key} salvo no navegador`);
     },

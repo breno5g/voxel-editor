@@ -1,6 +1,7 @@
 import type { Editor } from '../editor/editor.ts';
 import { modelFromCells, worldCells } from '../editor/object-booleans.ts';
-import { encodeQb, encodeSlab, encodeXraw } from '../format/grid-formats.ts';
+import { documentFromModels, encodeQb, encodeSlab, encodeXraw } from '../format/grid-formats.ts';
+import { writeVox } from '../format/vox-writer.ts';
 import type { PlacedModel } from '../format/grid-formats.ts';
 import { DEFAULT_MESH_OPTIONS, exportMesh, MESH_FORMATS } from '../format/mesh-export.ts';
 import type { ExportAxis, ExportFile, ExportObject, MeshFormat } from '../format/mesh-export.ts';
@@ -10,7 +11,7 @@ import type { RgbaImage } from '../format/voxel-images.ts';
 import { isUnder, parentMap } from '../scene/scene-tree.ts';
 import { downloadBlob, element } from './dom.ts';
 
-const GRID_FORMATS = ['qb', 'xraw', 'slab'] as const;
+const GRID_FORMATS = ['vox', 'qb', 'xraw', 'slab'] as const;
 const IMAGE_FORMATS = ['iso', '2d', 'slice'] as const;
 type ExportFormat = MeshFormat | (typeof GRID_FORMATS)[number] | (typeof IMAGE_FORMATS)[number];
 const isMesh = (format: string): format is MeshFormat => MESH_FORMATS.some((mesh) => mesh === format);
@@ -83,6 +84,7 @@ export function bindExportActions(editor: Editor): void {
       return [...files, { name: `${base}.png`, data: texture, type: 'image/png' }];
     }
     if (chosen === 'qb') return [{ name: `${base}.qb`, data: encodeQb(placed(items), palette), type: 'application/octet-stream' }];
+    if (chosen === 'vox') return [{ name: `${base}-objetos.vox`, data: writeVox(documentFromModels(placed(items), palette)), type: 'application/octet-stream' }];
     const model = mergedModel(items);
     if (!model) throw new Error('Exporte um objeto só em espaço local, ou a cena em espaço do mundo');
     if (chosen === 'xraw') return [{ name: `${base}.xraw`, data: encodeXraw(model, palette), type: 'application/octet-stream' }];

@@ -56,7 +56,7 @@ export function createFileActions(editor: Editor, viewport: Viewport) {
 
   const save = (fileName: string) => {
     try {
-      downloadBlob(new Blob([writeVox(editor.state.vox)], { type: 'application/octet-stream' }), fileName);
+      downloadBlob(new Blob([writeVox(editor.savedDocument())], { type: 'application/octet-stream' }), fileName);
       editor.markSaved(fileName);
       editor.status(`${fileName} salvo`);
     } catch (error) {
