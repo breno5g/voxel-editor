@@ -384,11 +384,24 @@ vec3 sky(vec3 direction) {
   return u_sky;
 }
 
-/** What a ray leaving the scene sees; the sun disk only where it was not already sampled directly. */
-vec3 escape(vec3 direction, bool showSun) {
+/** The sun's solid angle; its radiance is its irradiance spread over it. */
+float sunSolidAngle() {
+  return 2.0 * PI * (1.0 - u_sunCos);
+}
+
+/**
+ * What a ray leaving the scene sees. \`sunWeight\` is how much of the sun it may add: 0 where the sun was
+ * sampled directly, a MIS weight after a glossy reflection, 1 after a mirror, the disk's visibility first.
+ */
+vec3 escape(vec3 direction, float sunWeight) {
   vec3 color = sky(direction);
-  if (showSun && u_sunDisk && dot(direction, u_sunDirection) > u_sunCos) color += sunlight() * PI / max(2.0 * PI * (1.0 - u_sunCos), 1e-4);
+  if (sunWeight > 0.0 && dot(direction, u_sunDirection) > u_sunCos) color += sunWeight * sunlight() * PI / max(sunSolidAngle(), 1e-6);
   return color;
+}
+
+/** The power heuristic's weight for a sample from the strategy with density \`chosen\` against \`other\`. */
+float powerHeuristic(float chosen, float other) {
+  return chosen * chosen / max(chosen * chosen + other * other, 1e-30);
 }
 
 struct Surface { bool hit; float t; vec3 position; vec3 normal; uint color; ivec3 cell; bool ground; };
@@ -509,9 +522,23 @@ float gridLine(vec2 coordinates, float spacing, float width) {
   return step(min(offset.x, offset.y), width * 0.5);
 }
 
-/* GGX microfacets (Walter et al. 2007) for metal and blend reflections; below GLOSSY_ALPHA a lobe is
-   treated as a mirror. */
-const float GLOSSY_ALPHA = 0.05;
+/* GGX microfacets (Walter et al. 2007) for metal and blend reflections. */
+
+float ggxDistribution(float nh, float alpha) {
+  float a2 = alpha * alpha;
+  float denominator = nh * nh * (a2 - 1.0) + 1.0;
+  return a2 / (PI * denominator * denominator);
+}
+
+/** Density over directions of a reflection sampled by its GGX half vector. */
+float ggxDensity(vec3 normal, vec3 view, vec3 halfway, float alpha) {
+  return ggxDistribution(max(dot(normal, halfway), 0.0), alpha) * max(dot(normal, halfway), 0.0) / max(4.0 * dot(view, halfway), 1e-6);
+}
+
+/** Density of a direction sampled uniformly over the sun's disk (a point sun is sampled exactly). */
+float sunDensity() {
+  return u_sunCos < 1.0 ? 1.0 / sunSolidAngle() : 1e30;
+}
 
 /** cos θ of a half vector drawn from the GGX distribution. */
 float ggxCosTheta(float alpha) {
@@ -537,19 +564,16 @@ vec3 ggxWeight(vec3 normal, vec3 view, vec3 light, vec3 halfway, float alpha, ve
   return schlick(reflectance, vh) * smithG1(nv, alpha) * smithG1(nl, alpha) * vh / (nv * nh);
 }
 
-/** Sunlight reflected toward \`view\` by a GGX lobe, sampled over the sun's disk. */
+/** Sunlight reflected toward \`view\` by a GGX lobe, sampled over the sun's disk and MIS-weighted. */
 vec3 ggxSunlight(vec3 normal, vec3 view, float alpha, vec3 reflectance, vec3 origin) {
   vec3 light = cone(u_sunDirection, u_sunCos);
   float nl = dot(normal, light);
   float nv = dot(normal, view);
   if (nl <= 0.0 || nv <= 0.0) return vec3(0.0);
   vec3 halfway = normalize(view + light);
-  float nh = max(dot(normal, halfway), 0.0);
-  float a2 = alpha * alpha;
-  float denominator = nh * nh * (a2 - 1.0) + 1.0;
-  float distribution = a2 / (PI * denominator * denominator);
-  vec3 brdf = schlick(reflectance, max(dot(view, halfway), 0.0)) * distribution * smithG1(nv, alpha) * smithG1(nl, alpha) / (4.0 * nv * nl);
-  return brdf * nl * PI * sunlight() * sunlightThrough(origin, light);
+  vec3 brdf = schlick(reflectance, max(dot(view, halfway), 0.0)) * ggxDistribution(max(dot(normal, halfway), 0.0), alpha) * smithG1(nv, alpha) * smithG1(nl, alpha) / (4.0 * nv * nl);
+  float weight = powerHeuristic(sunDensity(), ggxDensity(normal, view, halfway, alpha));
+  return weight * brdf * nl * PI * sunlight() * sunlightThrough(origin, light);
 }
 
 /** The ray through pixel coordinates for the chosen projection, with depth of field. */
@@ -616,7 +640,7 @@ void main() {
   vec3 radiance = vec3(0.0);
   vec3 throughput = vec3(1.0);
   float coverage = 1.0;
-  bool showSun = true;
+  float sunWeight = u_sunDisk ? 1.0 : 0.0;
   int diffuse = 0;
   int specular = 0;
   int scatter = 0;
@@ -630,7 +654,7 @@ void main() {
         throughput *= u_fogColor;
         radiance += throughput * sunlightThrough(origin, u_sunDirection) * sunlight() * PI * phaseHG(dot(direction, u_sunDirection), u_fogPhase);
         direction = henyeyGreenstein(direction, u_fogPhase);
-        showSun = false;
+        sunWeight = 0.0;
         continue;
       }
     }
@@ -640,7 +664,7 @@ void main() {
     }
     if (!surface.hit) {
       if (depth == 0 && u_flatBackground) coverage = 0.0;
-      else radiance += throughput * escape(direction, showSun);
+      else radiance += throughput * escape(direction, sunWeight);
       break;
     }
 
@@ -649,7 +673,7 @@ void main() {
       float fade = 1.0 - exp(-u_horizon * surface.t);
       if (depth == 0 && u_flatBackground) coverage = 1.0 - fade;
       else {
-        radiance += throughput * fade * escape(direction, showSun);
+        radiance += throughput * fade * escape(direction, sunWeight);
         throughput *= 1.0 - fade;
       }
     }
@@ -711,7 +735,7 @@ void main() {
       throughput *= albedo;
       radiance += throughput * sunlightThrough(origin, u_sunDirection) * sunlight() * PI * phaseHG(dot(direction, u_sunDirection), shape.z);
       direction = henyeyGreenstein(direction, shape.z);
-      showSun = false;
+      sunWeight = 0.0;
       continue;
     }
     if ((kind == 2 || kind == 4) && random() < transparency) {
@@ -727,7 +751,7 @@ void main() {
       throughput *= albedo;
       origin = surface.position + next * bias * 2.0;
       direction = next;
-      showSun = true;
+      sunWeight = 1.0;
       continue;
     }
     if ((kind == 1 || kind == 4) && random() < metalness + (1.0 - metalness) * clamp(extra.w, 0.0, 1.0) * 0.25) {
@@ -737,15 +761,14 @@ void main() {
       vec3 reflectance = mix(vec3(0.04), albedo, metalness);
       float alpha = max(roughness * roughness, 1e-4);
       origin = surface.position + facing * bias;
-      /* Glossy lobes take the sun by direct sampling; near-mirrors see it (and its disk) by reflection. */
-      bool glossy = alpha > GLOSSY_ALPHA;
-      if (glossy) radiance += throughput * ggxSunlight(facing, view, alpha, reflectance, origin);
+      /* The sun reaches a reflection two ways, sampled directly and hit by the reflected ray; MIS weighs them. */
+      radiance += throughput * ggxSunlight(facing, view, alpha, reflectance, origin);
       vec3 halfway = around(facing, ggxCosTheta(alpha));
       vec3 next = reflect(direction, halfway);
       if (dot(next, facing) <= 0.0 || dot(view, facing) <= 0.0) break;
       throughput *= ggxWeight(facing, view, next, halfway, alpha, reflectance);
+      sunWeight = powerHeuristic(ggxDensity(facing, view, halfway, alpha), sunDensity());
       direction = next;
-      showSun = !glossy;
       continue;
     }
     vec3 shadingPoint = u_pixelated && fullCubes && !surface.ground ? (vec3(surface.cell) + 0.5 + normal * 0.5) * u_scale + u_origin : surface.position;
@@ -757,7 +780,7 @@ void main() {
     diffuse++;
     throughput *= albedo;
     direction = cosineHemisphere(facing);
-    showSun = false;
+    sunWeight = 0.0;
     if (depth > 2) {
       float survive = max(throughput.r, max(throughput.g, throughput.b));
       if (random() > survive) break;
