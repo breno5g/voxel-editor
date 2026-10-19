@@ -19,6 +19,8 @@ precision highp usampler3D;
 
 uniform usampler3D u_volume;
 uniform usampler3D u_bricks;
+/** Smooth shapes (marching cubes, clay): occupancy, plain or blurred, filtered trilinearly; the surface is at 0.5. */
+uniform highp sampler3D u_density;
 uniform sampler2D u_palette;
 uniform sampler2D u_materials;
 uniform sampler2D u_ibl;
@@ -150,6 +152,50 @@ bool brickFilled(ivec3 cell) {
 
 struct Hit { float t; vec3 normal; uint color; ivec3 cell; };
 
+const int SMOOTH_SAMPLES = 3;
+const int SMOOTH_REFINES = 6;
+
+float densityAt(vec3 point) {
+  return texture(u_density, point / vec3(u_size)).r;
+}
+
+/** The first t in [from, to] where the density rises to 0.5, refined by bisection; -1 when it stays below. */
+float smoothCrossing(vec3 origin, vec3 direction, float from, float to) {
+  if (densityAt(origin + direction * from) >= 0.5) return from;
+  float previous = from;
+  for (int step = 1; step <= SMOOTH_SAMPLES; step++) {
+    float t = mix(from, to, float(step) / float(SMOOTH_SAMPLES));
+    if (densityAt(origin + direction * t) >= 0.5) {
+      float low = previous;
+      float high = t;
+      for (int refine = 0; refine < SMOOTH_REFINES; refine++) {
+        float middle = 0.5 * (low + high);
+        if (densityAt(origin + direction * middle) >= 0.5) high = middle;
+        else low = middle;
+      }
+      return high;
+    }
+    previous = t;
+  }
+  return -1.0;
+}
+
+/** A smooth-surface hit: the normal from the density gradient, the colour of the voxel it wraps. */
+Hit smoothHit(vec3 point, float t) {
+  const float e = 0.25;
+  vec3 gradient = vec3(
+    densityAt(point + vec3(e, 0.0, 0.0)) - densityAt(point - vec3(e, 0.0, 0.0)),
+    densityAt(point + vec3(0.0, e, 0.0)) - densityAt(point - vec3(0.0, e, 0.0)),
+    densityAt(point + vec3(0.0, 0.0, e)) - densityAt(point - vec3(0.0, 0.0, e)));
+  Hit hit;
+  hit.t = t;
+  hit.normal = dot(gradient, gradient) > 0.0 ? -normalize(gradient) : vec3(0.0, 0.0, 1.0);
+  hit.cell = ivec3(floor(point));
+  for (int attempt = 0; attempt < 3 && !solid(hit.cell); attempt++) hit.cell = ivec3(floor(point - hit.normal * (0.5 + 0.5 * float(attempt))));
+  hit.color = solid(hit.cell) ? voxelAt(hit.cell) : 0u;
+  return hit;
+}
+
 /** Ray against the box [low, high]: entry t (or -1) and the face it enters through. */
 float boxHit(vec3 origin, vec3 inverse, vec3 low, vec3 high, out vec3 normal) {
   vec3 t0 = (low - origin) * inverse;
@@ -215,7 +261,6 @@ float primitiveHit(vec3 origin, vec3 direction, vec3 inverse, ivec3 cell, out ve
     }
     return body;
   }
-  // ponytail: marching-cubes (2) and clay (3) shapes render as boxes; smooth surfaces need a density field walk.
   return boxHit(origin, inverse, center - extent, center + extent, normal);
 }
 
@@ -235,6 +280,7 @@ Hit traceVolume(vec3 origin, vec3 direction) {
   if (tEnter >= tExit) return hit;
 
   bool fullCubes = u_shape == 0 && u_cell >= 1.0;
+  bool smoothShape = u_shape == 2 || u_shape == 3;
   ivec3 stepDirection = ivec3(sign(direction));
   vec3 tDelta = abs(inverse);
   float t = tEnter;
@@ -255,7 +301,14 @@ Hit traceVolume(vec3 origin, vec3 direction) {
     } else {
       vec3 next = (vec3(cell) + max(vec3(stepDirection), vec3(0.0)) - origin) * inverse;
       for (int inner = 0; inner < BRICK * 3; inner++) {
-        uint color = voxelAt(cell);
+        if (smoothShape) {
+          float crossing = smoothCrossing(origin, direction, t, min(min(next.x, min(next.y, next.z)), tExit));
+          if (crossing >= 0.0) {
+            Hit surface = smoothHit(origin + direction * crossing, crossing);
+            if (surface.color != 0u) return surface;
+          }
+        }
+        uint color = smoothShape ? 0u : voxelAt(cell);
         vec3 shapeNormal = normal;
         float shapeT = color == 0u || fullCubes ? t : primitiveHit(origin, direction, inverse, cell, shapeNormal);
         if (color != 0u && shapeT >= 0.0) {
@@ -476,7 +529,8 @@ void main() {
     float transparency = clamp(extra.x, 0.0, 1.0);
     radiance += throughput * albedo * extra.y;
 
-    float bias = 1e-3 * max(max(u_scale.x, u_scale.y), max(u_scale.z, 1.0));
+    /* Smooth surfaces sit on 8-bit density, so rays leave them with a wider gap. */
+    float bias = (u_shape == 2 || u_shape == 3 ? 0.05 : 1e-3) * max(max(u_scale.x, u_scale.y), max(u_scale.z, 1.0));
     bool entering = dot(direction, normal) < 0.0;
     vec3 facing = entering ? normal : -normal;
     // ponytail: media voxels (clouds) pass light through with probability 1 - density instead of a real volume walk.

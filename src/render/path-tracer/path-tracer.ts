@@ -7,6 +7,7 @@ import { linkFullScreenProgram } from '../gl-program.ts';
 import type { HdrImage } from './hdr-image.ts';
 import { MATERIAL_ROWS } from './material-table.ts';
 import { BLOOM_BLUR_FRAGMENT, BLOOM_DOWNSAMPLE, BLOOM_EXTRACT_FRAGMENT, DISPLAY_FRAGMENT, PATH_TRACE_FRAGMENT } from './path-trace-shader.ts';
+import { dilateBricks, shapeDensity } from './scene-volume.ts';
 import type { SceneVolume } from './scene-volume.ts';
 
 export type PathTracer = ReturnType<typeof createPathTracer>;
@@ -31,7 +32,9 @@ const EXTINCTION_SCALE = 0.01;
 const APERTURE_SCALE = 0.02;
 
 /** Units for the trace pass, then for the bloom and display passes (which bind only 2D textures). */
-const TEXTURE_UNITS = { volume: 0, bricks: 1, palette: 2, materials: 3, ibl: 4, previous: 5, accumulation: 0, bloom: 1 } as const;
+const TEXTURE_UNITS = { volume: 0, bricks: 1, palette: 2, materials: 3, ibl: 4, previous: 5, density: 6, accumulation: 0, bloom: 1 } as const;
+/** Clay is occupancy blurred this many times; marching cubes uses it as is. */
+const CLAY_BLUR_PASSES = 2;
 
 const linear = (color: Vec3): Vec3 => [Math.pow(color[0] / 255, 2.2), Math.pow(color[1] / 255, 2.2), Math.pow(color[2] / 255, 2.2)];
 const scaled = (color: Vec3, factor: number): Vec3 => [color[0] * factor, color[1] * factor, color[2] * factor];
@@ -68,10 +71,12 @@ export function createPathTracer(container: HTMLElement) {
     gl.texParameteri(target, gl.TEXTURE_MAG_FILTER, filter);
     gl.texParameteri(target, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(target, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    if (target === gl.TEXTURE_3D) gl.texParameteri(target, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
     return texture;
   };
   const volumeTexture = createTexture(gl.TEXTURE_3D);
   const bricksTexture = createTexture(gl.TEXTURE_3D);
+  const densityTexture = createTexture(gl.TEXTURE_3D, gl.LINEAR);
   const paletteTexture = createTexture(gl.TEXTURE_2D);
   const materialsTexture = createTexture(gl.TEXTURE_2D);
   const iblTexture = createTexture(gl.TEXTURE_2D, gl.LINEAR);
@@ -87,6 +92,11 @@ export function createPathTracer(container: HTMLElement) {
     if (image) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, image.width, image.height, 0, gl.RGB, gl.FLOAT, image.pixels);
     else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, 1, 1, 0, gl.RGB, gl.FLOAT, new Float32Array(3));
   };
+  const uploadDensity = (size: Vec3, density: Uint8Array) => {
+    gl.bindTexture(gl.TEXTURE_3D, densityTexture);
+    gl.texImage3D(gl.TEXTURE_3D, 0, gl.R8, size[0], size[1], size[2], 0, gl.RED, gl.UNSIGNED_BYTE, density);
+  };
+  uploadDensity([1, 1, 1], new Uint8Array(1));
   upload3d(volumeTexture, [1, 1, 1], new Uint8Array(1));
   upload3d(bricksTexture, [1, 1, 1], new Uint8Array(1));
   uploadIbl(null);
@@ -132,6 +142,13 @@ export function createPathTracer(container: HTMLElement) {
   let lastView = '';
   const reset = () => {
     samples = 0;
+  };
+  /** Smooth shapes need the density field, and bricks grown by one so surfaces bulging out of them are found. */
+  const uploadShape = () => {
+    if (!volume) return;
+    const smooth = options.shape === 'mc' || options.shape === 'clay';
+    upload3d(bricksTexture, volume.brickSize, smooth ? dilateBricks(volume) : volume.bricks);
+    if (smooth) uploadDensity(volume.size, shapeDensity(volume, options.shape === 'clay' ? CLAY_BLUR_PASSES : 0));
   };
 
   /** The camera's frame and projection as uniforms; returns a key that changes whenever the view does. */
@@ -271,10 +288,8 @@ export function createPathTracer(container: HTMLElement) {
       const limit = gl.getParameter(gl.MAX_3D_TEXTURE_SIZE);
       if (next && next.size.some((axis) => axis > limit)) throw new Error(`A GPU aceita até ${limit} voxels por eixo; a cena tem ${next.size.join('×')}`);
       volume = next;
-      if (next) {
-        upload3d(volumeTexture, next.size, next.voxels);
-        upload3d(bricksTexture, next.brickSize, next.bricks);
-      }
+      if (next) upload3d(volumeTexture, next.size, next.voxels);
+      uploadShape();
       reset();
     },
 
@@ -305,7 +320,9 @@ export function createPathTracer(container: HTMLElement) {
     },
 
     setOptions(next: TraceOptions) {
+      const reshaped = next.shape !== options.shape;
       options = next;
+      if (reshaped) uploadShape();
       reset();
     },
 
@@ -340,6 +357,8 @@ export function createPathTracer(container: HTMLElement) {
       bind(TEXTURE_UNITS.materials, gl.TEXTURE_2D, materialsTexture);
       bind(TEXTURE_UNITS.ibl, gl.TEXTURE_2D, iblTexture);
       bind(TEXTURE_UNITS.previous, gl.TEXTURE_2D, accumulation[previous].texture);
+      bind(TEXTURE_UNITS.density, gl.TEXTURE_3D, densityTexture);
+      gl.uniform1i(at(traceProgram, 'u_density'), TEXTURE_UNITS.density);
       gl.uniform1i(at(traceProgram, 'u_volume'), TEXTURE_UNITS.volume);
       gl.uniform1i(at(traceProgram, 'u_bricks'), TEXTURE_UNITS.bricks);
       gl.uniform1i(at(traceProgram, 'u_palette'), TEXTURE_UNITS.palette);
