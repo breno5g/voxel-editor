@@ -71,7 +71,11 @@ export function createOverlays(scene: THREE.Scene) {
   frameGrid.matrixAutoUpdate = false;
   frameGrid.visible = false;
   let frameGridKey = '';
-  root.add(grid, selectionBoxes, wireBoxes, hover, frameGrid);
+  const outline = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: HOVER_COLOR, depthTest: false, transparent: true }));
+  outline.matrixAutoUpdate = false;
+  outline.renderOrder = 1;
+  outline.visible = false;
+  root.add(grid, selectionBoxes, wireBoxes, hover, frameGrid, outline);
   scene.add(root);
 
   const createSelectionBox = () => {
@@ -94,6 +98,16 @@ export function createOverlays(scene: THREE.Scene) {
       hover.visible = objectMatrix !== null;
       if (objectMatrix) hover.matrix.copy(cellBox(objectMatrix, size, from, to));
       hover.matrixWorldNeedsUpdate = true;
+    },
+    /** Segments in model cell coordinates (a face region's border); null hides them. */
+    showOutline(object: BoxedObject | null, segments: number[] = []) {
+      outline.visible = object !== null && segments.length > 0;
+      if (!object) return;
+      const pivot = modelPivot(object.size);
+      outline.geometry.dispose();
+      outline.geometry = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(segments, 3));
+      outline.matrix.copy(object.matrix).multiply(new THREE.Matrix4().makeTranslation(-pivot[0], -pivot[1], -pivot[2]));
+      outline.matrixWorldNeedsUpdate = true;
     },
     /** The edited model's floor grid every `spacing` cells (MagicaVoxel `rm_space`); null hides it. */
     showFrameGrid(object: BoxedObject | null, spacing: number) {

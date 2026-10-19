@@ -3,7 +3,7 @@ import { cellOf, EMPTY_VOXEL, isInside, voxelIndex } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
 import { chunksTouching } from '../geometry/mesher.ts';
 import type { ClientRect, Viewport } from '../render/viewport.ts';
-import { addScaled, AXES, alongAxes, axisOf, cellsBetween, centeredShape, colorRegion, faceRegion, lineCells, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
+import { addScaled, AXES, alongAxes, axisOf, cellsBetween, centeredShape, colorRegion, faceRegion, lineCells, regionOutline, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
 import type { BrushMode, BrushType, Editor } from './editor.ts';
 import type { ObjectCommands } from './object-commands.ts';
 import { createTransformTool } from './transform-tool.ts';
@@ -69,10 +69,8 @@ const PROJECTION_STEP = 2;
 /** Pixels of vertical drag per layer when the face normal points at the camera. */
 const PIXELS_PER_LAYER = 12;
 
-const regionBounds = (region: Vec3[]): [Vec3, Vec3] => [
-  [Math.min(...region.map((cell) => cell[0])), Math.min(...region.map((cell) => cell[1])), Math.min(...region.map((cell) => cell[2]))],
-  [Math.max(...region.map((cell) => cell[0])), Math.max(...region.map((cell) => cell[1])), Math.max(...region.map((cell) => cell[2]))],
-];
+/** Pixels of horizontal drag per voxel of brush size (`Ctrl+Alt` + drag). */
+const PIXELS_PER_SIZE = 8;
 
 /**
  * Model editor strokes (MagicaVoxel `b_mode` x `b_type`):
@@ -91,6 +89,8 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
   let stroke: Stroke | null = null;
   let marquee: Marquee | null = null;
   let move: Move | null = null;
+  /** `Ctrl+Alt` + drag in voxel mode: the brush size follows the horizontal drag. */
+  let sizing: { start: number; size: number } | null = null;
   /** Code mode: the box being dragged, handed to the XS shader on release. */
   let codeBox: { transformId: number; model: VoxModel; anchor: Vec3; last: Vec3 } | null = null;
   const transform = createTransformTool(editor, viewport);
@@ -409,18 +409,15 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
     editor.setVoxelSelection({ model, mask });
   };
 
-  /** Hover outline of the face region under the pointer, cached while the pointer stays on the same face. */
+  /** Hover outline of the face region under the pointer, rebuilt only when the pointer moves to another face. */
   let hoverKey = '';
-  let hoverBounds: [Vec3, Vec3] | null = null;
   const showFaceHover = (object: { transformId: number; model: VoxModel }, clientX: number, clientY: number) => {
     const hit = viewport.pick(clientX, clientY, object.transformId)?.hit;
     const key = hit ? `${hit.voxel}|${hit.normal}` : '';
-    if (key !== hoverKey) {
-      hoverKey = key;
-      const region = hit ? faceRegion(object.model, hit.voxel, hit.normal, state.faceBrush) : [];
-      hoverBounds = region.length > 0 ? regionBounds(region) : null;
-    }
-    viewport.showHover(hoverBounds ? object.transformId : null, hoverBounds?.[0], hoverBounds?.[1]);
+    if (key === hoverKey) return;
+    hoverKey = key;
+    viewport.showHover(null);
+    viewport.showOutline(hit ? object.transformId : null, hit ? regionOutline(faceRegion(object.model, hit.voxel, hit.normal, state.faceBrush), hit.normal) : []);
   };
 
   const restore = (model: VoxModel, changes: Changes, side: 0 | 1) => {
@@ -449,6 +446,11 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
 
     begin(clientX: number, clientY: number, modifiers: PointerModifiers) {
       const { brushType } = state;
+      viewport.showHover(null);
+      if (modifiers.ctrlKey && modifiers.altKey && brushMode() === 'vox') {
+        sizing = { start: clientX, size: state.voxBrush.size };
+        return;
+      }
       if ((modifiers.altKey && !modifiers.shiftKey) || brushType === 'pick') return pickColor(clientX, clientY);
       const object = edited();
       if (!object) return;
@@ -488,6 +490,10 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
       if (move) return dragMove(move, clientX, clientY);
       if (transforming) return transform.move(clientX, clientY);
       if (resizing) return dragResize(resizing, clientX, clientY);
+      if (sizing) {
+        editor.setVoxBrush({ size: sizing.size + Math.round((clientX - sizing.start) / PIXELS_PER_SIZE) });
+        return editor.status(`Pincel de ${state.voxBrush.size} voxel(s)`);
+      }
       if (state.brushType === 'resize') return viewport.showHover(null);
       if (codeBox) {
         const target = targetAt(clientX, clientY, codeBox.model, codeBox.transformId);
@@ -514,6 +520,7 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
       transforming = false;
       resizing?.drag.commit();
       resizing = null;
+      sizing = null;
       if (marquee) finishMarquee(marquee);
       marquee = null;
       if (codeBox) runShader(boxMask(codeBox.model.size, codeBox.anchor, codeBox.last));

@@ -12,8 +12,9 @@ import { isUnder, parentMap } from '../scene/scene-tree.ts';
 import { isEditingText } from './dom.ts';
 
 const MAIN_BUTTON = 0;
-/** MagicaVoxel `camera-control`: hold the key and drag with the left button. */
+/** MagicaVoxel `camera-control`: hold the key and drag with the left button; with `X` held a click recentres the orbit. */
 const CAMERA_DRAG_KEYS: Record<string, CameraDrag> = { Space: 'pan', KeyZ: 'zoom', KeyK: 'rotate' };
+const FOCUS_KEY = 'KeyX';
 
 /**
  * Keeps the viewport in step with editor events and routes left-button input by editor:
@@ -47,19 +48,29 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
     else commands.enterLevel();
   });
 
+  let focusHeld = false;
   window.addEventListener('keydown', (event) => {
+    if (event.code === FOCUS_KEY && !event.ctrlKey && !event.metaKey && !isEditingText(event)) focusHeld = true;
     const drag = CAMERA_DRAG_KEYS[event.code];
     if (!drag || event.ctrlKey || event.metaKey || isEditingText(event) || event.target instanceof HTMLButtonElement) return;
     event.preventDefault();
     viewport.camera.setLeftDrag(drag);
   });
   window.addEventListener('keyup', (event) => {
+    if (event.code === FOCUS_KEY) focusHeld = false;
     if (CAMERA_DRAG_KEYS[event.code]) viewport.camera.setLeftDrag(null);
   });
-  window.addEventListener('blur', () => viewport.camera.setLeftDrag(null));
+  window.addEventListener('blur', () => {
+    focusHeld = false;
+    viewport.camera.setLeftDrag(null);
+  });
 
   canvas.addEventListener('pointerdown', (event) => {
     if (event.button !== MAIN_BUTTON || viewport.camera.leftDrag()) return;
+    if (focusHeld) {
+      if (!viewport.focusAt(event.clientX, event.clientY)) editor.status('Clique num voxel para centralizar a câmera nele');
+      return;
+    }
     canvas.setPointerCapture(event.pointerId);
     tools().begin(event.clientX, event.clientY, event);
   });

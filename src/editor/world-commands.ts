@@ -9,6 +9,7 @@ import type { Pose } from '../scene/scene-graph.ts';
 import { cloneSubtree, groupNode, groupOf, instanceBounds, instancesUnder, parentMap, parentPose, rootLevel, unionBounds } from '../scene/scene-tree.ts';
 import type { Bounds } from '../scene/scene-tree.ts';
 import type { Editor } from './editor.ts';
+import { isLayerHidden } from './layer-commands.ts';
 import { sceneChange } from './scene-change.ts';
 
 type Picked = { id: number; node: TransformNode };
@@ -190,6 +191,12 @@ export function createWorldCommands(editor: Editor) {
     );
   };
 
+  const selectable = (includeHidden: boolean) =>
+    (levelGroup()?.children ?? []).filter((id) => {
+      const node = state.vox.nodes[id];
+      return includeHidden || (node?.kind === 'transform' && !isHidden(node.attrs) && !isLayerHidden(state.vox, node.layer));
+    });
+
   return {
     setHidden,
     exitLevel,
@@ -289,16 +296,18 @@ export function createWorldCommands(editor: Editor) {
       change(() => (level.children = after), () => (level.children = before), 'Ordem alterada');
     },
 
-    selectAll() {
-      editor.setSelection(levelGroup()?.children ?? []);
+    /** `osel_all 0|1`: every node of the level, skipping hidden ones (and those on hidden layers) unless `includeHidden`. */
+    selectAll(includeHidden = false) {
+      editor.setSelection(selectable(includeHidden));
     },
 
     selectNone() {
       editor.setSelection([]);
     },
 
-    invertSelection() {
-      editor.setSelection((levelGroup()?.children ?? []).filter((id) => !state.selection.includes(id)));
+    /** `osel_inv 0|1`, with the same treatment of hidden nodes as `osel_all`. */
+    invertSelection(includeHidden = false) {
+      editor.setSelection(selectable(includeHidden).filter((id) => !state.selection.includes(id)));
     },
 
     moveSelected(delta: Vec3) {

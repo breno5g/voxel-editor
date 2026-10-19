@@ -39,6 +39,10 @@ const toVec3 = (vector: THREE.Vector3): Vec3 => [vector.x, vector.y, vector.z];
 const FOCUS_ZOOM_STEP = 0.1;
 const FREE_ZOOM_STEP = 10;
 const MIN_ZOOM_EXTENT = 0.001;
+/** Free camera mouse look: radians per dragged pixel, and how close to straight up or down it may pitch. */
+const LOOK_SPEED = 0.005;
+const LOOK_POLAR_MARGIN = 0.01;
+const RIGHT_BUTTON = 2;
 /** Wheel delta per notch for each `WheelEvent.deltaMode` (pixels, lines, pages), as OrbitControls reads it. */
 const WHEEL_NOTCH = [100, 3, 1];
 
@@ -49,6 +53,17 @@ const WHEEL_NOTCH = [100, 3, 1];
 export const focusZoomRadius = (radius: number, amount: number) => Math.max((radius + 1) * Math.exp(-amount) - 1, MIN_ZOOM_EXTENT);
 /** Its orthographic and isometric zoom: the view extent scales linearly. */
 export const focusZoomExtent = (extent: number, amount: number) => Math.max(extent * (1 - amount), MIN_ZOOM_EXTENT);
+
+/**
+ * Free camera look: the target turned about the eye, `yaw` around the vertical (positive turns right)
+ * and `pitch` down (positive) or up, never past straight up or down; its distance is kept.
+ */
+export function turnedTarget(eye: THREE.Vector3, target: THREE.Vector3, yaw: number, pitch: number): THREE.Vector3 {
+  const direction = target.clone().sub(eye).applyAxisAngle(UP, -yaw);
+  const polar = direction.angleTo(UP);
+  const nextPolar = THREE.MathUtils.clamp(polar + pitch, LOOK_POLAR_MARGIN, Math.PI - LOOK_POLAR_MARGIN);
+  return direction.applyAxisAngle(direction.clone().cross(UP).normalize(), polar - nextPolar).add(eye);
+}
 
 /**
  * Perspective and orthographic cameras orbiting one target (right button rotates,
@@ -73,6 +88,29 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
     },
     { passive: false },
   );
+  /**
+   * The free camera turns around its own eye (MagicaVoxel `cam_mode free`), so its rotate drags are
+   * handled here, ahead of OrbitControls, which would swing the eye around the target instead.
+   */
+  let look: { x: number; y: number } | null = null;
+  canvas.addEventListener('pointerdown', (event) => {
+    const rotates = event.button === RIGHT_BUTTON || (event.button === 0 && controls.mouseButtons.LEFT === THREE.MOUSE.ROTATE);
+    if (mode !== 'free' || !rotates) return;
+    event.stopImmediatePropagation();
+    canvas.setPointerCapture(event.pointerId);
+    look = { x: event.clientX, y: event.clientY };
+  });
+  canvas.addEventListener('pointermove', (event) => {
+    if (!look) return;
+    event.stopImmediatePropagation();
+    lookAround((event.clientX - look.x) * LOOK_SPEED, (event.clientY - look.y) * LOOK_SPEED);
+    look = { x: event.clientX, y: event.clientY };
+  });
+  canvas.addEventListener('pointerup', (event) => {
+    if (!look) return;
+    event.stopImmediatePropagation();
+    look = null;
+  });
   const controls = new OrbitControls<THREE.PerspectiveCamera | THREE.OrthographicCamera>(perspective, canvas);
   controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
   controls.zoomToCursor = true;
@@ -97,6 +135,11 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
     updateProjection();
     controls.update();
     onChange();
+  };
+
+  const lookAround = (yaw: number, pitch: number) => {
+    controls.target.copy(turnedTarget(camera().position, controls.target, yaw, pitch));
+    settle();
   };
 
   /** MagicaVoxel wheel zoom toward the focus, `notches` > 0 zooming in; the free camera flies instead. */
@@ -179,6 +222,14 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
       const view = camera().getWorldDirection(new THREE.Vector3());
       const depth = point.clone().sub(camera().position).dot(view);
       if (depth > 0) controls.target.copy(camera().position).addScaledVector(view, depth);
+    },
+
+    /** MagicaVoxel `camera-control` focus (`X` + click): `point` becomes the orbit centre, the view slides along with it. */
+    centerOn(point: THREE.Vector3) {
+      const view = offset();
+      controls.target.copy(point);
+      camera().position.copy(point).add(view);
+      settle();
     },
 
     /** Snaps the view to the nearest axis, keeping target and distance (MagicaVoxel `cam face`). */

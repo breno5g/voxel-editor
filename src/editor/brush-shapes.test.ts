@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createModel, voxelIndex } from '../format/vox.ts';
 import type { Vec3 } from '../format/vox.ts';
-import { alongAxes, cellsBetween, centeredShape, colorRegion, faceRegion, lineCells, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
+import { alongAxes, cellsBetween, centeredShape, colorRegion, faceRegion, lineCells, regionOutline, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
 
 describe('stampCells', () => {
   it('is the centre cell at size 1', () => {
@@ -24,6 +24,20 @@ describe('stampCells', () => {
     const flat = stampCells([4, 4, 4], 3, 'cube', 2);
     expect(flat).toHaveLength(9);
     expect(flat.every((cell) => cell[2] === 4)).toBe(true);
+  });
+});
+
+describe('regionOutline', () => {
+  it('draws only the border of a face region, on the face plane', () => {
+    const segments = regionOutline([[0, 0, 0], [1, 0, 0]], [0, 0, 1]);
+    expect(segments).toHaveLength(6 * 6);
+    expect(segments.filter((_value, index) => index % 3 === 2).every((z) => z === 1)).toBe(true);
+  });
+
+  it('puts negative faces on the near side of the cell', () => {
+    const segments = regionOutline([[2, 3, 4]], [-1, 0, 0]);
+    expect(segments).toHaveLength(4 * 6);
+    expect(segments.filter((_value, index) => index % 3 === 0).every((x) => x === 2)).toBe(true);
   });
 });
 

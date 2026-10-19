@@ -417,14 +417,30 @@ export function createViewport(container: HTMLElement) {
       requestRender();
     },
 
+    /** Draws segments in object `transformId`'s model cell coordinates (a face region's border); null clears them. */
+    showOutline(transformId: number | null, segments?: number[]) {
+      overlays.showOutline(transformId === null ? null : (boxed(transformId)[0] ?? null), segments);
+      requestRender();
+    },
+
     /** Outlines a cell, or the box from `cell` to `boxEnd`, in the object's model space. */
     showHover(transformId: number | null, cell?: Vec3, boxEnd?: Vec3) {
       const view = transformId === null ? undefined : views.get(transformId);
+      overlays.showOutline(null);
       overlays.showHover(view?.model && cell ? view.group.matrix : null, view?.model?.size, cell, boxEnd ?? cell);
       requestRender();
     },
 
     pick,
+
+    /** Recentres the orbit on the voxel surface under the pointer; false over empty space. */
+    focusAt(clientX: number, clientY: number): boolean {
+      const nearest = pick(clientX, clientY);
+      if (!nearest) return false;
+      aim(clientX, clientY);
+      rig.centerOn(raycaster.ray.at(nearest.hit.distance, new THREE.Vector3()));
+      return true;
+    },
 
     /** Where the pointer ray crosses the horizontal plane at height `z`, in world space. */
     planePoint(clientX: number, clientY: number, z: number): Vec3 | null {

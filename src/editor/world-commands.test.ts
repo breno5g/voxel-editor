@@ -115,6 +115,19 @@ describe('groups', () => {
     expect(editor.state.selection).toEqual([2, 4]);
   });
 
+  it('selects all visible nodes, or hidden ones too when asked', () => {
+    const { editor, commands } = setup();
+    editor.setSelection([4]);
+    commands.hideSelected();
+    commands.selectAll();
+    expect(editor.state.selection).toEqual([2]);
+    commands.selectAll(true);
+    expect(editor.state.selection).toEqual([2, 4]);
+    editor.setSelection([2]);
+    commands.invertSelection(true);
+    expect(editor.state.selection).toEqual([4]);
+  });
+
   it('enters a group with Tab and climbs out with Shift+Tab', () => {
     const { editor, commands } = setup();
     commands.groupSelected();

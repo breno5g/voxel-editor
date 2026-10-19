@@ -30,8 +30,8 @@ export function bindWorldPanel(editor: Editor, commands: ObjectCommands): void {
   const showTool = bindButtonGroup('object-tool', (raw) => OBJECT_TOOLS.find((tool) => tool === raw), editor.setObjectTool);
 
   const actions: Record<string, () => void> = {
-    selectAll: commands.selectAll,
-    invertSelection: commands.invertSelection,
+    selectAll: () => commands.selectAll(),
+    invertSelection: () => commands.invertSelection(),
     selectNone: commands.selectNone,
     hide: () => commands.hideSelected(true),
     show: () => commands.hideSelected(false),

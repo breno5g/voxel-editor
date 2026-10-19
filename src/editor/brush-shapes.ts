@@ -9,6 +9,7 @@ export type StampShape = (typeof STAMP_SHAPES)[number];
 /** The axis a face normal points along. */
 export const axisOf = (normal: Vec3): Axis => (normal[0] !== 0 ? 0 : normal[1] !== 0 ? 1 : 2);
 
+const unit = (axis: Axis): Vec3 => [axis === 0 ? 1 : 0, axis === 1 ? 1 : 0, axis === 2 ? 1 : 0];
 export const addScaled = (cell: Vec3, direction: Vec3, scale: number): Vec3 => [
   cell[0] + direction[0] * scale,
   cell[1] + direction[1] * scale,
@@ -54,6 +55,33 @@ export function faceRegion(model: VoxModel, start: Vec3, normal: Vec3, { byColor
     }
   }
   return region;
+}
+
+/**
+ * The outline of a face region: the unit-square edges on the faces' plane that only one region face
+ * has, as segment endpoints `[x0, y0, z0, x1, y1, z1, …]` in model cell coordinates.
+ */
+export function regionOutline(region: Vec3[], normal: Vec3): number[] {
+  const axis = axisOf(normal);
+  const [u, v] = AXES.filter((other) => other !== axis);
+  const edges = new Map<string, number[]>();
+  const toggle = (from: Vec3, to: Vec3) => {
+    const key = `${from}|${to}`;
+    if (edges.has(key)) edges.delete(key);
+    else edges.set(key, [...from, ...to]);
+  };
+  for (const cell of region) {
+    const corner: Vec3 = [cell[0], cell[1], cell[2]];
+    corner[axis] += normal[axis] > 0 ? 1 : 0;
+    const alongU = addScaled(corner, unit(u), 1);
+    const alongV = addScaled(corner, unit(v), 1);
+    const far = addScaled(alongU, unit(v), 1);
+    toggle(corner, alongU);
+    toggle(alongV, far);
+    toggle(corner, alongV);
+    toggle(alongU, far);
+  }
+  return [...edges.values()].flat();
 }
 
 /** Every cell of the box spanned by two corner cells, inclusive. */

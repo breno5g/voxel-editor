@@ -27,7 +27,7 @@ Depois da v1 o editor diverge livremente; até lá, atalhos e semântica seguem 
 Pendências da v0.6:
 
 - [ ] Gravar os slots de câmera em `rCAM` (falta a matriz base `M0` de `_angle`, ver [RE §4.4](magicavoxel-re.md))
-- [ ] Câmera livre girando em torno do olho (hoje orbita o alvo)
+- [x] Câmera livre girando em torno do olho; `X` + clique centraliza a órbita num voxel
 - [x] Sombra (`Ctrl+W`), contornos dos objetos (`Ctrl+M`), AO, sombreamento constante, esmaecer o fundo, cores de fundo/grade/aresta/seleção e grade do chão do modelo (`rm_space`), com os padrões do MagicaVoxel
 - [ ] Cubo de vista e régua da câmera
 - [ ] `Ctrl+N`, `Ctrl+T` e `Ctrl+W` são reservados pelo navegador: só chegam ao editor numa janela própria (PWA ou app desktop)
@@ -43,8 +43,8 @@ Pendências da v0.6:
 
 Pendências da v0.7:
 
-- [ ] Redimensionar o pincel com `Ctrl+Alt+arrastar`
-- [ ] Contorno da região de face no hover (hoje mostra a caixa que a envolve)
+- [x] Redimensionar o pincel com `Ctrl+Alt+arrastar`
+- [x] Contorno da região de face no hover
 - [x] Modos `code` (`C`, o shader XS roda na caixa arrastada) e `pattern` (`P`)
 
 ## v0.8: seleção e operações de modelo
@@ -70,6 +70,7 @@ Pendências da v0.7:
 - [x] Booleanas: união, interseção, operandos (`ooper`), subtração, substituição
 - [x] Alinhar (mín/centro/máx), espelhar objetos
 - [x] Ordem de render (`order`)
+- [x] `osel_all 1`/`osel_inv 1` (`Ctrl+Shift+A`/`I`) incluem os nós ocultos; sem o argumento, só os visíveis
 - [x] Camadas: 8 camadas com nome, cor, visibilidade, selecionar objetos da camada, mover a seleção para a camada, ordenar por nome
 - [x] Wrap no mundo (`N`, `b_obj_wrap_space`), cópias como referência; ferramenta padrão (`P`) coloca o padrão no chão
 
