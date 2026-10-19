@@ -104,6 +104,8 @@ export type EditorState = {
   /** Selected voxels of the edited model; ignored once that model is no longer the one being edited. */
   voxelSelection: VoxelSelection | null;
   color: number;
+  /** MagicaVoxel's palette multi-selection (Shift+click), for edits on several colours at once. */
+  paletteSelection: number[];
   /** Shows the previous model frame translucent while editing frame-by-frame animation. */
   onionSkin: boolean;
   display: Display;
@@ -114,8 +116,8 @@ export type Editor = ReturnType<typeof createEditor>;
 export const UNTITLED = 'untitled.vox';
 
 const DEFAULT_FPS = 12;
-/** A mid-lightness orange in the default palette, readable against the dark viewport. */
-const DEFAULT_COLOR = 100;
+/** Orange (#ff9933) in MagicaVoxel's default palette, readable against the dark viewport. */
+const DEFAULT_COLOR = 17;
 
 const toggled = ([x, y, z]: [boolean, boolean, boolean], axis: Axis): [boolean, boolean, boolean] => [
   axis === 0 ? !x : x,
@@ -172,6 +174,7 @@ export function createEditor() {
     wrapSpacing: [0, 0, 0],
     voxelSelection: null,
     color: DEFAULT_COLOR,
+    paletteSelection: [],
     onionSkin: false,
     display: { grid: true, frame: true, edges: false, backgroundObjects: true },
   };
@@ -385,6 +388,11 @@ export function createEditor() {
     setOnionSkin(enabled: boolean) {
       state.onionSkin = enabled;
       emit({ type: 'tool' });
+    },
+
+    setPaletteSelection(indices: number[]) {
+      state.paletteSelection = [...new Set(indices)].filter((index) => index > 0 && index < 256).sort((a, b) => a - b);
+      emit({ type: 'color' });
     },
 
     setColor(color: number) {

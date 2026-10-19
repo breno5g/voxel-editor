@@ -74,8 +74,9 @@ Pendências da v0.7:
 
 ## v0.10: paleta e materiais
 
-- [ ] Seletor HSV/RGB, hex, copiar/colar cor e região da paleta, gradiente (`Ctrl+Alt`), trocar (`Ctrl`)
-- [ ] Ordenar, marcar, mascarar cores não usadas, cores aleatórias, nota da paleta (`NOTE`)
+- [x] Seletor HSV/RGB, hex, somar a canais da seleção (`pal_add`), copiar/colar cor e região da paleta, gradiente (`Ctrl+Alt`), trocar (`Ctrl`, os voxels acompanham), cor da tela (`Alt`)
+- [x] Ordenar, marcar, mascarar cores não usadas, cores aleatórias
+- [ ] Nota da paleta (`NOTE`)
 - [ ] Importar/exportar paleta `.png`/`.act`; paleta padrão do MagicaVoxel
 - [ ] Materiais `MATL`: difuso, emissivo, mistura, metal, vidro, nuvem; copiar/colar/resetar
 

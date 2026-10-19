@@ -303,6 +303,26 @@ body {
   outline: 1px solid #000;
 }
 
+.palette button[data-selected='true'] {
+  border-color: var(--accent);
+}
+
+.palette button[data-unused='true'] {
+  opacity: 0.25;
+}
+
+.color-row {
+  grid-template-columns: 56px 1fr auto;
+}
+
+.palette-tools {
+  margin-top: 6px;
+}
+
+.slider-row input[type='range'] {
+  width: 100%;
+}
+
 /* Layers */
 
 .layer-list button {

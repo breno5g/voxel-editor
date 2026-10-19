@@ -1,6 +1,6 @@
 import type { Axis } from '../format/rotation.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
-import { chunkCounts } from '../geometry/mesher.ts';
+import { allChunks } from '../geometry/mesher.ts';
 import type { Viewport } from '../render/viewport.ts';
 import { addScaled, axisOf } from './brush-shapes.ts';
 import type { Editor } from './editor.ts';
@@ -36,10 +36,6 @@ type Drag = { start: [number, number]; screenNormal: [number, number]; base: num
 
 const sameVoxels = (left: Uint8Array, right: Uint8Array) => left.length === right.length && left.every((value, index) => value === right[index]);
 
-const allChunks = (model: VoxModel) => {
-  const [x, y, z] = chunkCounts(model.size);
-  return new Set(Array.from({ length: x * y * z }, (_unused, chunk) => chunk));
-};
 
 /** MagicaVoxel's transform options besides move: scale, wrap and rotate the selection by dragging one of its faces. */
 export function createTransformTool(editor: Editor, viewport: Pick<Viewport, 'pick' | 'project'>) {
@@ -49,7 +45,7 @@ export function createTransformTool(editor: Editor, viewport: Pick<Viewport, 'pi
 
   const write = (model: VoxModel, voxels: Uint8Array, mask: Uint8Array) => {
     model.voxels.set(voxels);
-    editor.voxelsChanged(model, allChunks(model));
+    editor.voxelsChanged(model, allChunks(model.size));
     editor.setVoxelSelection({ model, mask });
   };
 

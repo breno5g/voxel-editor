@@ -2,7 +2,7 @@ import { isAxis } from '../format/rotation.ts';
 import type { Axis } from '../format/rotation.ts';
 import { EMPTY_VOXEL } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
-import { chunkCounts } from '../geometry/mesher.ts';
+import { allChunks } from '../geometry/mesher.ts';
 import type { Editor } from './editor.ts';
 import * as ops from './model-ops.ts';
 import type { AxisReach } from './model-ops.ts';
@@ -10,10 +10,6 @@ import { countSelected, invertSelection, selectAll, selectColor, selectedVoxels,
 
 export type ModelCommands = ReturnType<typeof createModelCommands>;
 
-const allChunks = (model: VoxModel) => {
-  const [x, y, z] = chunkCounts(model.size);
-  return new Set(Array.from({ length: x * y * z }, (_unused, chunk) => chunk));
-};
 
 const AXIS_LETTERS = 'xyz';
 const axisOf = (letter: string): Axis | null => {
@@ -88,7 +84,7 @@ export function createModelCommands(editor: Editor) {
     const after = model.voxels.slice();
     const restore = (voxels: Uint8Array) => () => {
       model.voxels.set(voxels);
-      editor.voxelsChanged(model, allChunks(model));
+      editor.voxelsChanged(model, allChunks(model.size));
     };
     restore(after)();
     editor.history.push({ undo: restore(before), redo: restore(after) });

@@ -30,8 +30,48 @@
     <aside class="sidebar left" aria-label="Paleta e pincel">
       <section aria-labelledby="palette-title">
         <h2 id="palette-title">Paleta</h2>
-        <div id="palette" class="palette" role="group" aria-label="Cores da paleta"></div>
-        <label class="control-row"><span class="label">Editar cor</span><input id="palette-color" type="color" /></label>
+        <div id="palette" class="palette" role="group" aria-label="Cores da paleta. Shift+clique seleciona um intervalo; arrastar copia a cor, Ctrl+arrastar troca, Ctrl+Alt+arrastar faz gradiente; Alt+clique pega uma cor da tela"></div>
+        <div class="control-row color-row">
+          <input id="palette-color" type="color" aria-label="Cor atual" />
+          <input id="palette-hex" type="text" aria-label="Código hexadecimal da cor" title="Hex da cor; Enter aplica à cor atual ou à seleção" />
+          <button id="palette-tools-toggle" type="button" aria-expanded="false" aria-controls="palette-tools" title="Editar a paleta">Editar</button>
+        </div>
+        <div id="palette-tools" class="stack palette-tools" hidden>
+            <div id="color-space" class="segmented" role="group" aria-label="Espaço de cor">
+              <button type="button" data-value="hsv">HSV</button>
+              <button type="button" data-value="rgb">RGB</button>
+            </div>
+            <label class="control-row slider-row"><span class="label" data-channel-label="0">H</span><input type="range" data-channel="0" /></label>
+            <label class="control-row slider-row"><span class="label" data-channel-label="1">S</span><input type="range" data-channel="1" /></label>
+            <label class="control-row slider-row"><span class="label" data-channel-label="2">V</span><input type="range" data-channel="2" /></label>
+            <div class="control-row">
+              <span class="label" title="Somar a todas as cores selecionadas (pal_add); Enter aplica">Somar</span>
+              <div class="size-fields">
+                <input type="number" data-delta="0" aria-label="Somar ao primeiro canal" value="0" />
+                <input type="number" data-delta="1" aria-label="Somar ao segundo canal" value="0" />
+                <input type="number" data-delta="2" aria-label="Somar ao terceiro canal" value="0" />
+              </div>
+            </div>
+            <div class="segmented" role="group" aria-label="Seleção da paleta">
+              <button type="button" data-palette="all" title="Selecionar todas as cores">Tudo</button>
+              <button type="button" data-palette="inv" title="Inverter a seleção de cores">Inverter</button>
+              <button type="button" data-palette="none" title="Limpar a seleção de cores">Nada</button>
+            </div>
+            <div class="segmented" role="group" aria-label="Operações na paleta">
+              <button type="button" data-palette="flag" title="Selecionar as cores usadas pelo modelo ou pela seleção de voxels">Marcar</button>
+              <button id="palette-mask" type="button" title="Escurecer as cores que nenhum voxel usa">Mascarar</button>
+              <button type="button" data-palette="sort" title="Ordenar a seleção (ou a paleta) por matiz e brilho; os voxels acompanham">Ordenar</button>
+            </div>
+            <div class="segmented" role="group" aria-label="Copiar e colar cores">
+              <button type="button" data-palette="copyCode" title="Copiar o código da cor">Copiar</button>
+              <button type="button" data-palette="pasteCode" title="Colar um código de cor">Colar</button>
+              <button type="button" data-palette="random" title="Colorir os voxels com cores aleatórias da seleção">Aleatório</button>
+            </div>
+            <div class="segmented" role="group" aria-label="Copiar e colar região da paleta">
+              <button type="button" data-palette="copyRegion" title="Copiar as cores selecionadas">Copiar região</button>
+              <button type="button" data-palette="pasteRegion" title="Colar as cores a partir da cor atual">Colar região</button>
+            </div>
+        </div>
       </section>
       <section aria-labelledby="brush-title" data-only-mode="model">
         <h2 id="brush-title">Pincel</h2>

@@ -27,6 +27,12 @@ export function chunkCounts(size: Vec3): Vec3 {
   return [Math.ceil(size[0] / CHUNK_SIZE), Math.ceil(size[1] / CHUNK_SIZE), Math.ceil(size[2] / CHUNK_SIZE)];
 }
 
+/** Every chunk id of a model of `size`, for a full remesh. */
+export function allChunks(size: Vec3): Set<number> {
+  const [x, y, z] = chunkCounts(size);
+  return new Set(Array.from({ length: x * y * z }, (_unused, chunk) => chunk));
+}
+
 export function chunkOrigin(size: Vec3, chunk: number): Vec3 {
   const [cx, cy] = chunkCounts(size);
   return [(chunk % cx) * CHUNK_SIZE, (Math.floor(chunk / cx) % cy) * CHUNK_SIZE, Math.floor(chunk / (cx * cy)) * CHUNK_SIZE];
