@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { alongAxes, cellsBetween, lineCells, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
+import { createModel, voxelIndex } from '../format/vox.ts';
+import type { Vec3 } from '../format/vox.ts';
+import { alongAxes, cellsBetween, faceRegion, lineCells, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
 
 describe('stampCells', () => {
   it('is the centre cell at size 1', () => {
@@ -22,6 +24,34 @@ describe('stampCells', () => {
     const flat = stampCells([4, 4, 4], 3, 'cube', 2);
     expect(flat).toHaveLength(9);
     expect(flat.every((cell) => cell[2] === 4)).toBe(true);
+  });
+});
+
+describe('faceRegion', () => {
+  /** A 3x3 slab at z = 0 with one red voxel, plus a voxel stacked on a corner. */
+  const slab = () => {
+    const model = createModel([5, 5, 3]);
+    const set = ([x, y, z]: Vec3, color: number) => (model.voxels[voxelIndex(model.size, x, y, z)] = color);
+    for (let x = 0; x < 3; x++) for (let y = 0; y < 3; y++) set([x, y, 0], 1);
+    set([1, 1, 0], 2);
+    set([2, 2, 1], 1);
+    return model;
+  };
+
+  it('collects the exposed faces on the clicked plane, around what covers them', () => {
+    const region = faceRegion(slab(), [0, 0, 0], [0, 0, 1], { byColor: false, neighbors: 4 });
+    expect(region).toHaveLength(8);
+    expect(region).not.toContainEqual([2, 2, 0]);
+  });
+
+  it('only crosses voxels of the starting colour when connecting by colour', () => {
+    const region = faceRegion(slab(), [0, 0, 0], [0, 0, 1], { byColor: true, neighbors: 4 });
+    expect(region).toHaveLength(7);
+    expect(region).not.toContainEqual([1, 1, 0]);
+  });
+
+  it('is empty when the clicked face is covered', () => {
+    expect(faceRegion(slab(), [2, 2, 0], [0, 0, 1], { byColor: false, neighbors: 4 })).toEqual([]);
   });
 });
 

@@ -143,6 +143,16 @@ export function createViewport(container: HTMLElement) {
     };
   };
 
+  /** Client-space position of a model-space point of object `transformId`. */
+  const project = (transformId: number, point: Vec3): [number, number] | null => {
+    const view = views.get(transformId);
+    if (!view?.model) return null;
+    const pivot = modelPivot(view.model.size);
+    const ndc = new THREE.Vector3(point[0] - pivot[0], point[1] - pivot[1], point[2] - pivot[2]).applyMatrix4(view.group.matrix).project(rig.camera());
+    const bounds = renderer.domElement.getBoundingClientRect();
+    return [bounds.left + ((ndc.x + 1) / 2) * bounds.width, bounds.top + ((1 - ndc.y) / 2) * bounds.height];
+  };
+
   /** The model cell of `layer` under the pointer, on the model-space plane `axis = plane`. */
   const planeCell = (clientX: number, clientY: number, transformId: number, axis: Axis, plane: number, layer: number): Vec3 | null => {
     const view = views.get(transformId);
@@ -277,6 +287,7 @@ export function createViewport(container: HTMLElement) {
     },
 
     planeCell,
+    project,
 
     floorCell: (clientX: number, clientY: number, transformId: number) => planeCell(clientX, clientY, transformId, 2, 0, 0),
 

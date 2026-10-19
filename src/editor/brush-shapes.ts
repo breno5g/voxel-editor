@@ -1,5 +1,6 @@
 import type { Axis } from '../format/rotation.ts';
-import type { Vec3 } from '../format/vox.ts';
+import { EMPTY_VOXEL, isInside, voxelIndex } from '../format/vox.ts';
+import type { Vec3, VoxModel } from '../format/vox.ts';
 
 export const AXES: readonly Axis[] = [0, 1, 2];
 export const STAMP_SHAPES = ['cube', 'sphere'] as const;
@@ -7,6 +8,53 @@ export type StampShape = (typeof STAMP_SHAPES)[number];
 
 /** The axis a face normal points along. */
 export const axisOf = (normal: Vec3): Axis => (normal[0] !== 0 ? 0 : normal[1] !== 0 ? 1 : 2);
+
+export const addScaled = (cell: Vec3, direction: Vec3, scale: number): Vec3 => [
+  cell[0] + direction[0] * scale,
+  cell[1] + direction[1] * scale,
+  cell[2] + direction[2] * scale,
+];
+
+/** Face connectivity options: MagicaVoxel `b_face_col` (same colour only) and `b_face_4` (4 or 8 neighbours). */
+export type FaceConnectivity = { byColor: boolean; neighbors: 4 | 8 };
+
+const colorAt = (model: VoxModel, cell: Vec3) => (isInside(model.size, cell) ? model.voxels[voxelIndex(model.size, cell[0], cell[1], cell[2])] : EMPTY_VOXEL);
+
+/**
+ * MagicaVoxel face mode: the voxels whose `normal` face is exposed and that connect to `start`
+ * across that plane (by geometry, or only through voxels of the same colour).
+ */
+export function faceRegion(model: VoxModel, start: Vec3, normal: Vec3, { byColor, neighbors }: FaceConnectivity): Vec3[] {
+  const axis = axisOf(normal);
+  const [u, v] = AXES.filter((other) => other !== axis);
+  const startColor = colorAt(model, start);
+  const steps = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+    ...(neighbors === 8 ? [[1, 1], [1, -1], [-1, 1], [-1, -1]] : []),
+  ];
+  const isMember = (cell: Vec3) => {
+    const color = colorAt(model, cell);
+    return color !== EMPTY_VOXEL && colorAt(model, addScaled(cell, normal, 1)) === EMPTY_VOXEL && (!byColor || color === startColor);
+  };
+  if (!isMember(start)) return [];
+  const key = (cell: Vec3) => `${cell[u]},${cell[v]}`;
+  const seen = new Set([key(start)]);
+  const region = [start];
+  for (let index = 0; index < region.length; index++) {
+    for (const [du, dv] of steps) {
+      const next: Vec3 = [region[index][0], region[index][1], region[index][2]];
+      next[u] += du;
+      next[v] += dv;
+      if (seen.has(key(next)) || !isMember(next)) continue;
+      seen.add(key(next));
+      region.push(next);
+    }
+  }
+  return region;
+}
 
 /** Every cell of the box spanned by two corner cells, inclusive. */
 export function* cellsBetween(from: Vec3, to: Vec3): Generator<Vec3> {

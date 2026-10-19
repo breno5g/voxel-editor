@@ -3,19 +3,31 @@ import { cellOf, EMPTY_VOXEL, isInside, voxelIndex } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
 import { chunksTouching } from '../geometry/mesher.ts';
 import type { Viewport } from '../render/viewport.ts';
-import { alongAxes, axisOf, cellsBetween, lineCells, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
+import { addScaled, alongAxes, axisOf, cellsBetween, faceRegion, lineCells, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
 import type { Editor } from './editor.ts';
 
 /** A brush cell and the face plane it was found on; attach strokes keep that plane while dragging. */
 type Target = { cell: Vec3; axis: Axis; plane: number };
 /** Voxel index -> [colour before the stroke, colour now]. */
 type Changes = Map<number, [number, number]>;
-type Stroke = { model: VoxModel; transformId: number; anchor: Target; last: Target; changes: Changes };
+/** A face stroke: the region picked at press, and the screen direction its normal points to. */
+type FaceStroke = { region: Vec3[]; normal: Vec3; start: [number, number]; screenNormal: [number, number]; layers: number };
+type Stroke = { model: VoxModel; transformId: number; anchor: Target; last: Target; changes: Changes; face: FaceStroke | null };
+
+/** Pixels of vertical drag per layer when the face normal points at the camera. */
+const PIXELS_PER_LAYER = 12;
+
+const regionBounds = (region: Vec3[]): [Vec3, Vec3] => [
+  [Math.min(...region.map((cell) => cell[0])), Math.min(...region.map((cell) => cell[1])), Math.min(...region.map((cell) => cell[2]))],
+  [Math.max(...region.map((cell) => cell[0])), Math.max(...region.map((cell) => cell[1])), Math.max(...region.map((cell) => cell[2]))],
+];
 
 /**
  * Model editor strokes (MagicaVoxel `b_mode` x `b_type`):
  * - `vox` stamps the brush (size, cube/ball, 2D/3D) under the pointer; dragging an attach
  *   stroke stays on the plane where it started instead of stacking toward the camera;
+ * - `face` works on the flat face region under the pointer: attach extrudes it and erase digs
+ *   into it by as many layers as the drag along the normal, paint recolours it;
  * - `box` previews the box between press and pointer live, reverting and redrawing it.
  * Every stroke goes through axis mode and mirror, and is one undo step. Alt+click picks a colour.
  */
@@ -69,15 +81,15 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
     return path.flatMap((cell) => stamp({ ...target, cell }));
   };
 
-  /** Applies the brush type to `cells` after axis mode and mirror; returns the chunks it touched. */
-  const apply = (active: Stroke, cells: Iterable<Vec3>, chunks: Set<number>) => {
+  /** Applies the brush type to `cells` after axis mode and mirror, adding the chunks it touched to `chunks`. */
+  const apply = (active: Stroke, cells: Iterable<Vec3>, chunks: Set<number>, colorFor: (cell: Vec3) => number = () => state.color) => {
     const { model, changes } = active;
-    const { brushType, color } = state;
-    const after = brushType === 'erase' ? EMPTY_VOXEL : color;
+    const { brushType } = state;
     for (const cell of withMirrors(alongAxes(cells, model.size, state.axes), model.size, state.mirror)) {
       if (!isInside(model.size, cell)) continue;
       const index = voxelIndex(model.size, cell[0], cell[1], cell[2]);
       const current = model.voxels[index];
+      const after = brushType === 'erase' ? EMPTY_VOXEL : colorFor(cell);
       const skips = current === after || (brushType === 'paint' && current === EMPTY_VOXEL) || (brushType === 'attach' && current !== EMPTY_VOXEL);
       if (skips) continue;
       changes.set(index, [changes.get(index)?.[0] ?? current, after]);
@@ -104,6 +116,68 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
     if (chunks.size > 0) editor.voxelsChanged(active.model, chunks);
   };
 
+  /** Extruded voxels copy the colour of the face they grow from (`b_face_pal` off), searching both ways so mirrored copies find theirs. */
+  const faceColor = ({ model }: Stroke, { normal, layers }: FaceStroke) => (cell: Vec3) => {
+    if (state.faceBrush.usePalette) return state.color;
+    for (let step = 1; step <= layers; step++) {
+      for (const source of [addScaled(cell, normal, -step), addScaled(cell, normal, step)]) {
+        const color = isInside(model.size, source) ? model.voxels[voxelIndex(model.size, source[0], source[1], source[2])] : EMPTY_VOXEL;
+        if (color !== EMPTY_VOXEL) return color;
+      }
+    }
+    return state.color;
+  };
+
+  const drawFace = (active: Stroke, face: FaceStroke) => {
+    const { brushType } = state;
+    const chunks = new Set<number>();
+    revert(active, chunks);
+    const layers = brushType === 'paint' ? 1 : face.layers;
+    const first = brushType === 'attach' ? 1 : 0;
+    const direction = brushType === 'attach' ? 1 : -1;
+    const cells = Array.from({ length: layers }, (_unused, layer) => face.region.map((cell) => addScaled(cell, face.normal, direction * (first + layer)))).flat();
+    apply(active, cells, chunks, faceColor(active, face));
+    if (chunks.size > 0) editor.voxelsChanged(active.model, chunks);
+  };
+
+  /** Layers follow the drag along the face normal on screen; attach extrudes outward, erase digs inward. */
+  const layersAt = (face: FaceStroke, clientX: number, clientY: number) => {
+    const [sx, sy] = face.screenNormal;
+    const lengthSquared = sx * sx + sy * sy;
+    const [dx, dy] = [clientX - face.start[0], clientY - face.start[1]];
+    const along = lengthSquared < 16 ? -dy / PIXELS_PER_LAYER : (dx * sx + dy * sy) / lengthSquared;
+    return Math.max(1, 1 + Math.round(state.brushType === 'erase' ? -along : along));
+  };
+
+  const beginFace = (object: { transformId: number; model: VoxModel }, clientX: number, clientY: number) => {
+    const hit = viewport.pick(clientX, clientY, object.transformId)?.hit;
+    if (!hit || hit.normal.every((value) => value === 0)) return;
+    const region = faceRegion(object.model, hit.voxel, hit.normal, state.faceBrush);
+    const center: Vec3 = [hit.voxel[0] + 0.5 + hit.normal[0] / 2, hit.voxel[1] + 0.5 + hit.normal[1] / 2, hit.voxel[2] + 0.5 + hit.normal[2] / 2];
+    const from = viewport.project(object.transformId, center);
+    const to = viewport.project(object.transformId, addScaled(center, hit.normal, 1));
+    if (region.length === 0 || !from || !to) return;
+    const axis = axisOf(hit.normal);
+    const target: Target = { cell: hit.voxel, axis, plane: facePlane(hit.voxel, hit.normal, axis) };
+    const face: FaceStroke = { region, normal: hit.normal, start: [clientX, clientY], screenNormal: [to[0] - from[0], to[1] - from[1]], layers: 1 };
+    stroke = { ...object, anchor: target, last: target, changes: new Map(), face };
+    drawFace(stroke, face);
+  };
+
+  /** Hover outline of the face region under the pointer, cached while the pointer stays on the same face. */
+  let hoverKey = '';
+  let hoverBounds: [Vec3, Vec3] | null = null;
+  const showFaceHover = (object: { transformId: number; model: VoxModel }, clientX: number, clientY: number) => {
+    const hit = viewport.pick(clientX, clientY, object.transformId)?.hit;
+    const key = hit ? `${hit.voxel}|${hit.normal}` : '';
+    if (key !== hoverKey) {
+      hoverKey = key;
+      const region = hit ? faceRegion(object.model, hit.voxel, hit.normal, state.faceBrush) : [];
+      hoverBounds = region.length > 0 ? regionBounds(region) : null;
+    }
+    viewport.showHover(hoverBounds ? object.transformId : null, hoverBounds?.[0], hoverBounds?.[1]);
+  };
+
   const restore = (model: VoxModel, changes: Changes, side: 0 | 1) => {
     const chunks = new Set<number>();
     for (const [index, colors] of changes) {
@@ -127,14 +201,22 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
     begin(clientX: number, clientY: number, isColorPick: boolean) {
       if (isColorPick) return pickColor(clientX, clientY);
       const object = edited();
+      if (object && state.brushMode === 'face') return beginFace(object, clientX, clientY);
       const target = object && targetAt(clientX, clientY, object.model, object.transformId);
       if (!object || !target) return;
-      stroke = { ...object, anchor: target, last: target, changes: new Map() };
+      stroke = { ...object, anchor: target, last: target, changes: new Map(), face: null };
       draw(stroke, target);
     },
 
     move(clientX: number, clientY: number) {
+      if (stroke?.face) {
+        const layers = layersAt(stroke.face, clientX, clientY);
+        if (layers !== stroke.face.layers) drawFace(stroke, { ...stroke.face, layers });
+        stroke.face.layers = layers;
+        return;
+      }
       const object = stroke ?? edited();
+      if (!stroke && object && state.brushMode === 'face') return showFaceHover(object, clientX, clientY);
       const target = object && targetAt(clientX, clientY, object.model, object.transformId);
       if (stroke?.anchor && state.brushMode === 'box') viewport.showHover(stroke.transformId, stroke.anchor.cell, target?.cell ?? stroke.anchor.cell);
       else viewport.showHover(object && target ? object.transformId : null, target?.cell);
@@ -144,6 +226,7 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
     end() {
       const finished = stroke;
       stroke = null;
+      hoverKey = '';
       if (!finished || finished.changes.size === 0) return;
       const { model, changes } = finished;
       editor.history.push({ undo: () => restore(model, changes, 0), redo: () => restore(model, changes, 1) });

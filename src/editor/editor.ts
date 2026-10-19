@@ -5,7 +5,7 @@ import { clampFrame, DEFAULT_RANGE, formatRange, parseRange, RANGE_META_KEY } fr
 import type { FrameRange } from '../scene/keyframes.ts';
 import { evaluateScene } from '../scene/scene-graph.ts';
 import type { Instance } from '../scene/scene-graph.ts';
-import type { StampShape } from './brush-shapes.ts';
+import type { FaceConnectivity, StampShape } from './brush-shapes.ts';
 import { createHistory } from './history.ts';
 
 /** MagicaVoxel's editors: `model` edits the selected object's voxels, `world` arranges objects. */
@@ -14,8 +14,11 @@ export type Mode = (typeof MODES)[number];
 /** MagicaVoxel `b_type`. */
 export const BRUSH_TYPES = ['attach', 'erase', 'paint'] as const;
 export type BrushType = (typeof BRUSH_TYPES)[number];
-/** MagicaVoxel `b_mode`: `vox` follows the pointer, `box` fills the cells between press and release. */
-export const BRUSH_MODES = ['vox', 'box'] as const;
+/**
+ * MagicaVoxel `b_mode`: `vox` stamps under the pointer, `face` works on the flat face region
+ * under it, `box` fills the cells between press and release.
+ */
+export const BRUSH_MODES = ['vox', 'face', 'box'] as const;
 export type BrushMode = (typeof BRUSH_MODES)[number];
 /** MagicaVoxel `rm_b_grid`, `rm_b_frame`, `rm_b_edge`, `rm_b_bo`. */
 export const DISPLAY_OPTIONS = ['grid', 'frame', 'edges', 'backgroundObjects'] as const;
@@ -23,6 +26,8 @@ export type DisplayOption = (typeof DISPLAY_OPTIONS)[number];
 export type Display = Record<DisplayOption, boolean>;
 /** Voxel brush options: MagicaVoxel `b_vox_size` (1..64), `b_vox_cube`, `b_vox_vol` (false is 2D). */
 export type VoxBrush = { size: number; shape: StampShape; volume: boolean };
+/** Face brush options: MagicaVoxel `b_face_pal` (new voxels take the palette colour, else the face's), plus connectivity. */
+export type FaceBrush = FaceConnectivity & { usePalette: boolean };
 export const MAX_BRUSH_SIZE = 64;
 export type StatusTone = 'info' | 'error';
 
@@ -61,6 +66,7 @@ export type EditorState = {
   /** MagicaVoxel `b_axis_x/y/z`: strokes run through the whole model along each enabled axis. */
   axes: [boolean, boolean, boolean];
   voxBrush: VoxBrush;
+  faceBrush: FaceBrush;
   color: number;
   /** Shows the previous model frame translucent while editing frame-by-frame animation. */
   onionSkin: boolean;
@@ -114,6 +120,7 @@ export function createEditor() {
     mirror: [false, false, false],
     axes: [false, false, false],
     voxBrush: { size: 1, shape: 'cube', volume: true },
+    faceBrush: { usePalette: true, byColor: false, neighbors: 4 },
     color: DEFAULT_COLOR,
     onionSkin: false,
     display: { grid: true, frame: true, edges: false, backgroundObjects: true },
@@ -228,6 +235,11 @@ export function createEditor() {
 
     toggleAxis(axis: Axis) {
       state.axes = toggled(state.axes, axis);
+      emit({ type: 'tool' });
+    },
+
+    setFaceBrush(changes: Partial<FaceBrush>) {
+      state.faceBrush = { ...state.faceBrush, ...changes };
       emit({ type: 'tool' });
     },
 

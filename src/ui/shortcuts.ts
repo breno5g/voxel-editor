@@ -97,6 +97,7 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
   const byMode: Record<Mode, Keymap> = {
     model: new Map([
       ['v', brushMode('vox')],
+      ['f', brushMode('face')],
       ['b', brushMode('box')],
       ['t', brushType('attach')],
       ['r', brushType('erase')],
