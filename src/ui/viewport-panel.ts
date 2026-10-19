@@ -1,5 +1,6 @@
 import type { Editor } from '../editor/editor.ts';
 import type { ObjectCommands } from '../editor/object-commands.ts';
+import type { PatternCommands } from '../editor/pattern-commands.ts';
 import { createVoxelTools } from '../editor/voxel-tools.ts';
 import { selectedVoxels } from '../editor/voxel-selection.ts';
 import { createWorldTools } from '../editor/world-tools.ts';
@@ -20,10 +21,10 @@ const CAMERA_DRAG_KEYS: Record<string, CameraDrag> = { Space: 'pan', KeyZ: 'zoom
  * belong to the camera). Tab and Shift+Tab move between levels (`olevel`) while the canvas has focus, so they still
  * moves focus everywhere else; Esc hands focus back to the page.
  */
-export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: ObjectCommands) {
+export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: ObjectCommands, patterns: PatternCommands) {
   const { state } = editor;
   const voxelTools = createVoxelTools(editor, viewport, commands.resizeDrag);
-  const worldTools = createWorldTools(editor, commands, viewport);
+  const worldTools = createWorldTools(editor, commands, viewport, patterns.placePattern);
   const tools = () => (state.mode === 'model' ? voxelTools : worldTools);
   const { canvas } = viewport;
 

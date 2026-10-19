@@ -125,6 +125,7 @@
           <button type="button" data-value="face" title="Face: a região plana sob o cursor; arraste para extrudar ou cavar camadas (F)">Face</button>
           <button type="button" data-value="box" title="Caixa: arraste para aplicar numa caixa (B)">Caixa</button>
           <button type="button" data-value="geo" title="Geometria: linha, quadrado ou círculo no plano onde o arrasto começou (L)">Geometria</button>
+          <button type="button" data-value="pattern" title="Padrão: carimba o padrão atual na face clicada; - e + giram em Z, 9 e 0 em X (P)">Padrão</button>
         </div>
         <div id="brush-types" class="stack" role="group" aria-label="Ação do pincel">
           <div class="segmented">
@@ -259,10 +260,11 @@
       </section>
       <section aria-labelledby="object-tool-title" data-only-mode="world">
         <h2 id="object-tool-title">Ferramenta</h2>
-        <div id="object-tool" class="segmented" role="group" aria-label="Ferramenta do mundo">
+        <div id="object-tool" class="segmented columns-2" role="group" aria-label="Ferramenta do mundo">
           <button type="button" data-value="move" title="Mover: clique seleciona, Shift soma, arrastar move; Ctrl move na vertical, Ctrl+Shift duplica">Mover</button>
           <button type="button" data-value="msel" title="Selecionar por retângulo (M): Shift soma, Shift+Alt subtrai">Selecionar</button>
           <button type="button" data-value="wrap" title="Wrap (N): arraste uma face para repetir a seleção no eixo; Shift dos dois lados">Wrap</button>
+          <button type="button" data-value="patt" title="Padrão (P): clique no chão para colocar o padrão atual como objeto">Padrão</button>
         </div>
         <div class="control-row" id="object-wrap-options">
           <span class="label" id="object-wrap-label">Espaço</span>
@@ -557,6 +559,35 @@
           <input id="xs-input" type="file" accept=".txt" multiple hidden />
         </div>
       </section>
+      <section aria-labelledby="pattern-title">
+        <h2 id="pattern-title">Padrão</h2>
+        <div class="stack">
+          <canvas id="pattern-preview" class="pattern-preview" width="1" height="1" role="img" aria-label="Prévia do padrão atual" hidden></canvas>
+          <div class="segmented">
+            <button id="pattern-from-selection" type="button" title="Criar o padrão da seleção (ou do modelo inteiro); no modo Mundo, dos objetos selecionados">Da seleção</button>
+            <button id="pattern-place" type="button" title="Colocar o padrão no mundo como um objeto novo">Colocar</button>
+            <button id="pattern-rotate" type="button" title="Girar o padrão 90° em Z (no pincel Padrão: - e + em Z, 9 e 0 em X)">Girar</button>
+          </div>
+          <div class="control-row pattern-row">
+            <select id="pattern-library" aria-label="Biblioteca de padrões"></select>
+            <button id="pattern-load" type="button" title="Usar o padrão escolhido; as cores viram as mais próximas da paleta atual">Usar</button>
+            <button id="pattern-save" type="button" title="Guardar o padrão atual na biblioteca do navegador">Salvar</button>
+            <button id="pattern-delete" type="button" title="Apagar o padrão escolhido da biblioteca" aria-label="Apagar padrão">✕</button>
+          </div>
+          <div class="control-row" data-only-mode="model">
+            <span class="label" id="pattern-color-label">Cor</span>
+            <div id="pattern-color" class="segmented" role="group" aria-labelledby="pattern-color-label">
+              <button type="button" data-value="voxel" title="O pincel usa as cores do padrão">Padrão</button>
+              <button type="button" data-value="palette" title="O pincel usa a cor atual da paleta">Paleta</button>
+            </div>
+          </div>
+          <div class="segmented" role="group" aria-label="Operações com o padrão" data-only-mode="model">
+            <button type="button" data-command="fractal" title="Fractal: cada voxel do modelo vira uma cópia do padrão, na cor do voxel">Fractal</button>
+            <button type="button" data-command="mask" title="Máscara: mantém só os voxels do modelo onde o padrão repetido tem voxel">Máscara</button>
+            <button type="button" data-command="tex" title="Textura: pinta o modelo com as cores do padrão repetido">Textura</button>
+          </div>
+        </div>
+      </section>
     </aside>
 
     <main id="viewport" class="viewport" aria-label="Viewport 3D: botão direito gira, do meio move, roda dá zoom">
@@ -688,6 +719,7 @@
           <tr><th scope="row">Entrar no grupo ou objeto / subir um nível</th><td><kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> com o viewport focado (<kbd>Esc</kbd> sai dele)</td></tr>
           <tr><th scope="row">Copiar / copiar como referência / recortar / colar objetos</th><td><kbd>Ctrl+C</kbd> / <kbd>Ctrl+Shift+C</kbd> / <kbd>Ctrl+X</kbd> / <kbd>Ctrl+V</kbd> no modo Mundo</td></tr>
           <tr><th scope="row">Wrap de objetos</th><td><kbd>N</kbd> e arrastar uma face (<kbd>Shift</kbd>: dos dois lados)</td></tr>
+          <tr><th scope="row">Colocar o padrão no chão</th><td><kbd>P</kbd> e clicar</td></tr>
           <tr><th scope="row">Agrupar / desagrupar</th><td><kbd>Ctrl+R</kbd> / <kbd>Ctrl+Shift+R</kbd> no modo Mundo</td></tr>
           <tr><th scope="row">Recentralizar / vista de face</th><td><kbd>5</kbd> / <kbd>Ctrl+5</kbd></td></tr>
           <tr><th scope="row">Salvar imagem da vista</th><td><kbd>6</kbd></td></tr>
@@ -702,7 +734,8 @@
           <tr><th scope="row">Key anterior / próxima (primeira / última)</th><td><kbd>Ctrl+,</kbd> <kbd>Ctrl+.</kbd> (+<kbd>Shift</kbd>)</td></tr>
           <tr><th scope="row">Onion skin</th><td><kbd>O</kbd></td></tr>
           <tr><th scope="row" colspan="2" class="group">Modo Modelo</th></tr>
-          <tr><th scope="row">Pincel voxel / face / caixa / geometria</th><td><kbd>V</kbd> / <kbd>F</kbd> / <kbd>B</kbd> / <kbd>L</kbd></td></tr>
+          <tr><th scope="row">Pincel voxel / face / caixa / geometria / padrão</th><td><kbd>V</kbd> / <kbd>F</kbd> / <kbd>B</kbd> / <kbd>L</kbd> / <kbd>P</kbd></td></tr>
+          <tr><th scope="row">Girar o padrão (pincel Padrão)</th><td><kbd>-</kbd> <kbd>+</kbd> em Z, <kbd>9</kbd> <kbd>0</kbd> em X</td></tr>
           <tr><th scope="row">Tamanho do pincel voxel</th><td><kbd>-</kbd> / <kbd>+</kbd></td></tr>
           <tr><th scope="row">Modo eixo X / Y / Z (atravessa o modelo)</th><td><kbd>Ctrl+1</kbd> / <kbd>Ctrl+2</kbd> / <kbd>Ctrl+3</kbd></td></tr>
           <tr><th scope="row">Adicionar / apagar / pintar</th><td><kbd>T</kbd> / <kbd>R</kbd> / <kbd>G</kbd></td></tr>

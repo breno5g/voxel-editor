@@ -55,7 +55,7 @@ Pendências da v0.7:
 - [x] Gizmo de escalar, wrap e girar com `Enter`/`Esc`
 - [x] `full`, `fill`, `zero`, `rev`, `x2`, `xh`, `rot90`, `flip`, `loop`, `mir`, `dia`
 - [x] Mover/escalar/cisalhar/girar/repetir com argumentos
-- [x] `prim elli|cyli|pyra|cone`, `maze`, `noise` (`fractal`, `mask` e `tex` usam padrões: v0.13)
+- [x] `prim elli|cyli|pyra|cone`, `maze`, `noise`; `fractal`, `mask` e `tex` com o padrão atual
 - [x] `flood 0` (remover invisíveis), `flood` (preencher vazios internos), dilatação, erosão
 - [x] `shrink` (ajustar ao conteúdo de todos os frames)
 - [x] Redimensionar arrastando a moldura (`Shift`: dos dois lados)
@@ -70,7 +70,7 @@ Pendências da v0.7:
 - [x] Alinhar (mín/centro/máx), espelhar objetos
 - [x] Ordem de render (`order`)
 - [x] Camadas: 8 camadas com nome, cor, visibilidade, selecionar objetos da camada, mover a seleção para a camada, ordenar por nome
-- [x] Wrap no mundo (`N`, `b_obj_wrap_space`), cópias como referência; o modo padrão (`P`) chega com os padrões da v0.13
+- [x] Wrap no mundo (`N`, `b_obj_wrap_space`), cópias como referência; ferramenta padrão (`P`) coloca o padrão no chão
 
 ## v0.10: paleta e materiais
 
@@ -96,7 +96,7 @@ Pendências da v0.7:
 ## v0.13: shaders XS e padrões
 
 - [x] Executar shaders XS na GPU (WebGL2) com a API do MagicaVoxel (`map()`, `voxel()`, `palette()`, `color_sel()`, `i_args`, `i_iter`, ...), argumentos lidos do cabeçalho, iterações, comando `xs [-n iter] nome args`; os 7 shaders de exemplo do MagicaVoxel rodam sem mudança
-- [ ] Biblioteca de padrões: criar da seleção, pincel de padrão, colocar no mundo
+- [x] Padrões: criar da seleção de voxels ou de objetos, pincel de padrão (`P`, girar com `-`/`+`/`9`/`0`, cores do padrão ou da paleta), colocar no mundo, biblioteca no navegador com cores casadas à paleta atual
 
 ## v1.0: renderizador
 

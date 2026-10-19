@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cellOf, createModel, voxelIndex } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
-import { tile, DEFAULT_NOISE, diagonal, dilate, double, erode, flip, flood, half, hull, loop, maze, mirror, neighborOffsets, noise, perlin, primitive, repeat, reverse, rotate, rotate90, scale, shear } from './model-ops.ts';
+import { tile, DEFAULT_NOISE, diagonal, dilate, double, erode, flip, flood, fractal, half, hull, loop, mask, maze, mirror, neighborOffsets, noise, perlin, primitive, repeat, reverse, rotate, rotate90, scale, shear, texture } from './model-ops.ts';
 
 const modelWith = (size: Vec3, cells: [Vec3, number][]): VoxModel => {
   const model = createModel(size);
@@ -195,5 +195,29 @@ describe('tile', () => {
     const model = modelWith([2, 1, 1], [[[0, 0, 0], 1], [[1, 0, 0], 2]]);
     expect(filled(tile(model, 0, 7, 1))).toEqual(['0,0,0=1', '1,0,0=2', '3,0,0=1', '4,0,0=2', '6,0,0=1']);
     expect(filled(tile(model, 0, 4, 0, 1))).toEqual(['0,0,0=2', '1,0,0=1', '2,0,0=2', '3,0,0=1']);
+  });
+});
+
+describe('pattern operations', () => {
+  const checker = () => {
+    const pattern = createModel([2, 1, 1]);
+    pattern.voxels.set([7, 0]);
+    return pattern;
+  };
+  const solid = (size: Vec3, color: number) => {
+    const model = createModel(size);
+    model.voxels.fill(color);
+    return model;
+  };
+
+  it('fractal turns each voxel into the pattern', () => {
+    const result = fractal(solid([2, 1, 1], 3), checker());
+    expect(result.size).toEqual([4, 1, 1]);
+    expect([...result.voxels]).toEqual([3, 0, 3, 0]);
+  });
+
+  it('mask and tex use the pattern tiled over the volume', () => {
+    expect([...mask(solid([4, 1, 1], 3), checker()).voxels]).toEqual([3, 0, 3, 0]);
+    expect([...texture(solid([4, 1, 1], 3), checker()).voxels]).toEqual([7, 3, 7, 3]);
   });
 });

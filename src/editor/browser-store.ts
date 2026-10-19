@@ -1,7 +1,7 @@
 /** IndexedDB stores of this editor: the autosave snapshot and the projects saved in the browser. */
 const DATABASE = 'voxel-editor';
-const VERSION = 2;
-export const STORES = { autosave: 'autosave', projects: 'projects' } as const;
+const VERSION = 3;
+export const STORES = { autosave: 'autosave', projects: 'projects', patterns: 'patterns' } as const;
 type StoreName = (typeof STORES)[keyof typeof STORES];
 
 /** A saved document: its name, `.vox` bytes and when it was written. */

@@ -25,9 +25,9 @@ const CLICK_SLOP = 3;
  * the pointer at the current level, Shift adds or removes it, and dragging moves the whole selection in
  * whole voxels (Ctrl: up and down, Ctrl+Shift: duplicates first). `wrap` drags a face of the selection
  * to repeat it along that axis (Shift: both sides). `msel`, and any press on empty space, draws a
- * marquee (Shift adds, Shift+Alt removes).
+ * marquee (Shift adds, Shift+Alt removes). `patt` drops the current pattern on the ground as an object.
  */
-export function createWorldTools(editor: Editor, commands: ObjectCommands, viewport: Viewport) {
+export function createWorldTools(editor: Editor, commands: ObjectCommands, viewport: Viewport, placePattern: (at: Vec3) => void) {
   const { state } = editor;
   let drag: Drag | null = null;
   let marquee: Marquee | null = null;
@@ -75,6 +75,10 @@ export function createWorldTools(editor: Editor, commands: ObjectCommands, viewp
 
   return {
     begin(clientX: number, clientY: number, modifiers: PointerModifiers) {
+      if (state.objectTool === 'patt') {
+        const point = viewport.planePoint(clientX, clientY, 0);
+        return point ? placePattern([Math.round(point[0]), Math.round(point[1]), 0]) : undefined;
+      }
       const hit = viewport.pick(clientX, clientY);
       const node = hit && levelNode(hit.transformId);
       const mode = selectionMode(modifiers);

@@ -24,17 +24,18 @@ export type BrushType = (typeof BRUSH_TYPES)[number];
 /** MagicaVoxel `b_msel`: the marquee selects by screen rectangle, by brush stroke, or by box. */
 export const MARQUEE_MODES = ['rect', 'brush', 'box'] as const;
 export type MarqueeMode = (typeof MARQUEE_MODES)[number];
-/** MagicaVoxel `b_obj`: the world editor's pointer tool (`patt` waits for patterns). */
-export const OBJECT_TOOLS = ['move', 'msel', 'wrap'] as const;
+/** MagicaVoxel `b_obj`: the world editor's pointer tool; `patt` places the current pattern as a new object. */
+export const OBJECT_TOOLS = ['move', 'msel', 'wrap', 'patt'] as const;
 export type ObjectTool = (typeof OBJECT_TOOLS)[number];
 /** MagicaVoxel `b_xform`: what dragging the selection does. */
 export const TRANSFORM_TOOLS = ['move', 'scale', 'wrap', 'rotate'] as const;
 export type TransformTool = (typeof TRANSFORM_TOOLS)[number];
 /**
  * MagicaVoxel `b_mode`: `vox` stamps under the pointer, `face` works on the flat face region
- * under it, `box` fills the cells between press and release, `geo` draws lines and shapes.
+ * under it, `box` fills the cells between press and release, `geo` draws lines and shapes,
+ * `pattern` stamps the current pattern on the face under the pointer.
  */
-export const BRUSH_MODES = ['vox', 'face', 'box', 'geo'] as const;
+export const BRUSH_MODES = ['vox', 'face', 'box', 'geo', 'pattern'] as const;
 export type BrushMode = (typeof BRUSH_MODES)[number];
 /** MagicaVoxel `rm_b_grid`, `rm_b_frame`, `rm_b_edge`, `rm_b_bo`. */
 export const DISPLAY_OPTIONS = ['grid', 'frame', 'edges', 'backgroundObjects'] as const;
@@ -117,6 +118,10 @@ export type EditorState = {
   pendingKeys: Map<TransformNode, TransformKey[]>;
   /** MagicaVoxel `aset global`: every object follows the frame; off, only the selected one does and the rest stay at the range start. */
   globalTime: boolean;
+  /** MagicaVoxel's current pattern (from a selection or the library), for the pattern brush, `fractal`, `mask` and `tex`. */
+  pattern: VoxModel | null;
+  /** MagicaVoxel `b_patt_pal`: stamped patterns take the current colour instead of their own. */
+  patternUsesPalette: boolean;
   /** Shows the previous model frame translucent while editing frame-by-frame animation. */
   onionSkin: boolean;
   display: Display;
@@ -188,6 +193,8 @@ export function createEditor() {
     paletteSelection: [],
     keySelection: { transform: [], shape: [] },
     globalTime: true,
+    pattern: null,
+    patternUsesPalette: false,
     autoKey: true,
     pendingKeys: new Map(),
     onionSkin: false,
@@ -427,6 +434,16 @@ export function createEditor() {
 
     setKeySelection(selection: KeySelection) {
       state.keySelection = { transform: [...new Set(selection.transform)].sort((a, b) => a - b), shape: [...new Set(selection.shape)].sort((a, b) => a - b) };
+      emit({ type: 'tool' });
+    },
+
+    setPattern(pattern: VoxModel | null) {
+      state.pattern = pattern;
+      emit({ type: 'tool' });
+    },
+
+    setPatternUsesPalette(enabled: boolean) {
+      state.patternUsesPalette = enabled;
       emit({ type: 'tool' });
     },
 

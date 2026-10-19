@@ -508,16 +508,16 @@ export function createWorldCommands(editor: Editor) {
       replaceInLevel(level, [target.id], nodes, `${models.length} objetos desempacotados`);
     },
 
-    /** Adds one object per model to the current group (on the current layer), side by side on the ground, and selects them. */
-    importModels(models: VoxModel[], names: string[]) {
+    /** Adds one object per model to the current group (on the current layer), side by side from `at` (the origin by default) and resting on its height, and selects them. */
+    importModels(models: VoxModel[], names: string[], at: Vec3 = [0, 0, 0]) {
       const level = levelGroup();
       if (!level || models.length === 0) return;
       const firstModel = state.vox.models.length;
       const firstNode = state.vox.nodes.length;
-      let x = 0;
+      let x = at[0];
       const nodes = models.flatMap((model, index): [TransformNode, ShapeNode] => {
         const transform: TransformNode = { ...objectTransform(firstNode + index * 2 + 1, model.size), layer: state.layer };
-        transform.keys = [{ ...transform.keys[0], translation: [x + Math.floor(model.size[0] / 2), 0, Math.floor(model.size[2] / 2)] }];
+        transform.keys = [{ ...transform.keys[0], translation: [x + Math.floor(model.size[0] / 2), at[1], at[2] + Math.floor(model.size[2] / 2)] }];
         if (names[index]) transform.attrs.set('_name', names[index]);
         x += model.size[0] + 1;
         return [transform, { kind: 'shape', attrs: new Map(), keys: [{ frame: 0, model: firstModel + index }] }];

@@ -2,6 +2,7 @@ import type { BrushMode, BrushType, DisplayOption, Editor, Mode } from '../edito
 import type { ModelCommands } from '../editor/model-commands.ts';
 import type { ObjectCommands } from '../editor/object-commands.ts';
 import type { KeyCommands } from '../editor/key-commands.ts';
+import type { PatternCommands } from '../editor/pattern-commands.ts';
 import type { Axis } from '../format/rotation.ts';
 import type { Vec3 } from '../format/vox.ts';
 import { isEditingText } from './dom.ts';
@@ -37,7 +38,7 @@ export type ShortcutActions = {
  * the editor's map wins. Tab (switch editor) is handled by the viewport, which owns its focus.
  * Browsers reserve Ctrl+N/T/W, so those MagicaVoxel keys only reach the page in a standalone window.
  */
-export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: ModelCommands, files: FileActions, actions: ShortcutActions, keys: KeyCommands): void {
+export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: ModelCommands, files: FileActions, actions: ShortcutActions, keys: KeyCommands, patterns: PatternCommands): void {
   const { state } = editor;
   const undo = () => {
     if (!editor.history.undo()) editor.status('Nada para desfazer');
@@ -52,6 +53,9 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
   const toggle = (option: DisplayOption) => () => editor.toggleDisplay(option);
   const mirror = (axis: Axis) => () => editor.toggleMirror(axis);
   const lockAxis = (axis: Axis) => () => editor.toggleAxis(axis);
+  /** In the pattern brush, `-`/`+`/`9`/`0` turn the pattern instead. */
+  const orPattern = (axis: Axis, direction: 1 | -1, otherwise?: () => void) => () =>
+    state.brushMode === 'pattern' ? patterns.rotatePattern(axis, direction) : otherwise?.();
   const resizeBrush = (delta: number) => () => {
     editor.setVoxBrush({ size: state.voxBrush.size + delta });
     editor.status(`Pincel de ${state.voxBrush.size} voxel(s)`);
@@ -101,6 +105,7 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
       ['f', brushMode('face')],
       ['b', brushMode('box')],
       ['l', brushMode('geo')],
+      ['p', brushMode('pattern')],
       ['t', brushType('attach')],
       ['r', brushType('erase')],
       ['g', brushType('paint')],
@@ -110,8 +115,10 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
       ['ctrl+Digit1', lockAxis(0)],
       ['ctrl+Digit2', lockAxis(1)],
       ['ctrl+Digit3', lockAxis(2)],
-      ['Minus', resizeBrush(-1)],
-      ['Equal', resizeBrush(1)],
+      ['Minus', orPattern(2, 1, resizeBrush(-1))],
+      ['Equal', orPattern(2, -1, resizeBrush(1))],
+      ['Digit9', orPattern(0, -1)],
+      ['Digit0', orPattern(0, 1)],
       ['m', brushType('msel')],
       ['n', brushType('asel')],
       ['u', models.full],
@@ -136,6 +143,7 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
       ['ctrl+h', () => commands.hideSelected()],
       ['m', () => editor.setObjectTool(state.objectTool === 'msel' ? 'move' : 'msel')],
       ['n', () => editor.setObjectTool(state.objectTool === 'wrap' ? 'move' : 'wrap')],
+      ['p', () => editor.setObjectTool(state.objectTool === 'patt' ? 'move' : 'patt')],
       ['ctrl+c', () => commands.copy('copy')],
       ['ctrl+shift+c', () => commands.copy('ref')],
       ['ctrl+x', commands.cut],

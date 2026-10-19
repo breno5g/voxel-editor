@@ -26,6 +26,8 @@ import { bindPalettePanel } from './ui/palette-panel.ts';
 import { createPaletteCommands } from './editor/palette-commands.ts';
 import { createMaterialCommands } from './editor/material-commands.ts';
 import { createKeyCommands } from './editor/key-commands.ts';
+import { createPatternCommands } from './editor/pattern-commands.ts';
+import { bindPatternPanel } from './ui/pattern-panel.ts';
 import { bindMaterialPanel } from './ui/material-panel.ts';
 import { bindShortcuts } from './ui/shortcuts.ts';
 import { bindStatusBar } from './ui/status-bar.ts';
@@ -38,8 +40,9 @@ const viewport = createViewport(element('viewport', HTMLElement));
 const commands = createObjectCommands(editor);
 const models = createModelCommands(editor);
 const keys = createKeyCommands(editor);
+const patterns = createPatternCommands(editor, models, commands);
 const files = createFileActions(editor, viewport);
-const { focusCamera } = bindViewportPanel(editor, viewport, commands);
+const { focusCamera } = bindViewportPanel(editor, viewport, commands, patterns);
 const cameras = bindCameraPanel(editor, viewport);
 
 bindStatusBar(editor);
@@ -57,6 +60,7 @@ bindProjectsPanel(editor, createProjectStore(editor));
 bindObjectInspector(editor, commands);
 bindModelPanel(models);
 bindXsPanel(editor, models);
+bindPatternPanel(editor, patterns);
 bindTimeline(editor, commands, keys);
 bindShortcuts(editor, commands, models, files, {
   focusCamera,
@@ -67,7 +71,7 @@ bindShortcuts(editor, commands, models, files, {
   selectCameraSlot: cameras.selectSlot,
   fly: viewport.camera.fly,
   openHelp: bindHelp().open,
-}, keys);
+}, keys, patterns);
 bindPlayback(editor);
 const autosave = bindAutosave(editor);
 

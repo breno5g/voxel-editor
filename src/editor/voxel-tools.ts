@@ -147,6 +147,31 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
     return cell && { cell, axis: 2, plane: 0 };
   };
 
+  /**
+   * Pattern mode: the pattern stands on the face under the pointer, its up (z) along the face normal,
+   * centred on the target cell; attach grows it outward, erase and paint sink it into the surface.
+   * Maps each cell to the colour it takes (the pattern's own, or the current colour with `b_patt_pal`).
+   */
+  const patternCells = (target: Target): Map<Vec3, number> => {
+    const pattern = state.pattern;
+    const cells = new Map<Vec3, number>();
+    if (!pattern) return cells;
+    const outward = target.cell[target.axis] >= target.plane ? 1 : -1;
+    const height = state.brushType === 'attach' ? outward : -outward;
+    const [u, v] = [(target.axis + 1) % 3, (target.axis + 2) % 3];
+    const [width, depth] = [pattern.size[0], pattern.size[1]];
+    pattern.voxels.forEach((color, index) => {
+      if (color === EMPTY_VOXEL) return;
+      const [px, py, pz] = cellOf(pattern.size, index);
+      const cell: Vec3 = [...target.cell];
+      cell[u] += px - Math.floor(width / 2);
+      cell[v] += py - Math.floor(depth / 2);
+      cell[target.axis] += pz * height;
+      cells.set(cell, state.patternUsesPalette ? state.color : color);
+    });
+    return cells;
+  };
+
   /** One stamp; attach stamps rest on the face they grow from. */
   const stamp = (target: Target): Vec3[] => {
     const { size, shape, volume } = state.voxBrush;
@@ -161,6 +186,7 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
    * surface under the pointer, never the inside a straight line would cut through.
    */
   const brushCells = (active: Stroke, target: Target, pointer: [number, number]): Iterable<Vec3> => {
+    if (brushMode() === 'pattern') return patternCells(target).keys();
     if (brushMode() === 'box') return cellsBetween(active.anchor.cell, target.cell);
     if (brushMode() === 'geo') return geoCells(active, target, pointer);
     const path = state.brushType === 'attach' ? lineCells(active.last.cell, target.cell) : [target.cell];
@@ -235,8 +261,12 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
   /** Box and geometry strokes are previews: the previous shape is reverted before the new one is drawn. */
   const draw = (active: Stroke, target: Target, pointer: [number, number]) => {
     const chunks = new Set<number>();
-    if (brushMode() === 'box' || brushMode() === 'geo') revert(active, chunks);
-    apply(active, brushCells(active, target, pointer), chunks);
+    if (brushMode() === 'box' || brushMode() === 'geo' || brushMode() === 'pattern') revert(active, chunks);
+    if (brushMode() === 'pattern') {
+      const colors = patternCells(target);
+      const byKey = new Map([...colors].map(([cell, color]) => [cell.join(), color]));
+      apply(active, colors.keys(), chunks, (cell) => byKey.get(cell.join()) ?? state.color);
+    } else apply(active, brushCells(active, target, pointer), chunks);
     active.last = target;
     if (chunks.size > 0) editor.voxelsChanged(active.model, chunks);
     publishSelection(active);

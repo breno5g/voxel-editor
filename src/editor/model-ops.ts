@@ -388,3 +388,33 @@ export function tile(model: VoxModel, axis: Axis, length: number, spacing: numbe
     return sampleAt(model, cell);
   });
 }
+
+/** The pattern colour tiled over cell `[x, y, z]` (its size repeating along every axis), or empty. */
+const tiledColor = (pattern: VoxModel, [x, y, z]: Vec3) => {
+  const [px, py, pz] = pattern.size;
+  return pattern.voxels[voxelIndex(pattern.size, x % px, y % py, z % pz)];
+};
+
+/**
+ * MagicaVoxel `fractal`: every voxel of the model becomes a copy of the pattern in that voxel's colour,
+ * so the result is the model's size times the pattern's (at most 256 per axis).
+ */
+export function fractal(model: VoxModel, pattern: VoxModel): VoxModel {
+  const [px, py, pz] = pattern.size;
+  return mapCells(perAxis((axis) => model.size[axis] * pattern.size[axis]), (cell) => {
+    const color = model.voxels[voxelIndex(model.size, Math.floor(cell[0] / px), Math.floor(cell[1] / py), Math.floor(cell[2] / pz))];
+    return color !== EMPTY_VOXEL && tiledColor(pattern, cell) !== EMPTY_VOXEL ? color : EMPTY_VOXEL;
+  });
+}
+
+/** MagicaVoxel `mask`: keeps only the voxels where the pattern, tiled over the volume, has one. */
+export const mask = (model: VoxModel, pattern: VoxModel): VoxModel =>
+  mapCells(model.size, (cell) => (tiledColor(pattern, cell) !== EMPTY_VOXEL ? colorAt(model, cell[0], cell[1], cell[2]) : EMPTY_VOXEL));
+
+/** MagicaVoxel `tex`: recolours the voxels with the pattern tiled over the volume, where the pattern has a voxel. */
+export const texture = (model: VoxModel, pattern: VoxModel): VoxModel =>
+  mapCells(model.size, (cell) => {
+    const color = colorAt(model, cell[0], cell[1], cell[2]);
+    const tile = tiledColor(pattern, cell);
+    return color !== EMPTY_VOXEL && tile !== EMPTY_VOXEL ? tile : color;
+  });
