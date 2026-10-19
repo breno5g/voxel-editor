@@ -12,15 +12,23 @@ Depois da v1 o editor diverge livremente; até lá, atalhos e semântica seguem 
 - [x] Objetos: novo, apagar, duplicar, renomear, ocultar, girar 90°, espelhar, redimensionar
 - [x] Undo/redo, autosave, sprite sheet PNG
 
-## v0.6: modos e mapa de atalhos
+## v0.6: modos e mapa de atalhos (feito)
 
-- [ ] Modo Modelo e modo Mundo (`olevel -2`, `TAB`, duplo clique)
-- [ ] F5/F6 e `Ctrl+,`/`Ctrl+.` agem no frame de modelo (modo Modelo) ou na key de transformação (modo Mundo), como `***REMOVED***`
-- [ ] Mapa de atalhos do `hotkey.txt` (global, model-editor, world-editor)
-- [ ] Mundo: clicar seleciona, arrastar move no chão, `G` assenta no chão (`omove g`), `+`/`-` e `9`/`0` giram (`orot`)
-- [ ] Modelo: objetos de fundo (`Ctrl+B`, esmaecidos), grade (`Ctrl+G`), moldura (`Ctrl+F`)
-- [ ] Espelho X/Y/Z do pincel (`1` `2` `3`)
-- [ ] Câmera: recentralizar (`5`), vista de face (`Ctrl+5`), perspectiva/ortogonal/isométrica, slots `7`/`8`/numpad salvos em `rCAM`, captura `6`
+- [x] Modo Modelo e modo Mundo (`olevel -2`, `Tab` com o viewport focado, duplo clique)
+- [x] F5/F6 e `Ctrl+,`/`Ctrl+.` agem no frame de modelo (modo Modelo) ou na key de transformação (modo Mundo), como `***REMOVED***`
+- [x] Mapa de atalhos do `hotkey.txt` (global, model-editor, world-editor, camera-control)
+- [x] Mundo: clicar seleciona, arrastar move no plano, `G` assenta no chão (`omove g`), `+`/`-` e `9`/`0` giram (`orot`), `Ctrl+H` oculta
+- [x] Modelo: objetos de fundo esmaecidos (`Ctrl+B`), grade (`Ctrl+G`), moldura (`Ctrl+F`), arestas (`Ctrl+E`)
+- [x] Espelho X/Y/Z do pincel (`1` `2` `3`); `full` (`U`), `fill` (`I`), `zero` (`Delete`)
+- [x] Câmera: recentralizar (`5`), vista de face (`Ctrl+5`), perspectiva/livre/ortogonal/isométrica, `Espaço`/`Z`/`K` + arrastar, slots `7`/`8`/numpad, captura `6`
+- [x] Layout do MagicaVoxel: paleta e pincel à esquerda, objetos e edição à direita
+
+Pendências da v0.6:
+
+- [ ] Gravar os slots de câmera em `rCAM` (falta a matriz base `M0` de `_angle`, ver [RE §4.4](magicavoxel-re.md))
+- [ ] Câmera livre girando em torno do olho (hoje orbita o alvo)
+- [ ] Sombra (`Ctrl+W`), wireframe (`Ctrl+M`), cubo de vista e régua da câmera
+- [ ] `Ctrl+N`, `Ctrl+T` e `Ctrl+W` são reservados pelo navegador: só chegam ao editor numa janela própria (PWA ou app desktop)
 
 ## v0.7: pincéis
 
@@ -62,6 +70,7 @@ Depois da v1 o editor diverge livremente; até lá, atalhos e semântica seguem 
 
 - [ ] Multisseleção de keys na timeline, duplicar arrastando, `arev`, `asel all|inv|none`
 - [ ] Tempo global (`aset global`), velocidade `a_speed`
+- [ ] Frames não gravados: editar fora de uma key fica pendente até `F5` ("Add/Replace Key Frame", `_frm_*`), com o aviso ao trocar de frame
 - [ ] Empacotar modelos em animação e desempacotar (`opack`, `ounpack`), importar sprites
 
 ## v0.12: importar e exportar
