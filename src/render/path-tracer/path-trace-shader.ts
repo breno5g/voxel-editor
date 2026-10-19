@@ -52,6 +52,18 @@ uniform float u_bladeRotation;
 
 uniform vec3 u_sunDirection;
 uniform vec3 u_sunRadiance;
+/* The emitter face picked for this sample (MagicaVoxel's \`area_*\`): corner and edges in world space, the cell it
+   belongs to, its radiance, and the density of picking a point there, per unit of area. */
+uniform bool u_hasArea;
+uniform vec3 u_areaCorner;
+uniform vec3 u_areaEdgeU;
+uniform vec3 u_areaEdgeV;
+uniform vec3 u_areaNormal;
+uniform ivec3 u_areaCell;
+uniform vec3 u_areaRadiance;
+uniform float u_areaDensity;
+/** Total power of every area-light face: a face's density is its brightest channel over this. */
+uniform float u_emitterPower;
 uniform float u_sunCos;
 uniform bool u_sunDisk;
 uniform int u_environment;
@@ -445,6 +457,7 @@ Surface traceScene(vec3 origin, vec3 direction) {
 
 const int MAX_SHADOW_LAYERS = 8;
 const int MAX_MEDIUM_STEPS = 256;
+const int EMIT_KIND = 3;
 const int MEDIA_KIND = 5;
 const int MEDIA_ABSORB = 0;
 const int MEDIA_EMIT = 2;
@@ -478,14 +491,18 @@ float mediumDensity(vec4 extra) {
   return max(extra.z, 0.0) * 3.0 / (u_scale.x + u_scale.y + u_scale.z);
 }
 
-/** How much sunlight gets from \`origin\` along \`direction\`: none past opaque voxels, tinted through glass. */
-vec3 sunlightThrough(vec3 origin, vec3 direction) {
+/**
+ * How much light gets from \`origin\` along \`direction\` within \`reach\`: none past opaque voxels, tinted
+ * through glass and media. Reaching the emitting \`target\` cell first counts as getting through.
+ */
+vec3 lightThrough(vec3 origin, vec3 direction, float reach, ivec3 target) {
   if (!u_shadows) return vec3(1.0);
   vec3 transmittance = vec3(1.0);
   for (int layer = 0; layer < MAX_SHADOW_LAYERS; layer++) {
     Surface surface = traceScene(origin, direction);
-    if (!surface.hit) return transmittance;
+    if (!surface.hit || surface.t >= reach) return transmittance;
     if (surface.ground) return vec3(0.0);
+    if (surface.cell == target) return transmittance;
     vec4 shape = texelFetch(u_materials, ivec2(int(surface.color), 0), 0);
     int kind = int(shape.x + 0.5);
     if (kind == MEDIA_KIND) {
@@ -494,15 +511,22 @@ vec3 sunlightThrough(vec3 origin, vec3 direction) {
       float span = mediumLength(surface.position, direction, surface.cell);
       transmittance *= exp(-mediumDensity(extra) * span * (int(shape.y + 0.5) == MEDIA_ABSORB ? 1.0 - albedo : vec3(1.0)));
       origin = surface.position + direction * (span + 2e-3);
+      reach -= surface.t + span + 2e-3;
       continue;
     }
     if (!u_translucentShadows) return vec3(0.0);
     float transparency = kind == 2 || kind == 4 ? texelFetch(u_materials, ivec2(int(surface.color), 1), 0).x : 0.0;
     if (transparency <= 0.0) return vec3(0.0);
     transmittance *= transparency * pow(texelFetch(u_palette, ivec2(int(surface.color), 0), 0).rgb, vec3(u_gamma));
-    origin = surface.position + direction * 2e-3 * max(max(u_scale.x, u_scale.y), max(u_scale.z, 1.0));
+    float nudge = 2e-3 * max(max(u_scale.x, u_scale.y), max(u_scale.z, 1.0));
+    origin = surface.position + direction * nudge;
+    reach -= surface.t + nudge;
   }
   return vec3(0.0);
+}
+
+vec3 sunlightThrough(vec3 origin, vec3 direction) {
+  return lightThrough(origin, direction, 1e30, ivec3(-1));
 }
 
 /** Distance (in voxels) from a point on a voxel face to the nearest border of that face lying on a geometric edge. */
@@ -606,6 +630,34 @@ float scatteredSunWeight(vec3 direction, vec3 next, float g) {
   return u_misScatter ? powerHeuristic(phaseHG(dot(direction, next), g), sunDensity()) : 0.0;
 }
 
+/** Light a diffuse surface at \`origin\` gets from a point on this sample's emitter face, MIS-weighted against its cosine bounce. */
+vec3 areaLight(vec3 origin, vec3 normal) {
+  vec3 toLight = u_areaCorner + u_areaEdgeU * random() + u_areaEdgeV * random() - origin;
+  float distanceSquared = dot(toLight, toLight);
+  float distance = sqrt(distanceSquared);
+  vec3 direction = toLight / distance;
+  float cosSurface = dot(normal, direction);
+  float cosLight = -dot(u_areaNormal, direction);
+  if (cosSurface <= 0.0 || cosLight <= 0.0) return vec3(0.0);
+  float lightDensity = u_areaDensity * distanceSquared / cosLight;
+  float weight = powerHeuristic(lightDensity, cosSurface / PI);
+  return weight * u_areaRadiance * cosSurface / (PI * lightDensity) * lightThrough(origin, direction, distance + 1e-3, u_areaCell);
+}
+
+/**
+ * How bright an \`_emit\` voxel is along a ray: as it looks (\`_ldr\`) until the path bounces off something
+ * diffuse or scatters, as it lights after. Hit right after a diffuse bounce (\`bounceDensity\`), an area light
+ * is weighed against \`areaLight\`, which may have sampled it too.
+ */
+float emitterBrightness(vec4 shape, vec4 extra, Surface surface, vec3 direction, bool seen, float bounceDensity) {
+  if (seen) return shape.y;
+  if (bounceDensity <= 0.0 || shape.z < 0.5 || u_emitterPower <= 0.0) return extra.y;
+  vec3 radiance = pow(texelFetch(u_palette, ivec2(int(surface.color), 0), 0).rgb, vec3(u_gamma)) * extra.y;
+  float cosLight = max(abs(dot(direction, surface.normal)), 1e-4);
+  float lightDensity = max(radiance.r, max(radiance.g, radiance.b)) / u_emitterPower * surface.t * surface.t / cosLight;
+  return extra.y * powerHeuristic(bounceDensity, lightDensity);
+}
+
 /** The ray through pixel coordinates for the chosen projection, with depth of field. */
 void cameraRay(vec2 pixel, out vec3 origin, out vec3 direction) {
   vec2 ndc = (pixel / u_resolution) * 2.0 - 1.0;
@@ -674,6 +726,8 @@ void main() {
   int diffuse = 0;
   int specular = 0;
   int scatter = 0;
+  /** The cosine density of the last bounce while the path has met nothing but empty space and media since; else 0. */
+  float bounceDensity = 0.0;
   for (int depth = 0; depth < MAX_DEPTH; depth++) {
     Surface surface = traceScene(origin, direction);
     if (!GUIDE && u_fogDensity > 0.0 && scatter < u_scatterBounces) {
@@ -683,6 +737,7 @@ void main() {
         origin += direction * fogDistance;
         throughput *= u_fogColor;
         radiance += throughput * phaseSunlight(origin, direction, u_fogPhase);
+        bounceDensity = 0.0;
         vec3 next = henyeyGreenstein(direction, u_fogPhase);
         sunWeight = scatteredSunWeight(direction, next, u_fogPhase);
         direction = next;
@@ -735,7 +790,8 @@ void main() {
     float metalness = clamp(shape.z, 0.0, 1.0);
     float ior = max(shape.w, 1.0);
     float transparency = clamp(extra.x, 0.0, 1.0);
-    if (kind != MEDIA_KIND) radiance += throughput * albedo * extra.y;
+    if (kind == EMIT_KIND) radiance += throughput * albedo * emitterBrightness(shape, extra, surface, direction, diffuse == 0 && scatter == 0, bounceDensity);
+    else if (kind != MEDIA_KIND) radiance += throughput * albedo * extra.y;
 
     /* Smooth surfaces sit on 8-bit density, so rays leave them with a wider gap. */
     float bias = (SHAPE == 2 || SHAPE == 3 ? 0.05 : 1e-3) * max(max(u_scale.x, u_scale.y), max(u_scale.z, 1.0));
@@ -765,6 +821,7 @@ void main() {
       origin = surface.position + direction * flight;
       throughput *= albedo;
       radiance += throughput * phaseSunlight(origin, direction, shape.z);
+      bounceDensity = 0.0;
       vec3 next = henyeyGreenstein(direction, shape.z);
       sunWeight = scatteredSunWeight(direction, next, shape.z);
       direction = next;
@@ -784,6 +841,7 @@ void main() {
       origin = surface.position + next * bias * 2.0;
       direction = next;
       sunWeight = 1.0;
+      bounceDensity = 0.0;
       continue;
     }
     if ((kind == 1 || kind == 4) && random() < metalness + (1.0 - metalness) * clamp(extra.w, 0.0, 1.0) * 0.25) {
@@ -793,6 +851,7 @@ void main() {
       vec3 reflectance = mix(vec3(0.04), albedo, metalness);
       float alpha = max(roughness * roughness, 1e-4);
       origin = surface.position + facing * bias;
+      bounceDensity = 0.0;
       /* The sun reaches a reflection two ways, sampled directly and hit by the reflected ray; MIS weighs them. */
       radiance += throughput * ggxSunlight(facing, view, alpha, reflectance, origin);
       vec3 halfway = around(facing, ggxCosTheta(alpha));
@@ -808,10 +867,12 @@ void main() {
     vec3 toSun = cone(u_sunDirection, u_sunCos);
     float cosSun = dot(toSun, facing);
     if (cosSun > 0.0) radiance += throughput * albedo * sunlightThrough(origin, toSun) * sunlight() * cosSun;
+    if (u_hasArea) radiance += throughput * albedo * areaLight(origin, facing);
     if (diffuse >= u_diffuseBounces) break;
     diffuse++;
     throughput *= albedo;
     direction = cosineHemisphere(facing);
+    bounceDensity = max(dot(direction, facing), 1e-4) / PI;
     sunWeight = 0.0;
     if (depth > 2) {
       float survive = max(throughput.r, max(throughput.g, throughput.b));

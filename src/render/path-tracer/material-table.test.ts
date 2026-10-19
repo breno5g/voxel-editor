@@ -16,6 +16,12 @@ describe('materialTable', () => {
     expect([row(table, 5, 1)[1], row(table, 6, 1)[1]]).toEqual([expect.closeTo(151), 1]);
   });
 
+  it('stores how bright an emitter looks and whether it is an area light', () => {
+    const table = materialTable(new Map([[5, new Map([['_type', '_emit'], ['_emit', '0.5'], ['_flux', '2'], ['_ldr', '0.5']])], [6, new Map([['_type', '_emit'], ['_emit', '1'], ['_flux', '0']])]]));
+    expect(row(table, 5, 0).slice(1, 3)).toEqual([2.5, 1]);
+    expect(row(table, 6, 0).slice(1, 3)).toEqual([4, 0]);
+  });
+
   it('leaves metal and transparency off for diffuse colours', () => {
     const table = materialTable(new Map([[1, new Map([['_metal', '1'], ['_trans', '1']])]]));
     expect([row(table, 1, 0)[2], row(table, 1, 1)[0]]).toEqual([0, 0]);

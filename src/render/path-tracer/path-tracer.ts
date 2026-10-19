@@ -4,9 +4,11 @@ import type { RenderSettings } from '../../format/render-settings.ts';
 import { PALETTE_BYTES, PALETTE_SIZE } from '../../format/vox.ts';
 import type { Vec3 } from '../../format/vox.ts';
 import { linkFullScreenProgram } from '../gl-program.ts';
+import { collectEmitterFaces, emitterPower, FACE_NORMALS, sampleEmitter } from './emitter-faces.ts';
+import type { EmitterFaces } from './emitter-faces.ts';
 import { sphereLuminance } from './hdr-image.ts';
 import type { HdrImage } from './hdr-image.ts';
-import { MATERIAL_ROWS } from './material-table.ts';
+import { MATERIAL_KIND, MATERIAL_ROWS } from './material-table.ts';
 import { BLOOM_BLUR_FRAGMENT, BLOOM_DOWNSAMPLE, BLOOM_EXTRACT_FRAGMENT, DENOISE_FRAGMENT, DISPLAY_FRAGMENT, pathTraceFragment } from './path-trace-shader.ts';
 import { dilateBricks, shapeDensity } from './scene-volume.ts';
 import type { SceneVolume } from './scene-volume.ts';
@@ -74,6 +76,10 @@ const unit = (color: Vec3): Vec3 => [Math.min(color[0] / 255, 1), Math.min(color
 const airCoefficient = (color: Vec3, density: number, scale: number) => scaled(unit(color), (Math.pow(10, 1.5 * density) - 1) * scale * AIR_DEPTH);
 const scaled = (color: Vec3, factor: number): Vec3 => [color[0] * factor, color[1] * factor, color[2] * factor];
 const radians = THREE.MathUtils.degToRad;
+/** `_setting _scale`: the world size of a voxel, kept away from zero. */
+const voxelScale = ({ scale }: RenderSettings['show']): Vec3 => [Math.max(scale[0], 1e-3), Math.max(scale[1], 1e-3), Math.max(scale[2], 1e-3)];
+/** Materials light passes through, so an emitter face against them still shines out. */
+const CLEAR_KINDS = new Set([MATERIAL_KIND._glass, MATERIAL_KIND._blend, MATERIAL_KIND._media]);
 
 /**
  * MagicaVoxel's renderer: a progressive path tracer on its own WebGL2 canvas laid over the editor's.
@@ -199,6 +205,15 @@ export function createPathTracer(container: HTMLElement) {
   };
 
   let volume: SceneVolume | null = null;
+  /** Palette texels and the material table as uploaded, read again on the CPU to find area lights. */
+  let paletteTexels = new Uint8Array(PALETTE_BYTES);
+  let materials: Float32Array = new Float32Array(PALETTE_SIZE * MATERIAL_ROWS * 4);
+  /** Area-light faces of the current volume and materials, rebuilt when either changes. */
+  let emitters: EmitterFaces | null = null;
+  /** Each emitter group's running power, the radiance per palette index behind it, and its world scale. */
+  let emitterCumulative: Float64Array = new Float64Array(0);
+  const emitterRadiance = new Float32Array(PALETTE_SIZE * 3);
+  let emitterScale: Vec3 = [1, 1, 1];
   let settings: RenderSettings | null = null;
   let options: TraceOptions = { shadows: true, translucentShadows: true, antialias: true, pixelated: false, misReflect: true, misScatter: true, shape: 'cube', bloom: false, denoise: false };
   let hasIbl = false;
@@ -295,7 +310,7 @@ export function createPathTracer(container: HTMLElement) {
     uniformInt('u_projection', PROJECTIONS.indexOf(lens.projection));
     uniform1('u_blades', lens.blades);
     uniform1('u_bladeRotation', radians(lens.bladeRotation));
-    const scale: Vec3 = [Math.max(show.scale[0], 1e-3), Math.max(show.scale[1], 1e-3), Math.max(show.scale[2], 1e-3)];
+    const scale = voxelScale(show);
     uniform3('u_scale', scale);
     uniform3('u_origin', volume ? [volume.origin[0] * scale[0], volume.origin[1] * scale[1], volume.origin[2] * scale[2]] : [0, 0, 0]);
     gl.uniform3iv(at(traceProgram, 'u_size'), volume?.size ?? [1, 1, 1]);
@@ -313,6 +328,7 @@ export function createPathTracer(container: HTMLElement) {
     gl.useProgram(program);
     const viewKey = applyCamera(view, active.lens);
     applySettings(active);
+    weighEmitters(active);
     gl.uniform1i(at(program, 'u_shadows'), Number(options.shadows));
     gl.uniform1i(at(program, 'u_translucentShadows'), Number(options.translucentShadows));
     gl.uniform1i(at(program, 'u_misReflect'), Number(options.misReflect));
@@ -332,8 +348,57 @@ export function createPathTracer(container: HTMLElement) {
     return viewKey;
   };
 
+  /**
+   * MagicaVoxel's area lights (***REMOVED***): the faces of `_emit` voxels with `_flux` above 0, each
+   * group (palette index, direction) weighed by its faces' power under the current colours and scale.
+   */
+  const weighEmitters = (active: RenderSettings) => {
+    if (!volume) {
+      emitterCumulative = new Float64Array(0);
+      gl.uniform1f(at(traceProgram, 'u_emitterPower'), 0);
+      return;
+    }
+    const kind = (index: number) => materials[index * 4];
+    const areaLight = (index: number) => kind(index) === MATERIAL_KIND._emit && materials[index * 4 + 2] > 0.5;
+    const flags = (test: (index: number) => boolean) => Uint8Array.from({ length: PALETTE_SIZE }, (_, index) => Number(index > 0 && test(index)));
+    emitters ??= collectEmitterFaces(volume, flags(areaLight), flags((index) => CLEAR_KINDS.has(kind(index))));
+    const gamma = Math.max(active.film.gamma, 0.1);
+    for (let index = 0; index < PALETTE_SIZE; index++) {
+      const emission = areaLight(index) ? materials[(PALETTE_SIZE + index) * 4 + 1] : 0;
+      for (let channel = 0; channel < 3; channel++) emitterRadiance[index * 3 + channel] = Math.pow(paletteTexels[index * 4 + channel] / 255, gamma) * emission;
+    }
+    emitterScale = voxelScale(active.show);
+    emitterCumulative = emitterPower(emitters, emitterRadiance, emitterScale);
+    gl.uniform1f(at(traceProgram, 'u_emitterPower'), emitterCumulative.at(-1) ?? 0);
+  };
+
+  /** Picks the emitter face this sample lights by, as MagicaVoxel's ***REMOVED*** does once per pass. */
+  const pickEmitter = () => {
+    const sample = emitters && volume ? sampleEmitter(emitters, emitterCumulative, Math.random(), Math.random()) : null;
+    gl.uniform1i(at(traceProgram, 'u_hasArea'), Number(sample !== null));
+    if (!sample || !volume) return;
+    const { cell, index, face } = sample;
+    const { size, origin } = volume;
+    const coordinate: Vec3 = [cell % size[0], Math.floor(cell / size[0]) % size[1], Math.floor(cell / (size[0] * size[1]))];
+    const axis = face >> 1;
+    const [sx, sy, sz] = emitterScale;
+    /* A face on the cell's far side sits one voxel further along its axis. */
+    const far = (along: number) => Number(along === axis && (face & 1) === 1);
+    const corner: Vec3 = [(coordinate[0] + origin[0] + far(0)) * sx, (coordinate[1] + origin[1] + far(1)) * sy, (coordinate[2] + origin[2] + far(2)) * sz];
+    const edge = (along: number): Vec3 => [along === 0 ? sx : 0, along === 1 ? sy : 0, along === 2 ? sz : 0];
+    const radiance: Vec3 = [emitterRadiance[index * 3], emitterRadiance[index * 3 + 1], emitterRadiance[index * 3 + 2]];
+    gl.uniform3fv(at(traceProgram, 'u_areaCorner'), corner);
+    gl.uniform3fv(at(traceProgram, 'u_areaEdgeU'), edge((axis + 1) % 3));
+    gl.uniform3fv(at(traceProgram, 'u_areaEdgeV'), edge((axis + 2) % 3));
+    gl.uniform3fv(at(traceProgram, 'u_areaNormal'), FACE_NORMALS[face]);
+    gl.uniform3iv(at(traceProgram, 'u_areaCell'), coordinate);
+    gl.uniform3fv(at(traceProgram, 'u_areaRadiance'), radiance);
+    gl.uniform1f(at(traceProgram, 'u_areaDensity'), Math.max(...radiance) / (emitterCumulative.at(-1) ?? 1));
+  };
+
   /** Traces sample number `index` of the current program into `framebuffer`. */
   const drawSample = (index: number, framebuffer: WebGLFramebuffer | null) => {
+    pickEmitter();
     gl.uniform1f(at(traceProgram, 'u_sample'), index);
     gl.uniform1f(at(traceProgram, 'u_seed'), Math.floor(Math.random() * 65536));
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
@@ -441,6 +506,7 @@ export function createPathTracer(container: HTMLElement) {
       const limit = gl.getParameter(gl.MAX_3D_TEXTURE_SIZE);
       if (next && next.size.some((axis) => axis > limit)) throw new Error(`A GPU aceita até ${limit} voxels por eixo; a cena tem ${next.size.join('×')}`);
       volume = next;
+      emitters = null;
       if (next) upload3d(volumeTexture, next.size, next.voxels);
       uploadShape();
       reset();
@@ -450,6 +516,7 @@ export function createPathTracer(container: HTMLElement) {
     setPalette(palette: Uint8Array) {
       const texels = new Uint8Array(PALETTE_BYTES);
       texels.set(palette.subarray(0, PALETTE_BYTES - 4), 4);
+      paletteTexels = texels;
       gl.bindTexture(gl.TEXTURE_2D, paletteTexture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, PALETTE_SIZE, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, texels);
       reset();
@@ -458,6 +525,8 @@ export function createPathTracer(container: HTMLElement) {
     setMaterials(table: Float32Array) {
       gl.bindTexture(gl.TEXTURE_2D, materialsTexture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, PALETTE_SIZE, MATERIAL_ROWS, 0, gl.RGBA, gl.FLOAT, table);
+      materials = table;
+      emitters = null;
       reset();
     },
 
