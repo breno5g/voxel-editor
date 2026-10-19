@@ -509,6 +509,49 @@ float gridLine(vec2 coordinates, float spacing, float width) {
   return step(min(offset.x, offset.y), width * 0.5);
 }
 
+/* GGX microfacets (Walter et al. 2007) for metal and blend reflections; below GLOSSY_ALPHA a lobe is
+   treated as a mirror. */
+const float GLOSSY_ALPHA = 0.05;
+
+/** cos θ of a half vector drawn from the GGX distribution. */
+float ggxCosTheta(float alpha) {
+  float u = random();
+  return sqrt((1.0 - u) / (1.0 + (alpha * alpha - 1.0) * u));
+}
+
+float smithG1(float cosine, float alpha) {
+  float a2 = alpha * alpha;
+  return 2.0 * cosine / (cosine + sqrt(a2 + (1.0 - a2) * cosine * cosine));
+}
+
+vec3 schlick(vec3 reflectance, float cosine) {
+  return reflectance + (1.0 - reflectance) * pow(1.0 - cosine, 5.0);
+}
+
+/** Throughput of a reflection sampled by its half vector: F · G · (v·h) / ((n·v)(n·h)). */
+vec3 ggxWeight(vec3 normal, vec3 view, vec3 light, vec3 halfway, float alpha, vec3 reflectance) {
+  float nv = max(dot(normal, view), 1e-4);
+  float nl = max(dot(normal, light), 1e-4);
+  float nh = max(dot(normal, halfway), 1e-4);
+  float vh = max(dot(view, halfway), 0.0);
+  return schlick(reflectance, vh) * smithG1(nv, alpha) * smithG1(nl, alpha) * vh / (nv * nh);
+}
+
+/** Sunlight reflected toward \`view\` by a GGX lobe, sampled over the sun's disk. */
+vec3 ggxSunlight(vec3 normal, vec3 view, float alpha, vec3 reflectance, vec3 origin) {
+  vec3 light = cone(u_sunDirection, u_sunCos);
+  float nl = dot(normal, light);
+  float nv = dot(normal, view);
+  if (nl <= 0.0 || nv <= 0.0) return vec3(0.0);
+  vec3 halfway = normalize(view + light);
+  float nh = max(dot(normal, halfway), 0.0);
+  float a2 = alpha * alpha;
+  float denominator = nh * nh * (a2 - 1.0) + 1.0;
+  float distribution = a2 / (PI * denominator * denominator);
+  vec3 brdf = schlick(reflectance, max(dot(view, halfway), 0.0)) * distribution * smithG1(nv, alpha) * smithG1(nl, alpha) / (4.0 * nv * nl);
+  return brdf * nl * PI * sunlight() * sunlightThrough(origin, light);
+}
+
 /** The ray through pixel coordinates for the chosen projection, with depth of field. */
 void cameraRay(vec2 pixel, out vec3 origin, out vec3 direction) {
   vec2 ndc = (pixel / u_resolution) * 2.0 - 1.0;
@@ -690,12 +733,19 @@ void main() {
     if ((kind == 1 || kind == 4) && random() < metalness + (1.0 - metalness) * clamp(extra.w, 0.0, 1.0) * 0.25) {
       if (specular >= u_specularBounces) break;
       specular++;
-      vec3 next = normalize(reflect(direction, facing) + uniformSphere() * roughness * roughness);
-      if (dot(next, facing) <= 0.0) break;
-      throughput *= mix(vec3(1.0), albedo, metalness);
+      vec3 view = -direction;
+      vec3 reflectance = mix(vec3(0.04), albedo, metalness);
+      float alpha = max(roughness * roughness, 1e-4);
       origin = surface.position + facing * bias;
+      /* Glossy lobes take the sun by direct sampling; near-mirrors see it (and its disk) by reflection. */
+      bool glossy = alpha > GLOSSY_ALPHA;
+      if (glossy) radiance += throughput * ggxSunlight(facing, view, alpha, reflectance, origin);
+      vec3 halfway = around(facing, ggxCosTheta(alpha));
+      vec3 next = reflect(direction, halfway);
+      if (dot(next, facing) <= 0.0 || dot(view, facing) <= 0.0) break;
+      throughput *= ggxWeight(facing, view, next, halfway, alpha, reflectance);
       direction = next;
-      showSun = true;
+      showSun = !glossy;
       continue;
     }
     vec3 shadingPoint = u_pixelated && fullCubes && !surface.ground ? (vec3(surface.cell) + 0.5 + normal * 0.5) * u_scale + u_origin : surface.position;

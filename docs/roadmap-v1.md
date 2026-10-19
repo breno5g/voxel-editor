@@ -117,5 +117,6 @@ Pendências da v1.0:
 - [x] Denoise na vista e nas imagens finais: filtro à-trous guiado por albedo e normal (o MagicaVoxel usa o OIDN da Intel, que não roda no navegador)
 - [x] Iluminação pixelada (`pt_px`)
 - [x] Meios (`_media`): absorver (Beer–Lambert colorido), espalhar e SSS (distância livre e fase `_g`), emitir; sombras atravessam os meios
-- [ ] MIS (reflexo e espalhamento): o path tracer amostra só a BRDF e o sol; as opções estocástico e volume esparso não têm equivalente separado (sempre ligados)
+- [x] Reflexo de metal e mistura com microfacetas GGX e luz direta do sol nos lobos ásperos (o lugar do MIS-Reflect; espelhos veem o sol por reflexão)
+- [ ] MIS completo (combinar amostragem da BRDF e do sol com pesos) e MIS no espalhamento; as opções estocástico e volume esparso não têm equivalente separado (sempre ligados)
 - [ ] Escalas inferidas do path tracer (área do sol, névoa, abertura, emissão, atmosfera; ver [RE §8](magicavoxel-re.md)) conferidas contra renders do MagicaVoxel
