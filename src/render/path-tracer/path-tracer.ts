@@ -62,6 +62,8 @@ const AIR_DEPTH = 5;
 
 /** Units for the trace pass, then for the bloom and display passes (which bind only 2D textures). */
 const TEXTURE_UNITS = { volume: 0, bricks: 1, palette: 2, materials: 3, ibl: 4, previous: 5, density: 6, previousNormal: 7, emitterFaces: 8, emitterOffsets: 9, emitterShares: 10, accumulation: 0, bloom: 1, albedo: 1, normal: 2 } as const;
+/** The live view renders at most this many pixels per CSS pixel: 4× the work at 2 already. */
+const MAX_PIXEL_RATIO = 2;
 /** Samples of first-hit albedo and normal the denoiser averages (anti-aliased edges). */
 const GUIDE_SAMPLES = 8;
 /** À-trous passes: taps 1, 2, 4, 8 and 16 pixels apart. */
@@ -575,8 +577,10 @@ export function createPathTracer(container: HTMLElement) {
      */
     trace(view: TraceView, size?: { width: number; height: number }, moving = false) {
       if (!settings) return;
-      const nextWidth = Math.max(1, Math.round(size?.width ?? canvas.clientWidth));
-      const nextHeight = Math.max(1, Math.round(size?.height ?? canvas.clientHeight));
+      /* The live view matches the screen's pixels, as the editor's viewport does; final images their own size. */
+      const ratio = size ? 1 : Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO);
+      const nextWidth = Math.max(1, Math.round(size?.width ?? canvas.clientWidth * ratio));
+      const nextHeight = Math.max(1, Math.round(size?.height ?? canvas.clientHeight * ratio));
       if (nextWidth !== width || nextHeight !== height) {
         resize(nextWidth, nextHeight);
         reset();
