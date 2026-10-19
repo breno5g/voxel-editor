@@ -48,7 +48,7 @@ export type ShortcutActions = {
 /**
  * MagicaVoxel's `config/hotkey.txt`: a global map plus one per editor (`model-editor`, `world-editor`);
  * the editor's map wins (the `renderer` map while rendering). Tab (switch editor) is handled by the viewport, which owns its focus.
- * Browsers reserve Ctrl+N/T/W, so those MagicaVoxel keys only reach the page in a standalone window.
+ * Browsers reserve Ctrl+N/T/W; those MagicaVoxel keys reach the page in fullscreen, with the keyboard locked (fullscreen.ts).
  */
 export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: ModelCommands, files: FileActions, actions: ShortcutActions, keys: KeyCommands, patterns: PatternCommands, renderer: RenderShortcuts): void {
   const { state } = editor;

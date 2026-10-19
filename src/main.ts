@@ -39,6 +39,7 @@ import { bindViewportPanel } from './ui/viewport-panel.ts';
 import { bindViewCube } from './ui/view-cube.ts';
 import { bindRenderPanel } from './ui/render-panel.ts';
 import { bindRenderImage } from './ui/render-image.ts';
+import { bindFullscreen } from './ui/fullscreen.ts';
 
 const editor = createEditor();
 const viewport = createViewport(element('viewport', HTMLElement));
@@ -56,6 +57,7 @@ bindRenderImage(editor, viewport, renderer.session);
 bindViewCube(viewport);
 
 bindStatusBar(editor);
+bindFullscreen(editor.status);
 bindToolbar(editor, files, commands, focusCamera);
 bindBrushPanel(editor);
 bindDisplayPanel(editor);

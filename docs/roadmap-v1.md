@@ -33,7 +33,7 @@ Pendências da v0.6:
 - [x] Cubo de vista (`ui/scene.cube`, clique numa face) e régua da câmera (`ui/scene.ruler`, arrastar gira; aparência inferida)
 - [x] Rolagem da câmera (`cam rz`, `_angle` z no `rCAM`)
 - [x] Desfazer/refazer do gizmo (`undo_brush`): cada arrasto da sessão já é um passo do `Ctrl+Z`
-- [ ] `Ctrl+N`, `Ctrl+T` e `Ctrl+W` são reservados pelo navegador: só chegam ao editor numa janela própria (PWA ou app desktop)
+- [x] `Ctrl+N`, `Ctrl+T` e `Ctrl+W` são reservados pelo navegador: chegam ao editor em tela cheia (botão Tela cheia, com a Keyboard Lock API do Chromium)
 
 ## v0.7: pincéis (feito)
 

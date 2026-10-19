@@ -29,6 +29,7 @@
         <button id="import-sprites" type="button" title="Importar imagens PNG como objetos (ou solte-as no viewport); Shift+clique monta uma animação com elas (opack loop)">Importar</button>
       </div>
       <span id="file-name" class="file-name"></span>
+      <button id="fullscreen-toggle" type="button" aria-pressed="false" title="Tela cheia: Ctrl+N, Ctrl+T e Ctrl+W passam a chegar ao editor, como no MagicaVoxel">Tela cheia</button>
       <button id="open-help" type="button" title="Atalhos (?)">Atalhos</button>
       <span id="app-version" class="version"></span>
     </header>
@@ -668,7 +669,7 @@
         <button type="button" data-display="edges" title="Arestas dos voxels (Ctrl+E)">Arestas</button>
         <button type="button" data-display="backgroundObjects" title="Outros objetos, esmaecidos, no modo Modelo (Ctrl+B)">Fundo</button>
         <button type="button" data-display="wire" title="Contorno de todos os objetos no modo Mundo (Ctrl+M)">Contorno</button>
-        <button type="button" data-display="shadow" title="Sombra do sol nos objetos e no chão (Ctrl+W numa janela própria)">Sombra</button>
+        <button type="button" data-display="shadow" title="Sombra do sol nos objetos e no chão (Ctrl+W em tela cheia)">Sombra</button>
         <button type="button" id="display-more" aria-expanded="false" aria-controls="display-settings" title="Mais opções de exibição" aria-label="Mais opções de exibição">⋯</button>
       </div>
       <div id="display-settings" class="overlay display-settings stack" role="group" aria-label="Opções de exibição" hidden>
@@ -835,7 +836,7 @@
           <tr><th scope="row">Salvar imagem da vista</th><td><kbd>6</kbd></td></tr>
           <tr><th scope="row">Câmera: salvar / carregar / escolher slot</th><td><kbd>7</kbd> / <kbd>8</kbd> / teclado numérico</td></tr>
           <tr><th scope="row">Câmera livre: mover</th><td><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>, <kbd>Q</kbd> / <kbd>E</kbd></td></tr>
-          <tr><th scope="row">Exibir grade / arestas / objetos de fundo / contornos / sombra</th><td><kbd>Ctrl+G</kbd> / <kbd>Ctrl+E</kbd> / <kbd>Ctrl+B</kbd> / <kbd>Ctrl+M</kbd> / <kbd>Ctrl+W</kbd> (numa janela própria)</td></tr>
+          <tr><th scope="row">Exibir grade / arestas / objetos de fundo / contornos / sombra</th><td><kbd>Ctrl+G</kbd> / <kbd>Ctrl+E</kbd> / <kbd>Ctrl+B</kbd> / <kbd>Ctrl+M</kbd> / <kbd>Ctrl+W</kbd> (em tela cheia)</td></tr>
           <tr><th scope="row">Desfazer / refazer</th><td><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></td></tr>
           <tr><th scope="row">Novo / abrir / salvar / salvar como</th><td><kbd>Ctrl+P</kbd> / <kbd>Ctrl+O</kbd> / <kbd>Ctrl+S</kbd> / <kbd>Ctrl+Shift+S</kbd></td></tr>
           <tr><th scope="row" colspan="2" class="group">Renderizador</th></tr>
@@ -872,7 +873,7 @@
           <tr><th scope="row">Mover objeto</th><td>arrastar, setas, <kbd>PageUp</kbd> / <kbd>PageDown</kbd></td></tr>
           <tr><th scope="row">Apoiar no chão / ocultar</th><td><kbd>G</kbd> / <kbd>Ctrl+H</kbd></td></tr>
           <tr><th scope="row">Girar 90° em Z / em X</th><td><kbd>+</kbd> <kbd>-</kbd> / <kbd>9</kbd> <kbd>0</kbd></td></tr>
-          <tr><th scope="row">Novo / apagar objeto</th><td><kbd>Ctrl+N</kbd> (só em janela própria) / <kbd>Delete</kbd></td></tr>
+          <tr><th scope="row">Novo / apagar objeto</th><td><kbd>Ctrl+N</kbd> (em tela cheia) / <kbd>Delete</kbd></td></tr>
         </tbody>
       </table>
       <form method="dialog"><button type="submit" autofocus>Fechar</button></form>
