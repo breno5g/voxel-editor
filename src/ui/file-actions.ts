@@ -1,7 +1,16 @@
 import { UNTITLED } from '../editor/editor.ts';
 import type { Editor } from '../editor/editor.ts';
 import { createDocument } from '../format/defaults.ts';
+import { decodeQb, decodeSlab, decodeXraw } from '../format/grid-formats.ts';
 import { parseVox } from '../format/vox-reader.ts';
+import { VOX_MAGIC } from '../format/vox.ts';
+
+/** MagicaVoxel opens .vox (its own, or Slab6's when the magic is missing), Qubicle .qb and .xraw. */
+function readModelFile(name: string, bytes: Uint8Array) {
+  if (/\.qb$/i.test(name)) return decodeQb(bytes);
+  if (/\.xraw$/i.test(name)) return decodeXraw(bytes);
+  return new TextDecoder().decode(bytes.subarray(0, 4)) === VOX_MAGIC ? parseVox(bytes) : decodeSlab(bytes);
+}
 import { writeVox } from '../format/vox-writer.ts';
 import { renderSnapshot, renderSpriteSheet } from '../render/image-export.ts';
 import type { Viewport } from '../render/viewport.ts';
@@ -21,7 +30,9 @@ export function createFileActions(editor: Editor, viewport: Viewport) {
   const openFile = async (file: File) => {
     if (!confirmDiscard()) return;
     try {
-      editor.load(parseVox(new Uint8Array(await file.arrayBuffer())), file.name);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const name = file.name.replace(/\.(qb|xraw)$/i, '.vox');
+      editor.load(readModelFile(file.name, bytes), name);
       editor.status(`${file.name} aberto`);
     } catch (error) {
       editor.fail(`Não foi possível abrir ${file.name}`, error);

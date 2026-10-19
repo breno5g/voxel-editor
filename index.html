@@ -12,7 +12,7 @@
         <button id="open-file" type="button" title="Abrir .vox (Ctrl+O)">Abrir</button>
         <button id="save-file" type="button" title="Salvar .vox (Ctrl+S; salvar como: Ctrl+Shift+S)">Salvar</button>
       </div>
-      <input id="file-input" type="file" accept=".vox" hidden />
+      <input id="file-input" type="file" accept=".vox,.qb,.xraw" hidden />
       <input id="palette-input" type="file" accept=".png,.act,image/png" hidden />
       <input id="sprite-input" type="file" accept=".png,image/png" multiple hidden />
       <div id="modes" class="segmented" role="group" aria-label="Editor (Tab/Shift+Tab no viewport ou duplo clique alterna)">
@@ -23,6 +23,7 @@
         <button id="add-object" type="button" title="Novo objeto 32³ (Ctrl+N no modo Mundo)">Novo objeto</button>
         <button id="frame-camera" type="button" title="Recentralizar câmera (5)">Enquadrar</button>
         <button id="export-sheet" type="button" title="Exporta o intervalo de frames como PNG">Sprite sheet</button>
+        <button id="export-file" type="button" title="Exportar a cena ou a seleção (obj, ply, qb, xraw, png...)">Exportar</button>
         <button id="import-sprites" type="button" title="Importar imagens PNG como objetos (ou solte-as no viewport); Shift+clique monta uma animação com elas (opack loop)">Importar</button>
       </div>
       <span id="file-name" class="file-name"></span>
@@ -603,9 +604,9 @@
             <button id="remove-model-frame" type="button" aria-label="Remover frame de modelo" title="Remover frame de modelo (F6 no modo Modelo)">−</button>
           </div>
           <label class="check"><input id="loop-shape" type="checkbox" /> Loop</label>
-          <label class="check" title="Mostra o frame de modelo anterior translúcido (O)"><input id="onion-skin" type="checkbox" /> Onion skin</label>
+          <label class="check" title="Mostra o frame de modelo anterior translúcido (O)"><input id="onion-skin" type="checkbox" /> Onion</label>
           <label class="check" title="Tempo global (aset global): desligado, só o objeto selecionado anima"><input id="global-time" type="checkbox" /> Global</label>
-          <label class="check" title="Auto key: desligado, mover um objeto animado fora de uma key fica pendente até F5, como no MagicaVoxel"><input id="auto-key" type="checkbox" /> Auto key</label>
+          <label class="check" title="Auto key: desligado, mover um objeto animado fora de uma key fica pendente até F5, como no MagicaVoxel"><input id="auto-key" type="checkbox" /> Auto</label>
         </div>
       </div>
       <canvas id="timeline-track" class="timeline-track" role="slider" aria-label="Frame atual. Clique numa key seleciona (Shift soma), arrastar move (Ctrl duplica), botão direito abre o menu de keys" tabindex="0"></canvas>
@@ -619,6 +620,39 @@
     </footer>
 
     <div id="status" class="status" role="status" aria-live="polite"></div>
+    <dialog id="export-dialog" class="help" aria-labelledby="export-title">
+      <form method="dialog" class="stack export-form">
+        <h2 id="export-title">Exportar</h2>
+        <label class="control-row"><span class="label">Formato</span>
+          <select id="export-format">
+            <option value="obj">OBJ + MTL + paleta PNG</option>
+            <option value="ply">PLY (malha colorida)</option>
+            <option value="mc">PLY suavizado (mc)</option>
+            <option value="cube">PLY de cubos</option>
+            <option value="pcl">PLY nuvem de pontos</option>
+            <option value="qb">Qubicle .qb</option>
+            <option value="xraw">XRAW</option>
+            <option value="slab">Slab6 .vox</option>
+            <option value="iso">PNG isométrico</option>
+            <option value="2d">PNG 2D (frente)</option>
+            <option value="slice">PNG fatias</option>
+          </select>
+        </label>
+        <label class="check"><input id="export-selected" type="checkbox" /> Só os selecionados</label>
+        <label class="check"><input id="export-local" type="checkbox" /> Espaço local (sem a pose do objeto)</label>
+        <div class="control-row" id="export-mesh-options">
+          <span class="label">Escala</span>
+          <div class="size-fields">
+            <input id="export-scale" type="number" step="any" min="0.001" aria-label="Escala" />
+            <select id="export-axis" aria-label="Eixo para cima"><option value="XYZ">Z para cima</option><option value="XZ-Y">Y para cima</option></select>
+          </div>
+        </div>
+        <div class="segmented">
+          <button type="submit" value="cancel">Cancelar</button>
+          <button id="export-confirm" type="submit" value="export">Exportar</button>
+        </div>
+      </form>
+    </dialog>
     <dialog id="help" class="help" aria-labelledby="help-title">
       <h2 id="help-title">Atalhos</h2>
       <table>

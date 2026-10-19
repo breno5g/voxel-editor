@@ -1,3 +1,4 @@
+import { createDefaultPalette } from './defaults.ts';
 import { createModel, MAX_MODEL_SIZE, PALETTE_SIZE, voxelIndex } from './vox.ts';
 import type { VoxModel } from './vox.ts';
 
@@ -35,4 +36,24 @@ export function spriteModel(rgba: Uint8ClampedArray | Uint8Array, width: number,
     }
   }
   return model;
+}
+
+/**
+ * A palette for imported true-colour voxels: the colours themselves when there are at most 255,
+ * else the 255 most frequent, every other colour taking its nearest one.
+ */
+export function paletteFromColors(colors: [number, number, number][]): { palette: Uint8Array; indexOf: (rgb: [number, number, number]) => number } {
+  const counts = new Map<number, number>();
+  for (const [red, green, blue] of colors) {
+    const key = (red << 16) | (green << 8) | blue;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const kept = [...counts].sort((a, b) => b[1] - a[1]).slice(0, PALETTE_SIZE - 1).map(([key]) => key);
+  const palette = createDefaultPalette();
+  kept.forEach((key, slot) => palette.set([(key >> 16) & 255, (key >> 8) & 255, key & 255, 255], slot * 4));
+  const exact = new Map(kept.map((key, slot) => [key, slot + 1]));
+  return {
+    palette,
+    indexOf: ([red, green, blue]) => exact.get((red << 16) | (green << 8) | blue) ?? nearestColor(palette, red, green, blue),
+  };
 }

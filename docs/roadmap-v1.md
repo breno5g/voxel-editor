@@ -89,8 +89,8 @@ Pendências da v0.7:
 
 ## v0.12: importar e exportar
 
-- [ ] Exportar `obj`, `ply`, `mc` (marching cubes), `xraw`, `slab`, `qb`, `iso`, `2d`, `slice`, `pcl`, `cube`; só selecionados; espaço local
-- [ ] Importar `.qb`, `.xraw`, `.png` (sprites), Slab6 `.vox`
+- [x] Exportar `obj` (+ `mtl` e paleta PNG, faces unidas), `ply`, `mc` (malha suavizada por surface nets), `cube`, `pcl`, `qb`, `xraw`, `slab`, `iso`, `2d`, `slice`; só selecionados; espaço local; escala e eixo
+- [x] Importar `.qb`, `.xraw`, `.png` (sprites), Slab6 `.vox`
 - [ ] Lista de projetos, duplicar projeto, salvar como, recuperar (só modelos e paleta)
 
 ## v0.13: shaders XS e padrões
