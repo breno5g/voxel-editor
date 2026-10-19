@@ -183,6 +183,82 @@
           <button type="button" data-world="invertSelection" title="Inverter a seleção (Ctrl+I)">Inverter</button>
           <button type="button" data-world="selectNone" title="Selecionar nada (Ctrl+D)">Nada</button>
         </div>
+        <div class="segmented" role="group" aria-label="Área de transferência de objetos">
+          <button type="button" data-world="copy" title="Copiar objetos (Ctrl+C)">Copiar</button>
+          <button type="button" data-world="cut" title="Recortar como referência (Ctrl+X)">Recortar</button>
+          <button type="button" data-world="paste" title="Colar objetos (Ctrl+V)">Colar</button>
+        </div>
+        <div class="segmented" role="group" aria-label="Cópias especiais">
+          <button type="button" data-world="copyRef" title="Copiar como referência: as cópias mostram os mesmos voxels (Ctrl+Shift+C)">Ref</button>
+          <button type="button" data-world="copyFrame" title="Copiar só o frame atual">Frame</button>
+          <button type="button" data-world="refToObject" title="Converter referência em cópia própria (Ctrl+T; Ctrl+Shift+T na cena toda)">Separar</button>
+        </div>
+      </section>
+      <section aria-labelledby="world-transform-title" data-only-mode="world">
+        <h2 id="world-transform-title">Transformar</h2>
+        <div class="stack">
+          <div class="control-row">
+            <span class="label" id="position-label">Posição</span>
+            <div class="size-fields" role="group" aria-labelledby="position-label">
+              <input id="position-x" type="number" aria-label="Posição X" />
+              <input id="position-y" type="number" aria-label="Posição Y" />
+              <input id="position-z" type="number" aria-label="Posição Z" />
+            </div>
+          </div>
+          <label class="control-row"><span class="label">Mover</span><input id="move-objects" type="text" value="z 10" title="Mover a seleção: eixo e passos (ex.: x 4 z -2), ou g para o chão; Enter aplica" /></label>
+          <div class="segmented" role="group" aria-label="Transformação">
+            <button type="button" data-world="copyTransform" title="Copiar a transformação do objeto principal (m_copy)">Copiar transf.</button>
+            <button type="button" data-world="pasteTransform" title="Colar a transformação na seleção (m_paste)">Colar transf.</button>
+          </div>
+          <div class="segmented" role="group" aria-label="Colar parte da transformação">
+            <button type="button" data-world="pasteRotation" title="Colar só a rotação (m_paste r)">Rotação</button>
+            <button type="button" data-world="pasteTranslation" title="Colar só a posição (m_paste t)">Posição</button>
+            <button type="button" data-world="resetRotation" title="Zerar a rotação (m_paste i)">Zerar</button>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <aside class="sidebar right" aria-label="Objetos">
+      <section aria-labelledby="objects-title">
+        <h2 id="objects-title">Objetos</h2>
+        <ul id="object-list" class="object-list"></ul>
+      </section>
+      <section aria-labelledby="inspector-title">
+        <h2 id="inspector-title">Objeto selecionado</h2>
+        <fieldset id="inspector" class="inspector stack" disabled>
+          <label class="control-row"><span class="label">Nome</span><input id="object-name" type="text" placeholder="sem nome" /></label>
+          <div class="control-row">
+            <span class="label">Tamanho</span>
+            <div class="size-fields">
+              <input id="size-x" type="number" min="1" max="256" aria-label="Tamanho X" />
+              <input id="size-y" type="number" min="1" max="256" aria-label="Tamanho Y" />
+              <input id="size-z" type="number" min="1" max="256" aria-label="Tamanho Z" />
+              <button id="apply-size" type="button" title="Redimensiona todos os frames do objeto">OK</button>
+            </div>
+          </div>
+          <div class="control-row">
+            <span class="label" id="rotate-label" title="Shift inverte o sentido">Girar 90°</span>
+            <div class="segmented" role="group" aria-labelledby="rotate-label">
+              <button type="button" data-rotate="0" title="Girar em X (9 / 0; Shift: sentido inverso)">X</button>
+              <button type="button" data-rotate="1" title="Girar em Y (Shift: sentido inverso)">Y</button>
+              <button type="button" data-rotate="2" title="Girar em Z (+ / -; Shift: sentido inverso)">Z</button>
+            </div>
+          </div>
+          <div class="control-row">
+            <span class="label" id="flip-label">Espelhar</span>
+            <div class="segmented" role="group" aria-labelledby="flip-label">
+              <button type="button" data-mirror="0">X</button>
+              <button type="button" data-mirror="1">Y</button>
+              <button type="button" data-mirror="2">Z</button>
+            </div>
+          </div>
+          <div class="segmented">
+            <button id="shrink-object" type="button" title="Encolher o volume até os voxels de todos os frames (shrink)">Ajustar</button>
+            <button id="duplicate-object" type="button" title="Duplicar o objeto com cópia própria dos voxels">Duplicar</button>
+            <button id="delete-object" type="button" title="Apagar o objeto (Delete no modo Mundo)">Apagar</button>
+          </div>
+        </fieldset>
       </section>
       <section aria-labelledby="arrange-title" data-only-mode="world">
         <h2 id="arrange-title">Organizar</h2>
@@ -229,49 +305,6 @@
             <button type="button" data-world="ground" title="Apoiar no chão (G)">Chão</button>
           </div>
         </div>
-      </section>
-    </aside>
-
-    <aside class="sidebar right" aria-label="Objetos">
-      <section aria-labelledby="objects-title">
-        <h2 id="objects-title">Objetos</h2>
-        <ul id="object-list" class="object-list"></ul>
-      </section>
-      <section aria-labelledby="inspector-title">
-        <h2 id="inspector-title">Objeto selecionado</h2>
-        <fieldset id="inspector" class="inspector stack" disabled>
-          <label class="control-row"><span class="label">Nome</span><input id="object-name" type="text" placeholder="sem nome" /></label>
-          <div class="control-row">
-            <span class="label">Tamanho</span>
-            <div class="size-fields">
-              <input id="size-x" type="number" min="1" max="256" aria-label="Tamanho X" />
-              <input id="size-y" type="number" min="1" max="256" aria-label="Tamanho Y" />
-              <input id="size-z" type="number" min="1" max="256" aria-label="Tamanho Z" />
-              <button id="apply-size" type="button" title="Redimensiona todos os frames do objeto">OK</button>
-            </div>
-          </div>
-          <div class="control-row">
-            <span class="label" id="rotate-label" title="Shift inverte o sentido">Girar 90°</span>
-            <div class="segmented" role="group" aria-labelledby="rotate-label">
-              <button type="button" data-rotate="0" title="Girar em X (9 / 0; Shift: sentido inverso)">X</button>
-              <button type="button" data-rotate="1" title="Girar em Y (Shift: sentido inverso)">Y</button>
-              <button type="button" data-rotate="2" title="Girar em Z (+ / -; Shift: sentido inverso)">Z</button>
-            </div>
-          </div>
-          <div class="control-row">
-            <span class="label" id="flip-label">Espelhar</span>
-            <div class="segmented" role="group" aria-labelledby="flip-label">
-              <button type="button" data-mirror="0">X</button>
-              <button type="button" data-mirror="1">Y</button>
-              <button type="button" data-mirror="2">Z</button>
-            </div>
-          </div>
-          <div class="segmented">
-            <button id="shrink-object" type="button" title="Encolher o volume até os voxels de todos os frames (shrink)">Ajustar</button>
-            <button id="duplicate-object" type="button" title="Duplicar o objeto com cópia própria dos voxels">Duplicar</button>
-            <button id="delete-object" type="button" title="Apagar o objeto (Delete no modo Mundo)">Apagar</button>
-          </div>
-        </fieldset>
       </section>
       <section aria-labelledby="model-title" data-only-mode="model">
         <h2 id="model-title">Modelo</h2>
@@ -465,6 +498,7 @@
           <tr><th scope="row">Girar / mover câmera / zoom</th><td>botão direito / botão do meio / roda (no cursor ou no foco, em Zoom)</td></tr>
           <tr><th scope="row">Mover / zoom / girar com o botão esquerdo</th><td>segure <kbd>Espaço</kbd> / <kbd>Z</kbd> / <kbd>K</kbd> e arraste</td></tr>
           <tr><th scope="row">Entrar no grupo ou objeto / subir um nível</th><td><kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> com o viewport focado (<kbd>Esc</kbd> sai dele)</td></tr>
+          <tr><th scope="row">Copiar / copiar como referência / recortar / colar objetos</th><td><kbd>Ctrl+C</kbd> / <kbd>Ctrl+Shift+C</kbd> / <kbd>Ctrl+X</kbd> / <kbd>Ctrl+V</kbd> no modo Mundo</td></tr>
           <tr><th scope="row">Agrupar / desagrupar</th><td><kbd>Ctrl+R</kbd> / <kbd>Ctrl+Shift+R</kbd> no modo Mundo</td></tr>
           <tr><th scope="row">Recentralizar / vista de face</th><td><kbd>5</kbd> / <kbd>Ctrl+5</kbd></td></tr>
           <tr><th scope="row">Salvar imagem da vista</th><td><kbd>6</kbd></td></tr>
