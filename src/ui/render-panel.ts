@@ -105,6 +105,7 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
     const target = targetSamples();
     samplesLabel.value = tracer.samples >= target ? `Vista pronta: ${tracer.samples} amostras por pixel` : `Vista refinando: ${tracer.samples} de ${target} amostras`;
     if (tracer.samples < target) requestFrame();
+    else tracer.present();
   };
   const requestFrame = () => {
     if (frameQueued || !state.rendering) return;

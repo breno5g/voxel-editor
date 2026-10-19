@@ -64,6 +64,15 @@ const AIR_DEPTH = 5;
 const TEXTURE_UNITS = { volume: 0, bricks: 1, palette: 2, materials: 3, ibl: 4, previous: 5, density: 6, previousNormal: 7, emitterFaces: 8, emitterOffsets: 9, emitterShares: 10, accumulation: 0, bloom: 1, albedo: 1, normal: 2 } as const;
 /** The live view renders at most this many pixels per CSS pixel: 4× the work at 2 already. */
 const MAX_PIXEL_RATIO = 2;
+/* While the view or a setting keeps changing every sample is thrown away by the next, so the live view
+   traces at a fraction of its resolution until nothing has changed for a moment. */
+const SETTLING_SCALE = 0.5;
+const SETTLE_MS = 150;
+const SETTLE_TRACES = 2;
+/** Past 16 samples the preview's denoised image is refreshed every this many samples. */
+const DENOISE_EVERY = 16;
+/** Denoising costs more than a sample: the preview runs it at 1, 2, 4, 8 and 16 samples, then every 16. */
+const denoiseDue = (count: number) => (count & (count - 1)) === 0 || count % DENOISE_EVERY === 0;
 /** Samples of first-hit albedo and normal the denoiser averages (anti-aliased edges). */
 const GUIDE_SAMPLES = 8;
 /** À-trous passes: taps 1, 2, 4, 8 and 16 pixels apart. */
@@ -84,6 +93,12 @@ const radians = THREE.MathUtils.degToRad;
 const voxelScale = ({ scale }: RenderSettings['show']): Vec3 => [Math.max(scale[0], 1e-3), Math.max(scale[1], 1e-3), Math.max(scale[2], 1e-3)];
 /** Materials light passes through, so an emitter face against them still shines out. */
 const CLEAR_KINDS = new Set([MATERIAL_KIND._glass, MATERIAL_KIND._blend, MATERIAL_KIND._media]);
+/** What identifies a view: the camera's frame and projection, and the focus distance. */
+const viewKeyOf = ({ camera, focusDistance }: TraceView) => {
+  camera.updateMatrixWorld();
+  const orthoSize = camera instanceof THREE.OrthographicCamera ? (camera.top - camera.bottom) / camera.zoom : 0;
+  return [...camera.matrixWorld.elements, orthoSize, focusDistance].join(',');
+};
 
 /**
  * MagicaVoxel's renderer: a progressive path tracer on its own WebGL2 canvas laid over the editor's.
@@ -249,10 +264,23 @@ export function createPathTracer(container: HTMLElement) {
   /** The image on screen: the running mean, or its denoised copy until the next sample. */
   let shown: WebGLTexture | null = null;
   let guidesReady = false;
+  /** The sample count `shown` was denoised at, and the view the last sample came from. */
+  let denoisedAt = 0;
+  let lastTraceView: TraceView | null = null;
   const reset = () => {
     samples = 0;
     shown = null;
+    denoisedAt = 0;
     guidesReady = false;
+  };
+  /** When the scene, a setting or the view last changed; the live view traces coarser until it settles. */
+  let changedAt = -Infinity;
+  /** Traces since that change: a slow GPU may take longer than SETTLE_MS for each. */
+  let tracesSinceChange = Infinity;
+  const restart = () => {
+    changedAt = performance.now();
+    tracesSinceChange = 0;
+    reset();
   };
   /** Smooth shapes need the density field, and bricks grown by one so surfaces bulging out of them are found. */
   const uploadShape = () => {
@@ -262,7 +290,7 @@ export function createPathTracer(container: HTMLElement) {
     if (smooth) uploadDensity(volume.size, shapeDensity(volume, options.shape === 'clay' ? CLAY_BLUR_PASSES : 0));
   };
 
-  /** The camera's frame and projection as uniforms; returns a key that changes whenever the view does. */
+  /** The camera's frame and projection as uniforms. */
   const applyCamera = ({ camera, focusDistance }: TraceView, lens: RenderSettings['lens']) => {
     camera.updateMatrixWorld();
     const m = camera.matrixWorld.elements;
@@ -284,7 +312,6 @@ export function createPathTracer(container: HTMLElement) {
     gl.uniform1f(at(traceProgram, 'u_tanHalf'), tanHalf);
     gl.uniform1f(at(traceProgram, 'u_focus'), focusDistance);
     gl.uniform1f(at(traceProgram, 'u_aperture'), lens.aperture * APERTURE_SCALE * focusDistance);
-    return [...m, orthoHeight, tanHalf, focusDistance].join(',');
   };
 
   const applySettings = (active: RenderSettings) => {
@@ -346,11 +373,11 @@ export function createPathTracer(container: HTMLElement) {
     gl.bindTexture(target, texture);
   };
 
-  /** Makes `program` current with every input a sample reads but the previous mean; returns the view's key. */
+  /** Makes `program` current with every input a sample reads but the previous mean. */
   const prepareTrace = (program: WebGLProgram, view: TraceView, active: RenderSettings) => {
     traceProgram = program;
     gl.useProgram(program);
-    const viewKey = applyCamera(view, active.lens);
+    applyCamera(view, active.lens);
     applySettings(active);
     weighEmitters(active);
     gl.uniform1i(at(program, 'u_shadows'), Number(options.shadows));
@@ -384,7 +411,6 @@ export function createPathTracer(container: HTMLElement) {
     ];
     units.forEach(([name, unit]) => gl.uniform1i(at(program, name), unit));
     gl.uniform2f(at(program, 'u_resolution'), width, height);
-    return viewKey;
   };
 
   /**
@@ -528,7 +554,7 @@ export function createPathTracer(container: HTMLElement) {
       emitters = null;
       if (next) upload3d(volumeTexture, next.size, next.voxels);
       uploadShape();
-      reset();
+      restart();
     },
 
     /** RGBA palette bytes; palette index i is texel i, so slot i - 1 of the chunk. */
@@ -539,7 +565,7 @@ export function createPathTracer(container: HTMLElement) {
       emitterKey = '';
       gl.bindTexture(gl.TEXTURE_2D, paletteTexture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, PALETTE_SIZE, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, texels);
-      reset();
+      restart();
     },
 
     setMaterials(table: Float32Array) {
@@ -547,26 +573,26 @@ export function createPathTracer(container: HTMLElement) {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, PALETTE_SIZE, MATERIAL_ROWS, 0, gl.RGBA, gl.FLOAT, table);
       materials = table;
       emitters = null;
-      reset();
+      restart();
     },
 
     setIbl(image: HdrImage | null) {
       uploadIbl(image);
       hasIbl = image !== null;
       iblLuminance = image ? sphereLuminance(image) : 0;
-      reset();
+      restart();
     },
 
     setSettings(next: RenderSettings) {
       settings = next;
-      reset();
+      restart();
     },
 
     setOptions(next: TraceOptions) {
       const reshaped = next.shape !== options.shape;
       options = next;
       if (reshaped) uploadShape();
-      reset();
+      restart();
     },
 
     reset,
@@ -577,24 +603,42 @@ export function createPathTracer(container: HTMLElement) {
      */
     trace(view: TraceView, size?: { width: number; height: number }, moving = false) {
       if (!settings) return;
+      const viewKey = viewKeyOf(view);
+      if (viewKey !== lastView && !moving) restart();
+      lastView = viewKey;
+      lastTraceView = view;
+      const settling = !size && (tracesSinceChange < SETTLE_TRACES || performance.now() - changedAt < SETTLE_MS);
       /* The live view matches the screen's pixels, as the editor's viewport does; final images their own size. */
-      const ratio = size ? 1 : Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO);
+      const ratio = size ? 1 : Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO) * (settling ? SETTLING_SCALE : 1);
       const nextWidth = Math.max(1, Math.round(size?.width ?? canvas.clientWidth * ratio));
       const nextHeight = Math.max(1, Math.round(size?.height ?? canvas.clientHeight * ratio));
       if (nextWidth !== width || nextHeight !== height) {
         resize(nextWidth, nextHeight);
         reset();
       }
-      const viewKey = prepareTrace(traceProgramFor(options.shape), view, settings);
-      if (viewKey !== lastView && !moving) reset();
-      lastView = viewKey;
+      prepareTrace(traceProgramFor(options.shape), view, settings);
+      tracesSinceChange++;
       if (samples >= MAX_SAMPLES) return;
       const previous = current;
       current = 1 - current;
       bind(TEXTURE_UNITS.previous, gl.TEXTURE_2D, accumulation[previous].texture);
       drawSample(samples, accumulation[current].framebuffer);
       samples++;
-      shown = options.denoise ? denoised(view, settings) : null;
+      if (!options.denoise || settling) shown = null;
+      else if (denoiseDue(samples)) {
+        shown = denoised(view, settings);
+        denoisedAt = samples;
+      }
+      display(settings);
+    },
+
+    /** Shows the mean as it stands, denoised if that is on: the last sample of a final image or a finished preview. */
+    present() {
+      if (!settings || !lastTraceView || samples === 0) return;
+      if (options.denoise && denoisedAt !== samples) {
+        shown = denoised(lastTraceView, settings);
+        denoisedAt = samples;
+      }
       display(settings);
     },
 

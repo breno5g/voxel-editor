@@ -81,6 +81,7 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
       progress.value = (frame + (sample + 1) / samples) / frames;
       summary.value = `${frames > 1 ? `Frame ${frame + 1} de ${frames} · ` : ''}amostra ${sample + 1} de ${samples}`;
     }
+    tracer.present();
     return toPng(tracer.canvas);
   };
 
