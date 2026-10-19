@@ -177,6 +177,15 @@
         <div id="object-tool" class="segmented" role="group" aria-label="Ferramenta do mundo">
           <button type="button" data-value="move" title="Mover: clique seleciona, Shift soma, arrastar move; Ctrl move na vertical, Ctrl+Shift duplica">Mover</button>
           <button type="button" data-value="msel" title="Selecionar por retângulo (M): Shift soma, Shift+Alt subtrai">Selecionar</button>
+          <button type="button" data-value="wrap" title="Wrap (N): arraste uma face para repetir a seleção no eixo; Shift dos dois lados">Wrap</button>
+        </div>
+        <div class="control-row" id="object-wrap-options">
+          <span class="label" id="object-wrap-label">Espaço</span>
+          <div class="size-fields" role="group" aria-labelledby="object-wrap-label">
+            <input id="object-wrap-x" type="number" min="0" max="256" aria-label="Espaço do wrap em X" />
+            <input id="object-wrap-y" type="number" min="0" max="256" aria-label="Espaço do wrap em Y" />
+            <input id="object-wrap-z" type="number" min="0" max="256" aria-label="Espaço do wrap em Z" />
+          </div>
         </div>
         <div class="segmented" role="group" aria-label="Seleção de objetos">
           <button type="button" data-world="selectAll" title="Selecionar tudo (Ctrl+A)">Tudo</button>
@@ -523,6 +532,7 @@
           <tr><th scope="row">Mover / zoom / girar com o botão esquerdo</th><td>segure <kbd>Espaço</kbd> / <kbd>Z</kbd> / <kbd>K</kbd> e arraste</td></tr>
           <tr><th scope="row">Entrar no grupo ou objeto / subir um nível</th><td><kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> com o viewport focado (<kbd>Esc</kbd> sai dele)</td></tr>
           <tr><th scope="row">Copiar / copiar como referência / recortar / colar objetos</th><td><kbd>Ctrl+C</kbd> / <kbd>Ctrl+Shift+C</kbd> / <kbd>Ctrl+X</kbd> / <kbd>Ctrl+V</kbd> no modo Mundo</td></tr>
+          <tr><th scope="row">Wrap de objetos</th><td><kbd>N</kbd> e arrastar uma face (<kbd>Shift</kbd>: dos dois lados)</td></tr>
           <tr><th scope="row">Agrupar / desagrupar</th><td><kbd>Ctrl+R</kbd> / <kbd>Ctrl+Shift+R</kbd> no modo Mundo</td></tr>
           <tr><th scope="row">Recentralizar / vista de face</th><td><kbd>5</kbd> / <kbd>Ctrl+5</kbd></td></tr>
           <tr><th scope="row">Salvar imagem da vista</th><td><kbd>6</kbd></td></tr>

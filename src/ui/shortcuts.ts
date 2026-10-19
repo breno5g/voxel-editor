@@ -134,6 +134,7 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
       ['ctrl+d', commands.selectNone],
       ['ctrl+h', () => commands.hideSelected()],
       ['m', () => editor.setObjectTool(state.objectTool === 'msel' ? 'move' : 'msel')],
+      ['n', () => editor.setObjectTool(state.objectTool === 'wrap' ? 'move' : 'wrap')],
       ['ctrl+c', () => commands.copy('copy')],
       ['ctrl+shift+c', () => commands.copy('ref')],
       ['ctrl+x', commands.cut],

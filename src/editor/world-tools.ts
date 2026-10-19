@@ -1,6 +1,8 @@
+import { applyRows } from '../format/rotation.ts';
 import type { Vec3 } from '../format/vox.ts';
 import type { ClientRect, Viewport } from '../render/viewport.ts';
 import { childOfGroup, parentMap, rootLevel } from '../scene/scene-tree.ts';
+import { axisOf } from './brush-shapes.ts';
 import type { Editor } from './editor.ts';
 import type { ObjectCommands } from './object-commands.ts';
 import { selectionMode } from './voxel-selection.ts';
@@ -11,6 +13,9 @@ type DragHandle = NonNullable<ReturnType<ObjectCommands['dragSelected']>>;
 /** Horizontal drags slide over the plane at the grabbed height; upright ones (Ctrl) move along z. */
 type Drag = { handle: DragHandle; origin: Vec3; upright: boolean; last: string };
 type Marquee = { rect: ClientRect; mode: SelectionMode; previous: number[] };
+type WrapHandle = NonNullable<ReturnType<ObjectCommands['wrapDrag']>>;
+/** A wrap drag counts box lengths along the grabbed face's world normal, as seen on screen. */
+type Wrap = { handle: WrapHandle; start: [number, number]; screenAxis: [number, number]; count: number };
 
 /** A press that travels less than this (in pixels) is a click. */
 const CLICK_SLOP = 3;
@@ -18,13 +23,32 @@ const CLICK_SLOP = 3;
 /**
  * World editor pointer input (MagicaVoxel `b_obj`). `move`: a click selects the object (or group) under
  * the pointer at the current level, Shift adds or removes it, and dragging moves the whole selection in
- * whole voxels (Ctrl: up and down, Ctrl+Shift: duplicates first). `msel`, and any press on empty space,
- * draws a marquee (Shift adds, Shift+Alt removes).
+ * whole voxels (Ctrl: up and down, Ctrl+Shift: duplicates first). `wrap` drags a face of the selection
+ * to repeat it along that axis (Shift: both sides). `msel`, and any press on empty space, draws a
+ * marquee (Shift adds, Shift+Alt removes).
  */
 export function createWorldTools(editor: Editor, commands: ObjectCommands, viewport: Viewport) {
   const { state } = editor;
   let drag: Drag | null = null;
   let marquee: Marquee | null = null;
+  let wrap: Wrap | null = null;
+
+  /** `wrap`: the face under the pointer picks the world axis and side the selection repeats along. */
+  const beginWrap = (transformId: number, normal: Vec3, clientX: number, clientY: number, twoSided: boolean) => {
+    const instance = state.instances.find((candidate) => candidate.transformId === transformId);
+    if (!instance || normal.every((value) => value === 0)) return;
+    const worldNormal = applyRows(instance.pose.rows, normal);
+    const axis = axisOf(worldNormal);
+    const side = worldNormal[axis] > 0 ? 1 : -1;
+    const handle = commands.wrapDrag(axis, side, twoSided);
+    if (!handle) return;
+    const origin = instance.pose.translation;
+    const along: Vec3 = [...origin];
+    along[axis] += side * handle.step;
+    const [x0, y0] = viewport.projectWorld(origin);
+    const [x1, y1] = viewport.projectWorld(along);
+    wrap = { handle, start: [clientX, clientY], screenAxis: [x1 - x0, y1 - y0], count: 0 };
+  };
 
   /** The node at the current level holding object `transformId`; outside it, the world goes back to the root level. */
   const levelNode = (transformId: number) => {
@@ -58,16 +82,25 @@ export function createWorldTools(editor: Editor, commands: ObjectCommands, viewp
         marquee = { rect: { x0: clientX, y0: clientY, x1: clientX, y1: clientY }, mode, previous: state.selection };
         return viewport.showMarquee(marquee.rect);
       }
-      if (modifiers.shiftKey && !modifiers.ctrlKey) {
+      if (modifiers.shiftKey && !modifiers.ctrlKey && state.objectTool !== 'wrap') {
         return editor.setSelection(state.selection.includes(node) ? state.selection.filter((id) => id !== node) : [...state.selection, node]);
       }
       if (!state.selection.includes(node)) editor.setSelection([node]);
       else editor.setSelection([...state.selection.filter((id) => id !== node), node]);
+      if (state.objectTool === 'wrap' && hit) return beginWrap(hit.transformId, hit.hit.normal, clientX, clientY, modifiers.shiftKey);
       if (modifiers.ctrlKey && modifiers.shiftKey) commands.duplicateSelected(true);
       beginDrag(clientX, clientY, modifiers.ctrlKey && !modifiers.shiftKey);
     },
 
     move(clientX: number, clientY: number) {
+      if (wrap) {
+        const [sx, sy] = wrap.screenAxis;
+        const steps = ((clientX - wrap.start[0]) * sx + (clientY - wrap.start[1]) * sy) / Math.max(sx * sx + sy * sy, 1);
+        const count = Math.max(0, Math.round(steps));
+        if (count !== wrap.count) wrap.handle.preview(count);
+        wrap.count = count;
+        return;
+      }
       if (marquee) {
         marquee.rect = { ...marquee.rect, x1: clientX, y1: clientY };
         return viewport.showMarquee(marquee.rect);
@@ -85,6 +118,8 @@ export function createWorldTools(editor: Editor, commands: ObjectCommands, viewp
     end() {
       drag?.handle.commit();
       drag = null;
+      wrap?.handle.commit();
+      wrap = null;
       const finished = marquee;
       marquee = null;
       if (!finished) return;

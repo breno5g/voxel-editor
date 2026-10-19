@@ -70,7 +70,7 @@ Pendências da v0.7:
 - [x] Alinhar (mín/centro/máx), espelhar objetos
 - [x] Ordem de render (`order`)
 - [x] Camadas: 8 camadas com nome, cor, visibilidade, selecionar objetos da camada, mover a seleção para a camada, ordenar por nome
-- [ ] Wrap e padrões no mundo
+- [x] Wrap no mundo (`N`, `b_obj_wrap_space`), cópias como referência; o modo padrão (`P`) chega com os padrões da v0.13
 
 ## v0.10: paleta e materiais
 

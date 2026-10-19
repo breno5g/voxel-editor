@@ -138,3 +138,28 @@ describe('groups', () => {
     expect(editor.state.instances.map((instance) => instance.transformId)).toEqual([2, 4]);
   });
 });
+
+describe('object wrap', () => {
+  it('repeats the selection along an axis as references, one undo step per drag', () => {
+    const { editor, commands } = setup();
+    editor.setSelection([2]);
+    editor.setWrapSpacing(0, 1, 'world');
+    const wrap = commands.wrapDrag(0, 1, false);
+    wrap?.preview(3);
+    wrap?.preview(2);
+    wrap?.commit();
+    expect(translations(editor)).toEqual([[0, 0, 1], [10, 0, 1], [3, 0, 1], [6, 0, 1]]);
+    expect(editor.state.instances.slice(2).map((instance) => instance.model)).toEqual([0, 0]);
+    editor.history.undo();
+    expect(editor.state.instances).toHaveLength(2);
+  });
+
+  it('repeats on both sides', () => {
+    const { editor, commands } = setup();
+    editor.setSelection([2]);
+    const wrap = commands.wrapDrag(1, -1, true);
+    wrap?.preview(1);
+    wrap?.commit();
+    expect(translations(editor).slice(2)).toEqual([[0, -2, 1], [0, 2, 1]]);
+  });
+});

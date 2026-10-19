@@ -396,6 +396,57 @@ export function createWorldCommands(editor: Editor) {
       if (nodes.length) copyNodes(nodes, gap, false, nodes.length > 1 ? 'Objetos duplicados' : 'Objeto duplicado');
     },
 
+    /**
+     * MagicaVoxel `b_obj wrap`: repeats the selection along world `axis` on side `side` (both with
+     * `twoSided`), one copy per box length plus the wrap spacing. Copies are references (they share
+     * the voxels). `preview(count)` rebuilds the copies live; `commit` records them as one undo step.
+     */
+    wrapDrag(axis: Axis, side: 1 | -1, twoSided: boolean) {
+      const nodes = picked();
+      const level = levelGroup();
+      const bounds = boundsOf(nodes);
+      if (nodes.length === 0 || !level || !bounds) return null;
+      const step = bounds.high[axis] - bounds.low[axis] + state.objectWrapSpacing[axis];
+      const firstNode = state.vox.nodes.length;
+      const children = level.children;
+      let added: { nodes: typeof state.vox.nodes; roots: number[] } = { nodes: [], roots: [] };
+      const apply = (copies: typeof added) => {
+        state.vox.nodes.splice(firstNode, Infinity, ...copies.nodes);
+        level.children = [...children, ...copies.roots];
+      };
+      return {
+        step,
+        preview(count: number) {
+          const scratch = { ...state.vox, nodes: state.vox.nodes.slice(0, firstNode) };
+          const roots: number[] = [];
+          const sides = twoSided ? [side, -side] : [side];
+          for (let index = 1; index <= count; index++) {
+            for (const direction of sides) {
+              const offset: Vec3 = [0, 0, 0];
+              offset[axis] = direction * index * step;
+              for (const { id } of nodes) {
+                const root = scratch.nodes.length;
+                const { nodes: copies } = cloneSubtree(scratch, id, true);
+                const [holder] = copies;
+                if (holder?.kind === 'transform') holder.keys = holder.keys.map((key) => ({ ...key, translation: add(key.translation, offset) }));
+                scratch.nodes.push(...copies);
+                roots.push(root);
+              }
+            }
+          }
+          added = { nodes: scratch.nodes.slice(firstNode), roots };
+          apply(added);
+          editor.sceneChanged();
+        },
+        commit() {
+          const copies = added;
+          apply({ nodes: [], roots: [] });
+          if (copies.roots.length === 0) return editor.sceneChanged();
+          change(() => apply(copies), () => apply({ nodes: [], roots: [] }), `${copies.roots.length} cópia(s) por wrap`);
+        },
+      };
+    },
+
     /** MagicaVoxel `onew`: an empty object in the current group. */
     addObject() {
       const group = levelGroup();

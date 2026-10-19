@@ -396,6 +396,13 @@ export function createViewport(container: HTMLElement) {
       return point && toVec3(point);
     },
 
+    /** Client-space position of world point `point`. */
+    projectWorld(point: Vec3): [number, number] {
+      const ndc = new THREE.Vector3(...point).project(rig.camera());
+      const bounds = renderer.domElement.getBoundingClientRect();
+      return [bounds.left + ((ndc.x + 1) / 2) * bounds.width, bounds.top + ((1 - ndc.y) / 2) * bounds.height];
+    },
+
     /** Client-space centre of each drawn object's model box, for marquee selection of objects. */
     objectCenters(): { transformId: number; point: [number, number] }[] {
       return [...views].flatMap(([transformId, view]) => {

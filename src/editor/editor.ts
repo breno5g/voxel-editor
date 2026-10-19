@@ -96,6 +96,8 @@ export type EditorState = {
   regionBrush: RegionOptions;
   marquee: MarqueeMode;
   objectTool: ObjectTool;
+  /** MagicaVoxel `b_obj_wrap_space_x/y/z`: empty cells between wrapped object copies. */
+  objectWrapSpacing: Vec3;
   transformTool: TransformTool;
   /** MagicaVoxel `b_wrap_space_x/y/z`: empty cells between wrapped copies. */
   wrapSpacing: Vec3;
@@ -165,6 +167,7 @@ export function createEditor() {
     regionBrush: { connected: true, byColor: true, neighbors: 6 },
     marquee: 'rect',
     objectTool: 'move',
+    objectWrapSpacing: [0, 0, 0],
     transformTool: 'move',
     wrapSpacing: [0, 0, 0],
     voxelSelection: null,
@@ -334,10 +337,12 @@ export function createEditor() {
       emit({ type: 'tool' });
     },
 
-    setWrapSpacing(axis: Axis, spacing: number) {
-      const next: Vec3 = [...state.wrapSpacing];
+    /** Wrap spacing on `axis` for voxels (`model`) or objects (`world`). */
+    setWrapSpacing(axis: Axis, spacing: number, target: Mode = 'model') {
+      const key = target === 'model' ? 'wrapSpacing' : 'objectWrapSpacing';
+      const next: Vec3 = [...state[key]];
       next[axis] = Math.min(Math.max(Math.round(spacing) || 0, 0), MAX_MODEL_SIZE);
-      state.wrapSpacing = next;
+      state[key] = next;
       emit({ type: 'tool' });
     },
 

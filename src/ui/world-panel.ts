@@ -97,9 +97,18 @@ export function bindWorldPanel(editor: Editor, commands: ObjectCommands): void {
     });
   };
 
-  showTool(editor.state.objectTool);
+  const wrapOptions = element('object-wrap-options', HTMLElement);
+  const wrapInputs = (['object-wrap-x', 'object-wrap-y', 'object-wrap-z'] as const).map((id) => element(id, HTMLInputElement));
+  wrapInputs.forEach((input, axis) => input.addEventListener('change', () => isAxis(axis) && editor.setWrapSpacing(axis, input.valueAsNumber, 'world')));
+  const syncTool = () => {
+    showTool(editor.state.objectTool);
+    wrapOptions.hidden = editor.state.objectTool !== 'wrap';
+    wrapInputs.forEach((input, axis) => (input.value = String(editor.state.objectWrapSpacing[axis])));
+  };
+
+  syncTool();
   editor.subscribe((event) => {
-    if (event.type === 'tool') showTool(editor.state.objectTool);
+    if (event.type === 'tool') syncTool();
     if (event.type === 'selection' || event.type === 'scene' || event.type === 'frame' || event.type === 'document') syncPosition();
   });
 }
