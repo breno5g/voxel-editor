@@ -347,6 +347,29 @@
     </aside>
 
     <aside class="sidebar right" aria-label="Objetos">
+      <section aria-labelledby="render-image-title" data-render-panel>
+        <h2 id="render-image-title">Exportar imagem</h2>
+        <div id="render-image-kind" class="segmented" role="group" aria-label="Tipo de imagem">
+          <button type="button" data-value="photo" title="Imagem parada (PNG)">Foto</button>
+          <button type="button" data-value="turntable" title="A câmera gira em volta do foco (zip de PNGs)">Giro</button>
+          <button type="button" data-value="animation" title="Os frames da animação (zip de PNGs)">Animação</button>
+        </div>
+        <label class="control-row"><span class="label">Largura</span><input id="render-width" type="number" min="1" max="8192" value="1280" /></label>
+        <label class="control-row"><span class="label">Altura</span><input id="render-height" type="number" min="1" max="8192" value="720" /></label>
+        <label class="control-row" title="Amostras por pixel de cada imagem"><span class="label">Amostras</span><input id="render-spp" type="number" min="1" max="2048" value="256" /></label>
+        <div class="stack" data-image-kind="turntable">
+          <label class="control-row"><span class="label">Frames</span><input id="render-spin-frames" type="number" min="1" max="3600" value="36" /></label>
+          <label class="control-row" title="Quanto a câmera gira ao todo"><span class="label">Ângulo</span><input id="render-spin-angle" type="number" min="0" max="360" value="360" /></label>
+          <label class="control-row" title="Desfoque de movimento, em % do passo entre frames"><span class="label">Desfoque</span><input id="render-spin-blur" type="number" min="0" max="100" value="0" /></label>
+        </div>
+        <div class="stack" data-image-kind="animation">
+          <label class="control-row"><span class="label">Início</span><input id="render-anim-start" type="number" min="0" max="9999" value="0" /></label>
+          <label class="control-row"><span class="label">Fim</span><input id="render-anim-end" type="number" min="0" max="9999" value="0" /></label>
+        </div>
+        <label class="check" title="Filtra o ruído guiado pela cor e pela normal de cada voxel, na vista e nas imagens finais"><input id="render-denoise" type="checkbox" /> Denoise</label>
+        <button id="render-image" type="button" title="Renderiza e baixa a imagem; clique de novo para cancelar">Renderizar</button>
+        <progress id="render-progress" max="1" value="0" hidden></progress>
+      </section>
       <section aria-labelledby="render-camera-title" data-render-panel>
         <h2 id="render-camera-title">Câmera</h2>
         <div id="render-lens" class="stack"></div>
@@ -382,29 +405,6 @@
         <label class="check" title="Importância múltipla no reflexo: o sol num metal brilhante é amostrado pelo reflexo e direto, e as duas amostras são pesadas"><input id="render-mis-reflect" type="checkbox" checked /> MIS no reflexo</label>
         <label class="check" title="Importância múltipla no espalhamento: o mesmo para a névoa e os meios"><input id="render-mis-scatter" type="checkbox" checked /> MIS no espalhamento</label>
         <output id="render-samples" class="hint" aria-live="off">0 amostras</output>
-      </section>
-      <section aria-labelledby="render-image-title" data-render-panel>
-        <h2 id="render-image-title">Imagem</h2>
-        <div id="render-image-kind" class="segmented" role="group" aria-label="Tipo de imagem">
-          <button type="button" data-value="photo" title="Imagem parada (PNG)">Foto</button>
-          <button type="button" data-value="turntable" title="A câmera gira em volta do foco (zip de PNGs)">Giro</button>
-          <button type="button" data-value="animation" title="Os frames da animação (zip de PNGs)">Animação</button>
-        </div>
-        <label class="control-row"><span class="label">Largura</span><input id="render-width" type="number" min="1" max="8192" value="1280" /></label>
-        <label class="control-row"><span class="label">Altura</span><input id="render-height" type="number" min="1" max="8192" value="720" /></label>
-        <label class="control-row" title="Amostras por pixel de cada imagem"><span class="label">Amostras</span><input id="render-spp" type="number" min="1" max="2048" value="256" /></label>
-        <div class="stack" data-image-kind="turntable">
-          <label class="control-row"><span class="label">Frames</span><input id="render-spin-frames" type="number" min="1" max="3600" value="36" /></label>
-          <label class="control-row" title="Quanto a câmera gira ao todo"><span class="label">Ângulo</span><input id="render-spin-angle" type="number" min="0" max="360" value="360" /></label>
-          <label class="control-row" title="Desfoque de movimento, em % do passo entre frames"><span class="label">Desfoque</span><input id="render-spin-blur" type="number" min="0" max="100" value="0" /></label>
-        </div>
-        <div class="stack" data-image-kind="animation">
-          <label class="control-row"><span class="label">Início</span><input id="render-anim-start" type="number" min="0" max="9999" value="0" /></label>
-          <label class="control-row"><span class="label">Fim</span><input id="render-anim-end" type="number" min="0" max="9999" value="0" /></label>
-        </div>
-        <label class="check" title="Filtra o ruído guiado pela cor e pela normal de cada voxel, na vista e nas imagens finais"><input id="render-denoise" type="checkbox" /> Denoise</label>
-        <button id="render-image" type="button" title="Renderiza e baixa a imagem; clique de novo para cancelar">Renderizar</button>
-        <progress id="render-progress" max="1" value="0" hidden></progress>
       </section>
       <section aria-labelledby="objects-title">
         <h2 id="objects-title">Objetos</h2>
