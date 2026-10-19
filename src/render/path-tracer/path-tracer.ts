@@ -26,6 +26,8 @@ export type TraceOptions = {
   misReflect: boolean;
   /** `pt_mis_cloud`: the same for fog and media. */
   misScatter: boolean;
+  /** `pt_jit`: each pixel samples on its own; off, they share one draw per sample (smooth, banded noise). */
+  stochastic: boolean;
   shape: VoxelShape;
   bloom: boolean;
   denoise: boolean;
@@ -215,7 +217,7 @@ export function createPathTracer(container: HTMLElement) {
   const emitterRadiance = new Float32Array(PALETTE_SIZE * 3);
   let emitterScale: Vec3 = [1, 1, 1];
   let settings: RenderSettings | null = null;
-  let options: TraceOptions = { shadows: true, translucentShadows: true, antialias: true, pixelated: false, misReflect: true, misScatter: true, shape: 'cube', bloom: false, denoise: false };
+  let options: TraceOptions = { shadows: true, translucentShadows: true, antialias: true, pixelated: false, misReflect: true, misScatter: true, stochastic: true, shape: 'cube', bloom: false, denoise: false };
   let hasIbl = false;
   /** ∫ luminance dω of the loaded map, which its intensity is normalized by. */
   let iblLuminance = 0;
@@ -333,6 +335,7 @@ export function createPathTracer(container: HTMLElement) {
     gl.uniform1i(at(program, 'u_translucentShadows'), Number(options.translucentShadows));
     gl.uniform1i(at(program, 'u_misReflect'), Number(options.misReflect));
     gl.uniform1i(at(program, 'u_misScatter'), Number(options.misScatter));
+    gl.uniform1i(at(program, 'u_stochastic'), Number(options.stochastic));
     gl.uniform1i(at(program, 'u_antialias'), Number(options.antialias));
     gl.uniform1i(at(program, 'u_pixelated'), Number(options.pixelated));
     gl.uniform1f(at(program, 'u_cell'), Math.min(Math.max(active.show.cell, 0.01), 1));

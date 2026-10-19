@@ -74,6 +74,8 @@ uniform float u_gamma;
 /** MagicaVoxel's \`pt_mis_ggx\` and \`pt_mis_cloud\`: weigh sun samples against reflection and phase samples. */
 uniform bool u_misReflect;
 uniform bool u_misScatter;
+/** MagicaVoxel's \`pt_jit\` (its \`jitter_mult\`): off, every pixel draws the same random numbers each sample. */
+uniform bool u_stochastic;
 uniform mat3 u_iblRotation;
 uniform bool u_hasIbl;
 uniform vec3 u_rayleigh;
@@ -712,7 +714,8 @@ void accumulateGuide(vec3 albedo, vec3 normal) {
 }
 ` : 'void accumulateGuide(vec3 albedo, vec3 normal) {}'}
 void main() {
-  g_state = (uint(gl_FragCoord.x) * 1973u + uint(gl_FragCoord.y) * 9277u + uint(u_sample) * 26699u + uint(u_seed)) | 1u;
+  uint pixelSeed = u_stochastic ? uint(gl_FragCoord.x) * 1973u + uint(gl_FragCoord.y) * 9277u : 0u;
+  g_state = (pixelSeed + uint(u_sample) * 26699u + uint(u_seed)) | 1u;
   random();
   vec3 origin;
   vec3 direction;
