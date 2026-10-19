@@ -347,6 +347,11 @@
     </aside>
 
     <aside class="sidebar right" aria-label="Objetos">
+      <section aria-labelledby="render-preview-title" data-render-panel>
+        <h2 id="render-preview-title">Prévia</h2>
+        <label class="control-row" title="A vista refina até este número de amostras por pixel e para; não muda a imagem exportada"><span class="label">Amostras</span><input id="render-preview-spp" type="number" min="1" max="100000" value="2048" /></label>
+        <output id="render-samples" class="hint" aria-live="off">Vista: 0 amostras</output>
+      </section>
       <section aria-labelledby="render-image-title" data-render-panel>
         <h2 id="render-image-title">Exportar imagem</h2>
         <div id="render-image-kind" class="segmented" role="group" aria-label="Tipo de imagem">
@@ -356,8 +361,7 @@
         </div>
         <label class="control-row"><span class="label">Largura</span><input id="render-width" type="number" min="1" max="8192" value="1280" /></label>
         <label class="control-row"><span class="label">Altura</span><input id="render-height" type="number" min="1" max="8192" value="720" /></label>
-        <label class="control-row" title="Amostras por pixel (pt_spp): a vista para ao chegar nelas e a imagem final usa o mesmo número"><span class="label">Amostras</span><input id="render-spp" type="number" min="1" max="100000" value="1024" /></label>
-        <output id="render-samples" class="hint" aria-live="off" title="Amostras da vista: quando fica pronta, a imagem final terá a mesma qualidade">0 amostras</output>
+        <label class="control-row" title="Amostras por pixel de cada imagem exportada (pt_spp); ela é calculada à parte, do zero, sem aproveitar a prévia"><span class="label">Amostras</span><input id="render-spp" type="number" min="1" max="100000" value="1024" /></label>
         <div class="stack" data-image-kind="turntable">
           <label class="control-row"><span class="label">Frames</span><input id="render-spin-frames" type="number" min="1" max="3600" value="36" /></label>
           <label class="control-row" title="Quanto a câmera gira ao todo"><span class="label">Ângulo</span><input id="render-spin-angle" type="number" min="0" max="360" value="360" /></label>
@@ -368,6 +372,7 @@
           <label class="control-row"><span class="label">Fim</span><input id="render-anim-end" type="number" min="0" max="9999" value="0" /></label>
         </div>
         <label class="check" title="Filtra o ruído guiado pela cor e pela normal de cada voxel, na vista e nas imagens finais"><input id="render-denoise" type="checkbox" /> Denoise</label>
+        <output id="render-image-summary" class="hint" aria-live="polite"></output>
         <button id="render-image" type="button" title="Renderiza e baixa a imagem; clique de novo para cancelar">Renderizar</button>
         <progress id="render-progress" max="1" value="0" hidden></progress>
       </section>

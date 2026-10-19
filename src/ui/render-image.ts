@@ -35,6 +35,7 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
   const inputs = {
     width: number('render-width'),
     height: number('render-height'),
+    samples: number('render-spp'),
     spinFrames: number('render-spin-frames'),
     spinAngle: number('render-spin-angle'),
     spinBlur: number('render-spin-blur'),
@@ -43,6 +44,7 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
   };
   const button = element('render-image', HTMLButtonElement);
   const progress = element('render-progress', HTMLProgressElement);
+  const summary = element('render-image-summary', HTMLOutputElement);
   const kindPanels = [...document.querySelectorAll<HTMLElement>('[data-image-kind]')];
   let kind: ImageKind = 'photo';
   let job: { cancelled: boolean } | null = null;
@@ -51,21 +53,33 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
     kind = next;
     sync();
   });
+  const read = (input: HTMLInputElement) => Math.min(Math.max(Math.round(Number(input.value)) || Number(input.min), Number(input.min)), Number(input.max || Infinity));
+  const frameCount = () => (kind === 'turntable' ? read(inputs.spinFrames) : kind === 'animation' ? Math.abs(read(inputs.animEnd) - read(inputs.animStart)) + 1 : 1);
+  /** What the button will make: a fresh render, not a copy of the preview. */
+  const describe = () => {
+    const frames = frameCount();
+    const what = frames > 1 ? `${frames} frames de ${read(inputs.width)}×${read(inputs.height)}` : `${read(inputs.width)}×${read(inputs.height)}`;
+    summary.value = `Calculada do zero, à parte da prévia: ${what} com ${read(inputs.samples)} amostras por pixel (a prévia vai até ${session.previewSamples()}).`;
+  };
   const sync = () => {
     showKind(kind);
     kindPanels.forEach((panel) => (panel.hidden = panel.dataset.imageKind !== kind));
+    if (!job) describe();
   };
-  const read = (input: HTMLInputElement) => Math.min(Math.max(Math.round(Number(input.value)) || Number(input.min), Number(input.min)), Number(input.max || Infinity));
   const baseName = () => state.fileName.replace(/\.vox$/i, '');
 
-  /** Path traces one image of `samples` samples, a sample per animation frame so the editor stays responsive. */
-  const renderImage = async (tracer: PathTracer, size: Size, samples: number, viewAt: (sample: number) => TraceView, done: (fraction: number) => void) => {
+  /**
+   * Path traces frame `frame` (of `frames`) at `samples` samples, a sample per animation frame so the editor
+   * stays responsive, and reports how far it got.
+   */
+  const renderImage = async (tracer: PathTracer, size: Size, samples: number, viewAt: (sample: number) => TraceView, frame: number, frames: number) => {
     tracer.reset();
     for (let sample = 0; sample < samples; sample++) {
       await nextFrame();
       if (job?.cancelled) throw new Cancelled();
       tracer.trace(viewAt(sample), size, true);
-      done((sample + 1) / samples);
+      progress.value = (frame + (sample + 1) / samples) / frames;
+      summary.value = `${frames > 1 ? `Frame ${frame + 1} de ${frames} · ` : ''}amostra ${sample + 1} de ${samples}`;
     }
     return toPng(tracer.canvas);
   };
@@ -74,7 +88,7 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
     const tracer = session.prepare();
     if (!tracer) return;
     const size = { width: read(inputs.width), height: read(inputs.height) };
-    const samples = session.samples();
+    const samples = read(inputs.samples);
     const live = session.view();
     /* A copy: orbiting the editor camera mid-render must not move the image. */
     const base = { ...live, camera: live.camera.clone() };
@@ -86,7 +100,7 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
     progress.hidden = false;
     try {
       if (kind === 'photo') {
-        downloadBlob(await renderImage(tracer, size, samples, fixed, (fraction) => (progress.value = fraction)), `${baseName()}-render.png`);
+        downloadBlob(await renderImage(tracer, size, samples, fixed, 0, 1), `${baseName()}-render.png`);
       } else if (kind === 'turntable') {
         const frames = read(inputs.spinFrames);
         const step = read(inputs.spinAngle) / frames;
@@ -95,7 +109,7 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
         const entries: ZipEntry[] = [];
         for (let index = 0; index < frames; index++) {
           const viewAt = () => ({ ...base, camera: turned(base.camera, target, step * (index + (Math.random() - 0.5) * blur)) });
-          const png = await renderImage(tracer, size, samples, viewAt, (fraction) => (progress.value = (index + fraction) / frames));
+          const png = await renderImage(tracer, size, samples, viewAt, index, frames);
           entries.push({ name: frameName(index), data: new Uint8Array(await png.arrayBuffer()) });
         }
         downloadBlob(new Blob([zipStore(entries)], { type: 'application/zip' }), `${baseName()}-turntable.zip`);
@@ -106,12 +120,13 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
           editor.setFrame(frame);
           const ready = session.prepare();
           if (!ready) return;
-          const png = await renderImage(ready, size, samples, fixed, (fraction) => (progress.value = (frame - start + fraction) / (end - start + 1)));
+          const png = await renderImage(ready, size, samples, fixed, frame - start, end - start + 1);
           entries.push({ name: frameName(frame), data: new Uint8Array(await png.arrayBuffer()) });
         }
         downloadBlob(new Blob([zipStore(entries)], { type: 'application/zip' }), `${baseName()}-anim.zip`);
       }
-      editor.status(`Render final salvo: ${size.width}×${size.height}, ${samples} amostras por pixel`);
+      const frames = frameCount();
+      editor.status(`Render final salvo: ${frames > 1 ? `${frames} frames de ` : ''}${size.width}×${size.height}, ${samples} amostras por pixel`);
     } catch (error) {
       if (error instanceof Cancelled) editor.status('Render final cancelado');
       else editor.status(`Render final: ${error instanceof Error ? error.message : String(error)}`, 'error');
@@ -122,6 +137,7 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
       button.textContent = 'Renderizar';
       progress.hidden = true;
       progress.value = 0;
+      describe();
     }
   };
 
@@ -133,6 +149,12 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
     if (event.type !== 'render' && event.type !== 'document') return;
     if (document.activeElement !== inputs.animStart) inputs.animStart.value = String(state.range[0]);
     if (document.activeElement !== inputs.animEnd) inputs.animEnd.value = String(state.range[1]);
+    if (!job) describe();
   });
+  for (const input of [...Object.values(inputs), element('render-preview-spp', HTMLInputElement)]) {
+    input.addEventListener('input', () => {
+      if (!job) describe();
+    });
+  }
   sync();
 }

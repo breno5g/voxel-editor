@@ -19,8 +19,8 @@ export type RenderSession = {
   prepare: () => PathTracer | null;
   /** The live view: the editor camera and the lens focus. */
   view: () => TraceView;
-  /** Samples per pixel (`pt_spp`): the live view stops there and final images take as many. */
-  samples: () => number;
+  /** Samples per pixel the live view refines to before it stops. */
+  previewSamples: () => number;
   /** While a final image renders, the live view stops tracing. */
   setBusy: (busy: boolean) => void;
 };
@@ -37,7 +37,7 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
   const container = element('viewport', HTMLElement);
   const toggleButton = element('render-toggle', HTMLButtonElement);
   const samplesLabel = element('render-samples', HTMLOutputElement);
-  const samplesInput = element('render-spp', HTMLInputElement);
+  const samplesInput = element('render-preview-spp', HTMLInputElement);
   const shadowsCheck = element('render-shadows', HTMLInputElement);
   const bloomCheck = element('render-bloom-toggle', HTMLInputElement);
   const translucentCheck = element('render-translucent-shadows', HTMLInputElement);
@@ -103,7 +103,7 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
       return fail(error);
     }
     const target = targetSamples();
-    samplesLabel.value = tracer.samples >= target ? `${tracer.samples} amostras: pronta` : `${tracer.samples} de ${target} amostras`;
+    samplesLabel.value = tracer.samples >= target ? `Vista pronta: ${tracer.samples} amostras por pixel` : `Vista refinando: ${tracer.samples} de ${target} amostras`;
     if (tracer.samples < target) requestFrame();
   };
   const requestFrame = () => {
@@ -233,9 +233,10 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
       return target;
     },
     view,
-    samples: targetSamples,
+    previewSamples: targetSamples,
     setBusy(next) {
       busy = next;
+      if (busy) samplesLabel.value = 'A vista mostra a imagem exportada sendo renderizada';
       tracer?.reset();
       requestFrame();
     },
