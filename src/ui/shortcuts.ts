@@ -19,7 +19,17 @@ function comboOf(event: KeyboardEvent): string {
 /** Lets a focused button keep its own Space/Enter activation. */
 const isActivatingButton = (event: KeyboardEvent) => event.target instanceof HTMLButtonElement && (event.key === ' ' || event.key === 'Enter');
 
-export type ShortcutActions = { focusCamera: () => void; openHelp: () => void };
+export type ShortcutActions = {
+  focusCamera: () => void;
+  faceView: () => void;
+  snapshot: () => void;
+  saveCamera: () => void;
+  loadCamera: () => void;
+  selectCameraSlot: (slot: number) => void;
+  /** Free camera movement: forward, right and up steps. */
+  fly: (forward: number, right: number, up: number) => void;
+  openHelp: () => void;
+};
 
 /**
  * MagicaVoxel's `config/hotkey.txt`: a global map plus one per editor (`model-editor`, `world-editor`);
@@ -58,6 +68,18 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
     ['ctrl+shift+Comma', () => commands.stepKey(-1, true)],
     ['ctrl+shift+Period', () => commands.stepKey(1, true)],
     ['Digit5', actions.focusCamera],
+    ['ctrl+Digit5', actions.faceView],
+    ['Digit6', actions.snapshot],
+    ['ctrl+Digit6', actions.snapshot],
+    ['Digit7', actions.saveCamera],
+    ['Digit8', actions.loadCamera],
+    ...Array.from({ length: 10 }, (_unused, slot): [string, () => void] => [`Numpad${slot}`, () => actions.selectCameraSlot(slot)]),
+    ['w', () => actions.fly(1, 0, 0)],
+    ['s', () => actions.fly(-1, 0, 0)],
+    ['a', () => actions.fly(0, -1, 0)],
+    ['d', () => actions.fly(0, 1, 0)],
+    ['q', () => actions.fly(0, 0, -1)],
+    ['e', () => actions.fly(0, 0, 1)],
     ['ctrl+e', toggle('edges')],
     ['ctrl+g', toggle('grid')],
     ['ctrl+b', toggle('backgroundObjects')],

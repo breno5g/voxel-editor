@@ -372,3 +372,19 @@ label.track-shape {
   -webkit-appearance: none;
   margin: 0;
 }
+
+.view-options.bottom {
+  top: auto;
+  right: auto;
+  bottom: 8px;
+  left: 8px;
+  align-items: center;
+}
+
+.view-options select {
+  font: inherit;
+  color: inherit;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}

@@ -3,7 +3,7 @@ import type { Editor } from '../editor/editor.ts';
 import { createDocument } from '../format/defaults.ts';
 import { parseVox } from '../format/vox-reader.ts';
 import { writeVox } from '../format/vox-writer.ts';
-import { renderSpriteSheet } from '../render/sprite-sheet.ts';
+import { renderSnapshot, renderSpriteSheet } from '../render/image-export.ts';
 import type { Viewport } from '../render/viewport.ts';
 import { downloadBlob, element } from './dom.ts';
 
@@ -69,13 +69,25 @@ export function createFileActions(editor: Editor, viewport: Viewport) {
       if (name) save(/\.vox$/i.test(name) ? name : `${name}.vox`);
     },
 
+    /** MagicaVoxel `snap scene` (6): saves the current view as PNG. */
+    async snapshot() {
+      try {
+        downloadBlob(await renderSnapshot(viewport.imageTarget), `${baseName()}-${editor.state.frame}.png`);
+        editor.status('Imagem da vista salva');
+      } catch (error) {
+        editor.fail('Falha ao capturar a vista', error);
+      } finally {
+        viewport.requestRender();
+      }
+    },
+
     /** Renders every frame of the current range from the current camera. */
     async exportSpriteSheet() {
       const { range, frame } = editor.state;
       const frameCount = range[1] - range[0] + 1;
       editor.setPlaying(false);
       try {
-        const sheet = await renderSpriteSheet(viewport.spriteTarget, frameCount, SPRITE_FRAME_SIZE, (index) => editor.setFrame(range[0] + index));
+        const sheet = await renderSpriteSheet(viewport.imageTarget, frameCount, SPRITE_FRAME_SIZE, (index) => editor.setFrame(range[0] + index));
         downloadBlob(sheet, `${baseName()}-sheet.png`);
         editor.status(`Sprite sheet com ${frameCount} frames de ${SPRITE_FRAME_SIZE}px exportada`);
       } catch (error) {

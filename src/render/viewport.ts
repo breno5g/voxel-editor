@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { modelPivot } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
 import { raycastFloor, raycastVoxels } from '../geometry/raycast.ts';
 import type { VoxelHit } from '../geometry/raycast.ts';
 import type { Instance, Pose } from '../scene/scene-graph.ts';
+import { createCameraRig } from './camera-rig.ts';
+import type { ImageTarget } from './image-export.ts';
 import { createModelCache } from './model-cache.ts';
 import { createOverlays } from './overlays.ts';
-import type { SpriteTarget } from './sprite-sheet.ts';
 import { createVoxelMaterial } from './voxel-material.ts';
 
 export type Viewport = ReturnType<typeof createViewport>;
@@ -19,9 +19,6 @@ type Ghost = { transformId: number; model: VoxModel };
 type ModelRay = { origin: Vec3; direction: Vec3 };
 
 const BACKGROUND = 0x2b2d33;
-const FIELD_OF_VIEW = 45;
-const CAMERA_DIRECTION = new THREE.Vector3(1, -1.4, 1).normalize();
-const FRAMING_DISTANCE = 3;
 
 function poseMatrix({ rows, translation }: Pose): THREE.Matrix4 {
   return new THREE.Matrix4().set(
@@ -45,11 +42,7 @@ export function createViewport(container: HTMLElement) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(BACKGROUND);
-  const camera = new THREE.PerspectiveCamera(FIELD_OF_VIEW, 1, 0.1, 5000);
-  camera.up.set(0, 0, 1);
-  camera.position.set(60, -80, 60);
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
+  const rig = createCameraRig(renderer.domElement, () => requestRender());
 
   // Raw sRGB components: the shader writes its output without colour management, like the clear colour appears.
   const { material, backgroundMaterial, ghostMaterial, setPalette, setEdges } = createVoxelMaterial(
@@ -71,7 +64,7 @@ export function createViewport(container: HTMLElement) {
   let exporting = false;
   let renderQueued = false;
 
-  const render = () => renderer.render(scene, camera);
+  const render = () => renderer.render(scene, rig.camera());
   const requestRender = () => {
     if (renderQueued) return;
     renderQueued = true;
@@ -80,12 +73,9 @@ export function createViewport(container: HTMLElement) {
       render();
     });
   };
-  controls.addEventListener('change', requestRender);
-
   new ResizeObserver(() => {
     renderer.setSize(container.clientWidth, container.clientHeight);
-    camera.aspect = container.clientWidth / Math.max(container.clientHeight, 1);
-    camera.updateProjectionMatrix();
+    rig.setAspect(container.clientWidth / Math.max(container.clientHeight, 1));
     render();
   }).observe(container);
 
@@ -138,7 +128,7 @@ export function createViewport(container: HTMLElement) {
   const aim = (clientX: number, clientY: number) => {
     const bounds = renderer.domElement.getBoundingClientRect();
     const pointer = new THREE.Vector2(((clientX - bounds.left) / bounds.width) * 2 - 1, -((clientY - bounds.top) / bounds.height) * 2 + 1);
-    raycaster.setFromCamera(pointer, camera);
+    raycaster.setFromCamera(pointer, rig.camera());
   };
 
   const modelRay = (view: ObjectView, clientX: number, clientY: number): ModelRay | null => {
@@ -233,18 +223,17 @@ export function createViewport(container: HTMLElement) {
       requestRender();
     },
 
+    /** Camera modes, framing, face view, free flight and saved states. */
+    camera: rig,
+
+    /** Recentres the camera on every given pose. */
     frameAll(instances: Instance[], models: VoxModel[]) {
       const bounds = new THREE.Box3();
       for (const { pose, model } of instances) {
         const center = new THREE.Vector3(...pose.translation);
         bounds.union(new THREE.Box3().setFromCenterAndSize(center, new THREE.Vector3(...models[model].size)));
       }
-      if (bounds.isEmpty()) return;
-      const sphere = bounds.getBoundingSphere(new THREE.Sphere());
-      controls.target.copy(sphere.center);
-      camera.position.copy(sphere.center).addScaledVector(CAMERA_DIRECTION, sphere.radius * FRAMING_DISTANCE);
-      controls.update();
-      requestRender();
+      rig.frame(bounds);
     },
 
     setSelection(transformId: number | null) {
@@ -285,10 +274,12 @@ export function createViewport(container: HTMLElement) {
       return view?.model && ray ? raycastFloor(view.model, ray.origin, ray.direction) : null;
     },
 
-    spriteTarget: {
+    imageTarget: {
       renderer,
       scene,
-      camera,
+      camera: rig.camera,
+      aspect: rig.aspect,
+      setAspect: rig.setAspect,
       setOverlaysVisible: (visible: boolean) => {
         overlays.setVisible(visible);
         exporting = !visible;
@@ -296,6 +287,6 @@ export function createViewport(container: HTMLElement) {
         if (visible) placeGhost();
         else ghostGroup.visible = false;
       },
-    } satisfies SpriteTarget,
+    } satisfies ImageTarget,
   };
 }

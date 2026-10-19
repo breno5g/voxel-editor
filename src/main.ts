@@ -6,6 +6,7 @@ import { createObjectCommands } from './editor/object-commands.ts';
 import { bindPlayback } from './editor/playback.ts';
 import { createDocument } from './format/defaults.ts';
 import { createViewport } from './render/viewport.ts';
+import { bindCameraPanel } from './ui/camera-panel.ts';
 import { bindDisplayPanel } from './ui/display-panel.ts';
 import { element } from './ui/dom.ts';
 import { createFileActions } from './ui/file-actions.ts';
@@ -25,17 +26,27 @@ const viewport = createViewport(element('viewport', HTMLElement));
 const commands = createObjectCommands(editor);
 const models = createModelCommands(editor);
 const files = createFileActions(editor, viewport);
-const { frameScene } = bindViewportPanel(editor, viewport, commands);
+const { focusCamera } = bindViewportPanel(editor, viewport, commands);
+const cameras = bindCameraPanel(editor, viewport);
 
 bindStatusBar(editor);
-bindToolbar(editor, files, commands, frameScene);
+bindToolbar(editor, files, commands, focusCamera);
 bindDisplayPanel(editor);
 bindPalettePanel(editor);
 bindObjectsPanel(editor, commands);
 bindObjectInspector(editor, commands);
 bindModelPanel(models);
 bindTimeline(editor, commands);
-bindShortcuts(editor, commands, models, files, { focusCamera: frameScene, openHelp: bindHelp().open });
+bindShortcuts(editor, commands, models, files, {
+  focusCamera,
+  faceView: viewport.camera.faceView,
+  snapshot: () => void files.snapshot(),
+  saveCamera: cameras.save,
+  loadCamera: cameras.load,
+  selectCameraSlot: cameras.selectSlot,
+  fly: viewport.camera.fly,
+  openHelp: bindHelp().open,
+});
 bindPlayback(editor);
 const autosave = bindAutosave(editor);
 

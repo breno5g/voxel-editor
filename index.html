@@ -101,6 +101,15 @@
         <button type="button" data-display="edges" title="Arestas dos voxels (Ctrl+E)">Arestas</button>
         <button type="button" data-display="backgroundObjects" title="Outros objetos, esmaecidos, no modo Modelo (Ctrl+B)">Fundo</button>
       </div>
+      <div id="camera-options" class="view-options bottom" role="group" aria-label="Câmera">
+        <button type="button" data-camera-mode="pers" title="Câmera em perspectiva">Persp</button>
+        <button type="button" data-camera-mode="free" title="Câmera livre: W/A/S/D move, Q/E desce e sobe">Livre</button>
+        <button type="button" data-camera-mode="orth" title="Câmera ortogonal">Orto</button>
+        <button type="button" data-camera-mode="iso" title="Câmera isométrica">Iso</button>
+        <label class="field" title="Slot de câmera (teclado numérico 0–9)">Slot <select id="camera-slot"></select></label>
+        <button id="camera-save" type="button" title="Salvar a câmera no slot (7)">Salvar</button>
+        <button id="camera-load" type="button" title="Carregar a câmera do slot (8)">Carregar</button>
+      </div>
     </main>
 
     <footer class="timeline" aria-label="Linha do tempo">
@@ -136,7 +145,10 @@
           <tr><th scope="row" colspan="2" class="group">Geral</th></tr>
           <tr><th scope="row">Girar / mover câmera / zoom</th><td>botão direito / botão do meio / roda</td></tr>
           <tr><th scope="row">Alternar modo Modelo / Mundo</th><td><kbd>Tab</kbd> com o viewport focado (<kbd>Esc</kbd> sai dele)</td></tr>
-          <tr><th scope="row">Recentralizar câmera</th><td><kbd>5</kbd></td></tr>
+          <tr><th scope="row">Recentralizar / vista de face</th><td><kbd>5</kbd> / <kbd>Ctrl+5</kbd></td></tr>
+          <tr><th scope="row">Salvar imagem da vista</th><td><kbd>6</kbd></td></tr>
+          <tr><th scope="row">Câmera: salvar / carregar / escolher slot</th><td><kbd>7</kbd> / <kbd>8</kbd> / teclado numérico</td></tr>
+          <tr><th scope="row">Câmera livre: mover</th><td><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>, <kbd>Q</kbd> / <kbd>E</kbd></td></tr>
           <tr><th scope="row">Exibir grade / arestas / objetos de fundo</th><td><kbd>Ctrl+G</kbd> / <kbd>Ctrl+E</kbd> / <kbd>Ctrl+B</kbd></td></tr>
           <tr><th scope="row">Desfazer / refazer</th><td><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></td></tr>
           <tr><th scope="row">Novo / abrir / salvar / salvar como</th><td><kbd>Ctrl+P</kbd> / <kbd>Ctrl+O</kbd> / <kbd>Ctrl+S</kbd> / <kbd>Ctrl+Shift+S</kbd></td></tr>

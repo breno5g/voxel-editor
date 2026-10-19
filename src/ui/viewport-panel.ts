@@ -66,6 +66,12 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
     const poses = Array.from({ length: end - start + 1 }, (_unused, offset) => evaluateScene(state.vox, start + offset)).flat();
     viewport.frameAll(poses, state.vox.models);
   };
+  /** MagicaVoxel `cam focus` (5): the edited or selected object, else everything on screen. */
+  const focusCamera = () => {
+    const selected = editor.selectedInstance();
+    viewport.frameAll(selected ? [selected] : state.instances, state.vox.models);
+  };
+
   const syncGhost = () => {
     const instance = state.onionSkin ? editor.selectedInstance() : undefined;
     const shape = instance && state.vox.nodes[instance.shapeId];
@@ -107,5 +113,5 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
     }
   });
 
-  return { frameScene };
+  return { focusCamera };
 }
