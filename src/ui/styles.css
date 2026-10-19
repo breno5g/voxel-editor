@@ -332,6 +332,10 @@ body {
   width: 100%;
 }
 
+.xs-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 /* Context menu */
 
 .context-menu {

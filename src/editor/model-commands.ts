@@ -255,6 +255,14 @@ export function createModelCommands(editor: Editor) {
     fill,
     zero,
 
+    /** Replaces the edited model (or its selection's box) with `operation`'s result, as one undo step. */
+    apply: replace,
+
+    /** Adds a console command handled elsewhere (e.g. `xs`, which needs the GPU). */
+    define(name: string, command: (args: string[]) => string | void) {
+      COMMANDS[name] = command;
+    },
+
     /** Runs one MagicaVoxel model command line, e.g. `rot90 x`, `loop z 2` or `prim cone`. */
     run(line: string) {
       const [name = '', ...args] = line.trim().split(/\s+/);

@@ -544,6 +544,19 @@
           <button type="button" data-command="ero" title="Remover a camada externa">Erodir</button>
         </div>
       </section>
+      <section aria-labelledby="xs-title" data-only-mode="model">
+        <h2 id="xs-title">Shader XS</h2>
+        <div class="stack">
+          <div class="control-row xs-row">
+            <select id="xs-shader" aria-label="Shader"></select>
+            <button id="xs-open" type="button" title="Abrir shaders .txt do MagicaVoxel (ficam guardados no navegador)">Abrir</button>
+          </div>
+          <div id="xs-args" class="stack"></div>
+          <label class="control-row"><span class="label" title="Quantas vezes o shader roda, cada vez sobre o resultado anterior (i_iter)">Iterações</span><input id="xs-iterations" type="number" min="1" max="64" value="1" /></label>
+          <button id="xs-run" type="button" title="Rodar o shader no modelo (ou na seleção); também pelo console: xs nome args">Executar</button>
+          <input id="xs-input" type="file" accept=".txt" multiple hidden />
+        </div>
+      </section>
     </aside>
 
     <main id="viewport" class="viewport" aria-label="Viewport 3D: botão direito gira, do meio move, roda dá zoom">

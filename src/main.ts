@@ -20,6 +20,7 @@ import { bindLayersPanel } from './ui/layers-panel.ts';
 import { bindImportActions } from './ui/import-actions.ts';
 import { bindExportActions } from './ui/export-actions.ts';
 import { bindProjectsPanel } from './ui/projects-panel.ts';
+import { bindXsPanel } from './ui/xs-panel.ts';
 import { createProjectStore } from './editor/project-store.ts';
 import { bindPalettePanel } from './ui/palette-panel.ts';
 import { createPaletteCommands } from './editor/palette-commands.ts';
@@ -55,6 +56,7 @@ bindExportActions(editor);
 bindProjectsPanel(editor, createProjectStore(editor));
 bindObjectInspector(editor, commands);
 bindModelPanel(models);
+bindXsPanel(editor, models);
 bindTimeline(editor, commands, keys);
 bindShortcuts(editor, commands, models, files, {
   focusCamera,

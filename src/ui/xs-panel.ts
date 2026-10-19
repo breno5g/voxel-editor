@@ -1,0 +1,110 @@
+import type { Editor } from '../editor/editor.ts';
+import type { ModelCommands } from '../editor/model-commands.ts';
+import { createXsShader, EXAMPLE_SHADERS } from '../editor/xs-shader.ts';
+import type { XsShader } from '../editor/xs-shader.ts';
+import { createXsRunner } from '../render/xs-runner.ts';
+import { element } from './dom.ts';
+
+const STORAGE_KEY = 'voxel-editor:xs-shaders';
+
+/** Loaded shader sources survive reloads (they are small text files); unreadable storage just starts empty. */
+function storedShaders(): XsShader[] {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+    if (typeof parsed !== 'object' || parsed === null) return [];
+    return Object.entries(parsed).flatMap(([name, source]) => (typeof source === 'string' ? [createXsShader(name, source)] : []));
+  } catch {
+    return [];
+  }
+}
+
+/** MagicaVoxel's XS shader panel and `xs <name> [args…]` console command: arguments come from each shader's header. */
+export function bindXsPanel(editor: Editor, models: ModelCommands): void {
+  const { state } = editor;
+  const runner = createXsRunner();
+  const select = element('xs-shader', HTMLSelectElement);
+  const argsContainer = element('xs-args', HTMLElement);
+  const iterations = element('xs-iterations', HTMLInputElement);
+  const fileInput = element('xs-input', HTMLInputElement);
+  const library = new Map<string, XsShader>([...EXAMPLE_SHADERS, ...storedShaders()].map((shader) => [shader.name, shader]));
+  let argInputs: HTMLInputElement[] = [];
+
+  const save = () => {
+    const custom = Object.fromEntries([...library.values()].filter((shader) => !EXAMPLE_SHADERS.includes(shader)).map((shader) => [shader.name, shader.source]));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(custom));
+    } catch (error) {
+      editor.fail('Não foi possível guardar os shaders', error);
+    }
+  };
+
+  const renderArgs = () => {
+    const shader = library.get(select.value);
+    argInputs = (shader?.args ?? []).map((arg) => Object.assign(document.createElement('input'), { type: 'number', min: String(arg.min), max: String(arg.max), step: String(arg.step), value: String(arg.value), title: `${arg.label} (${arg.min} a ${arg.max})` }));
+    argsContainer.replaceChildren(
+      ...argInputs.map((input, index) => {
+        const row = Object.assign(document.createElement('label'), { className: 'control-row' });
+        row.append(Object.assign(document.createElement('span'), { className: 'label', textContent: shader?.args[index].label ?? '', title: shader?.args[index].label ?? '' }), input);
+        return row;
+      }),
+    );
+  };
+
+  const renderOptions = () => {
+    const current = select.value;
+    select.replaceChildren(...[...library.keys()].map((name) => Object.assign(document.createElement('option'), { value: name, textContent: name })));
+    if (library.has(current)) select.value = current;
+    renderArgs();
+  };
+
+  const run = (shader: XsShader, args: number[], passes: number) => {
+    try {
+      models.apply(
+        (model) =>
+          runner.run(shader, model, {
+            palette: state.vox.palette,
+            color: state.color,
+            colorSelection: state.paletteSelection,
+            args,
+            mirror: [Number(state.mirror[0]), Number(state.mirror[1]), Number(state.mirror[2])],
+            axis: [Number(state.axes[0]), Number(state.axes[1]), Number(state.axes[2])],
+            frame: state.frame - state.range[0],
+            frameCount: state.range[1] - state.range[0] + 1,
+            iterations: passes,
+            random: Math.random,
+          }),
+        `Shader ${shader.name} aplicado`,
+      );
+    } catch (error) {
+      editor.fail(`Shader ${shader.name}`, error);
+    }
+  };
+
+  element('xs-run', HTMLButtonElement).addEventListener('click', () => {
+    const shader = library.get(select.value);
+    if (shader) run(shader, argInputs.map((input) => input.valueAsNumber), Math.max(1, Math.round(iterations.valueAsNumber) || 1));
+  });
+  select.addEventListener('change', renderArgs);
+  element('xs-open', HTMLButtonElement).addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', async () => {
+    const files = [...(fileInput.files ?? [])];
+    fileInput.value = '';
+    for (const file of files) library.set(file.name.replace(/\.txt$/i, ''), createXsShader(file.name.replace(/\.txt$/i, ''), await file.text()));
+    save();
+    renderOptions();
+    if (files[0]) select.value = files[0].name.replace(/\.txt$/i, '');
+    renderArgs();
+    editor.status(`${files.length} shader(s) carregado(s)`);
+  });
+
+  /** MagicaVoxel console: `xs [-n iterações] nome args…`. */
+  models.define('xs', (words) => {
+    const passes = words[0] === '-n' ? Number(words[1]) : 1;
+    const [name = '', ...values] = words[0] === '-n' ? words.slice(2) : words;
+    const shader = library.get(name);
+    if (!shader) return `shader ${name || '?'} não carregado (${[...library.keys()].join(', ')})`;
+    run(shader, shader.args.map((arg, index) => (values[index] === undefined ? arg.value : Number(values[index]))), Math.max(1, passes || 1));
+  });
+
+  renderOptions();
+}

@@ -95,7 +95,7 @@ Pendências da v0.7:
 
 ## v0.13: shaders XS e padrões
 
-- [ ] Executar shaders XS na GPU com a API do MagicaVoxel (`map()`, `voxel()`, `i_args`, `i_iter`, ...), argumentos lidos do cabeçalho
+- [x] Executar shaders XS na GPU (WebGL2) com a API do MagicaVoxel (`map()`, `voxel()`, `palette()`, `color_sel()`, `i_args`, `i_iter`, ...), argumentos lidos do cabeçalho, iterações, comando `xs [-n iter] nome args`; os 7 shaders de exemplo do MagicaVoxel rodam sem mudança
 - [ ] Biblioteca de padrões: criar da seleção, pincel de padrão, colocar no mundo
 
 ## v1.0: renderizador
