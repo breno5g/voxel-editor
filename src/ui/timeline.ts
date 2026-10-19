@@ -19,6 +19,7 @@ export function bindTimeline(editor: Editor, commands: ObjectCommands, keys: Key
   const loops = { transform: element('loop-transform', HTMLInputElement), shape: element('loop-shape', HTMLInputElement) };
   const onionSkin = element('onion-skin', HTMLInputElement);
   const globalTime = element('global-time', HTMLInputElement);
+  const autoKey = element('auto-key', HTMLInputElement);
   const keyMenu = element('key-menu', HTMLElement);
   /** A press on a selected key drags the selection along the frames; Ctrl leaves copies behind. */
   let keyDrag: { start: number; delta: number; copy: boolean } | null = null;
@@ -55,6 +56,7 @@ export function bindTimeline(editor: Editor, commands: ObjectCommands, keys: Key
     loops.shape.disabled = !shape;
     onionSkin.checked = state.onionSkin;
     globalTime.checked = state.globalTime;
+    autoKey.checked = state.autoKey;
     track.setAttribute('aria-valuemin', String(state.range[0]));
     track.setAttribute('aria-valuemax', String(state.range[1]));
     track.setAttribute('aria-valuenow', String(state.frame));
@@ -79,6 +81,7 @@ export function bindTimeline(editor: Editor, commands: ObjectCommands, keys: Key
   loops.shape.addEventListener('change', () => commands.toggleLoop('shape'));
   onionSkin.addEventListener('change', () => editor.setOnionSkin(onionSkin.checked));
   globalTime.addEventListener('change', () => editor.setGlobalTime(globalTime.checked));
+  autoKey.addEventListener('change', () => editor.setAutoKey(autoKey.checked));
 
   const keyActions: Record<string, () => void> = {
     all: () => keys.selectKeys('all'),

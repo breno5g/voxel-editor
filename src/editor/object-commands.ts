@@ -122,6 +122,8 @@ export function createObjectCommands(editor: Editor) {
 
     /** MagicaVoxel `aadd` (F5): the editor on top decides the track, as in `***REMOVED***`. */
     addKey() {
+      const recorded = editor.recordPending();
+      if (recorded > 0) return editor.status(`Key gravada no frame ${state.frame}`);
       if (state.mode === 'model') addModelFrame();
       else addTransformKey();
     },

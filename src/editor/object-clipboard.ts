@@ -175,6 +175,7 @@ export function createObjectClipboard(editor: Editor) {
       return { node, before: node.keys, keys: setTransformAt(node.keys, state.frame, { translation: local.translation, rotation: local.rotation }) };
     });
     if (edits.length === 0) return;
+    edits.forEach(({ node, before }) => editor.notePendingKeys(node, before));
     change(() => edits.forEach(({ node, keys }) => (node.keys = keys)), () => edits.forEach(({ node, before }) => (node.keys = before)), message);
   };
 

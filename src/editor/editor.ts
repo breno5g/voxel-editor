@@ -1,7 +1,7 @@
 import { createDocument } from '../format/defaults.ts';
 import type { Axis } from '../format/rotation.ts';
 import { MAX_MODEL_SIZE } from '../format/vox.ts';
-import type { Vec3, VoxDocument, VoxModel } from '../format/vox.ts';
+import type { TransformKey, TransformNode, Vec3, VoxDocument, VoxModel } from '../format/vox.ts';
 import { clampFrame, DEFAULT_RANGE, formatRange, parseRange, RANGE_META_KEY } from '../scene/keyframes.ts';
 import type { FrameRange } from '../scene/keyframes.ts';
 import { evaluateScene, ROOT_ID } from '../scene/scene-graph.ts';
@@ -111,6 +111,10 @@ export type EditorState = {
   paletteSelection: number[];
   /** Selected key frames of the primary selection, per timeline row. */
   keySelection: KeySelection;
+  /** On, editing an animated object off its keys adds a key; off (MagicaVoxel), the edit stays pending until F5 and a frame change discards it. */
+  autoKey: boolean;
+  /** Unrecorded edits: each edited transform's keys before them. */
+  pendingKeys: Map<TransformNode, TransformKey[]>;
   /** MagicaVoxel `aset global`: every object follows the frame; off, only the selected one does and the rest stay at the range start. */
   globalTime: boolean;
   /** Shows the previous model frame translucent while editing frame-by-frame animation. */
@@ -184,6 +188,8 @@ export function createEditor() {
     paletteSelection: [],
     keySelection: { transform: [], shape: [] },
     globalTime: true,
+    autoKey: true,
+    pendingKeys: new Map(),
     onionSkin: false,
     display: { grid: true, frame: true, edges: false, backgroundObjects: true },
   };
@@ -193,10 +199,27 @@ export function createEditor() {
     state.instances = evaluateScene(state.vox, state.frame, state.globalTime ? null : { transformId: state.selected ?? -1, restFrame: state.range[0] });
   };
 
+  /** MagicaVoxel: changing frame drops unrecorded edits (one undo step brings them back). */
+  const discardPending = () => {
+    const pending = [...state.pendingKeys].filter(([node, recorded]) => node.keys !== recorded);
+    state.pendingKeys = new Map();
+    if (pending.length === 0) return;
+    const edited = pending.map(([node]) => node.keys);
+    const apply = (keys: TransformKey[][]) => () => {
+      pending.forEach(([node], index) => (node.keys = keys[index]));
+      evaluate();
+      emit({ type: 'scene' });
+    };
+    apply(pending.map(([, recorded]) => recorded))();
+    history.push({ undo: apply(edited), redo: apply(pending.map(([, recorded]) => recorded)) });
+    status('Edição sem key descartada (F5 grava a key antes de trocar de frame)', 'error');
+  };
+
   const setFrame = (frame: number) => {
     const [start, end] = state.range;
     const next = Math.min(Math.max(clampFrame(frame), start), end);
     if (next === state.frame) return;
+    discardPending();
     state.frame = next;
     evaluate();
     emit({ type: 'frame' });
@@ -230,7 +253,7 @@ export function createEditor() {
     },
 
     load(vox: VoxDocument, name: string) {
-      Object.assign(state, { vox, fileName: name, dirty: false, playing: false, voxelSelection: null, keySelection: { transform: [], shape: [] }, range: parseRange(vox.meta.get(RANGE_META_KEY)) });
+      Object.assign(state, { vox, fileName: name, dirty: false, playing: false, voxelSelection: null, keySelection: { transform: [], shape: [] }, pendingKeys: new Map(), range: parseRange(vox.meta.get(RANGE_META_KEY)) });
       state.frame = state.range[0];
       evaluate();
       const first = state.instances[0]?.transformId;
@@ -405,6 +428,25 @@ export function createEditor() {
     setKeySelection(selection: KeySelection) {
       state.keySelection = { transform: [...new Set(selection.transform)].sort((a, b) => a - b), shape: [...new Set(selection.shape)].sort((a, b) => a - b) };
       emit({ type: 'tool' });
+    },
+
+    setAutoKey(enabled: boolean) {
+      state.autoKey = enabled;
+      emit({ type: 'tool' });
+    },
+
+    /** Records that `node` was edited off its keys while auto key is off; `recorded` are its keys before. */
+    notePendingKeys(node: TransformNode, recorded: TransformKey[]) {
+      if (state.autoKey || recorded.length <= 1 || recorded.some((key) => key.frame === state.frame)) return;
+      if (!state.pendingKeys.has(node)) state.pendingKeys.set(node, recorded);
+      status('Edição sem key: F5 grava, trocar de frame descarta');
+    },
+
+    /** F5 keeps the pending edits as keys. */
+    recordPending() {
+      const count = state.pendingKeys.size;
+      state.pendingKeys = new Map();
+      return count;
     },
 
     setGlobalTime(enabled: boolean) {

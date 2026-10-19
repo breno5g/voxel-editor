@@ -72,6 +72,7 @@ export function createWorldCommands(editor: Editor) {
 
   const commitKeys = (edits: { node: TransformNode; keys: TransformKey[] }[], message?: string) => {
     const before = edits.map(({ node }) => node.keys);
+    edits.forEach(({ node }, index) => editor.notePendingKeys(node, before[index]));
     change(
       () => edits.forEach(({ node, keys }) => (node.keys = keys)),
       () => edits.forEach(({ node }, index) => (node.keys = before[index])),

@@ -3,6 +3,7 @@ import { createDocument } from '../format/defaults.ts';
 import { createModel } from '../format/vox.ts';
 import { createEditor } from './editor.ts';
 import { createKeyCommands } from './key-commands.ts';
+import { createObjectCommands } from './object-commands.ts';
 
 /** Object 2 with position keys at 0, 10, 20 and model frames at 0 and 10. */
 function setup() {
@@ -59,5 +60,26 @@ describe('timeline keys', () => {
     expect(editor.state.instances[0].pose.translation[0]).toBe(10);
     editor.setSelection([]);
     expect(editor.state.instances[0].pose.translation[0]).toBe(0);
+  });
+});
+
+describe('unrecorded edits', () => {
+  it('keeps a move off the keys pending until F5, and drops it on a frame change', () => {
+    const { editor, transform } = setup();
+    const commands = createObjectCommands(editor);
+    editor.setAutoKey(false);
+    editor.setMode('world');
+    editor.setFrame(5);
+    commands.moveSelected([0, 3, 0]);
+    expect(frames(transform)).toEqual([0, 5, 10, 20]);
+    editor.setFrame(6);
+    expect(frames(transform)).toEqual([0, 10, 20]);
+    editor.history.undo();
+    expect(frames(transform)).toEqual([0, 5, 10, 20]);
+    editor.setFrame(5);
+    commands.moveSelected([0, 1, 0]);
+    commands.addKey();
+    editor.setFrame(7);
+    expect(frames(transform)).toEqual([0, 5, 10, 20]);
   });
 });
