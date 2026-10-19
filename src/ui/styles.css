@@ -545,6 +545,35 @@ body {
   padding: 16px 20px;
 }
 
+.projects {
+  min-width: 420px;
+}
+
+.projects .control-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.project-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.project-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-list small {
+  color: var(--muted);
+}
+
 .export-form {
   min-width: 320px;
 }

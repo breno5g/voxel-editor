@@ -11,6 +11,7 @@
         <button id="new-file" type="button" title="Novo documento (Ctrl+P)">Novo</button>
         <button id="open-file" type="button" title="Abrir .vox (Ctrl+O)">Abrir</button>
         <button id="save-file" type="button" title="Salvar .vox (Ctrl+S; salvar como: Ctrl+Shift+S)">Salvar</button>
+        <button id="open-projects" type="button" title="Projetos salvos no navegador: abrir, salvar como, duplicar, apagar">Projetos</button>
       </div>
       <input id="file-input" type="file" accept=".vox,.qb,.xraw" hidden />
       <input id="palette-input" type="file" accept=".png,.act,image/png" hidden />
@@ -620,6 +621,17 @@
     </footer>
 
     <div id="status" class="status" role="status" aria-live="polite"></div>
+    <dialog id="projects-dialog" class="help" aria-labelledby="projects-title">
+      <div class="stack projects">
+        <h2 id="projects-title">Projetos no navegador</h2>
+        <div class="control-row">
+          <input id="project-name" type="text" aria-label="Nome do projeto" placeholder="nome.vox" />
+          <button id="project-save" type="button" title="Salvar o documento atual com este nome">Salvar como</button>
+        </div>
+        <ul id="project-list" class="project-list"></ul>
+        <form method="dialog" class="segmented"><button type="submit">Fechar</button></form>
+      </div>
+    </dialog>
     <dialog id="export-dialog" class="help" aria-labelledby="export-title">
       <form method="dialog" class="stack export-form">
         <h2 id="export-title">Exportar</h2>

@@ -91,7 +91,7 @@ Pendências da v0.7:
 
 - [x] Exportar `obj` (+ `mtl` e paleta PNG, faces unidas), `ply`, `mc` (malha suavizada por surface nets), `cube`, `pcl`, `qb`, `xraw`, `slab`, `iso`, `2d`, `slice`; só selecionados; espaço local; escala e eixo
 - [x] Importar `.qb`, `.xraw`, `.png` (sprites), Slab6 `.vox`
-- [ ] Lista de projetos, duplicar projeto, salvar como, recuperar (só modelos e paleta)
+- [x] Lista de projetos no navegador (IndexedDB): abrir, salvar como, duplicar, apagar; recuperar pelo autosave
 
 ## v0.13: shaders XS e padrões
 

@@ -1,48 +1,11 @@
 import { parseVox } from '../format/vox-reader.ts';
 import { writeVox } from '../format/vox-writer.ts';
+import { isSnapshot, STORES, transact } from './browser-store.ts';
+import type { Snapshot } from './browser-store.ts';
 import type { Editor } from './editor.ts';
 
-type Snapshot = { fileName: string; bytes: Uint8Array; savedAt: number };
-
-const DATABASE = 'voxel-editor';
-const STORE = 'autosave';
 const SNAPSHOT_KEY = 'current';
 const DEBOUNCE_MS = 3000;
-
-function isSnapshot(value: unknown): value is Snapshot {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'fileName' in value &&
-    typeof value.fileName === 'string' &&
-    'savedAt' in value &&
-    typeof value.savedAt === 'number' &&
-    'bytes' in value &&
-    value.bytes instanceof Uint8Array
-  );
-}
-
-function openDatabase(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE, 1);
-    request.onupgradeneeded = () => request.result.createObjectStore(STORE);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function transact<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-  const database = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(STORE, mode);
-    const request = run(transaction.objectStore(STORE));
-    transaction.oncomplete = () => {
-      database.close();
-      resolve(request.result);
-    };
-    transaction.onerror = () => reject(transaction.error);
-  });
-}
 
 /**
  * Keeps the latest unsaved state in IndexedDB (debounced) so a closed tab or crash
@@ -54,7 +17,7 @@ export function bindAutosave(editor: Editor) {
 
   const save = async () => {
     try {
-      await transact('readwrite', (store) => store.put({ fileName: state.fileName, bytes: writeVox(state.vox), savedAt: Date.now() } satisfies Snapshot, SNAPSHOT_KEY));
+      await transact(STORES.autosave, 'readwrite', (store) => store.put({ fileName: state.fileName, bytes: writeVox(state.vox), savedAt: Date.now() } satisfies Snapshot, SNAPSHOT_KEY));
     } catch (error) {
       editor.fail('Autosave falhou', error);
     }
@@ -62,7 +25,7 @@ export function bindAutosave(editor: Editor) {
 
   const clear = async () => {
     try {
-      await transact('readwrite', (store) => store.delete(SNAPSHOT_KEY));
+      await transact(STORES.autosave, 'readwrite', (store) => store.delete(SNAPSHOT_KEY));
     } catch (error) {
       editor.fail('Não foi possível limpar o autosave', error);
     }
@@ -83,7 +46,7 @@ export function bindAutosave(editor: Editor) {
     /** Offers the last unsaved snapshot, if any. Resolves true when it was restored. */
     async recover(): Promise<boolean> {
       try {
-        const snapshot: unknown = await transact('readonly', (store) => store.get(SNAPSHOT_KEY));
+        const snapshot: unknown = await transact(STORES.autosave, 'readonly', (store) => store.get(SNAPSHOT_KEY));
         if (!isSnapshot(snapshot)) return false;
         const when = new Date(snapshot.savedAt).toLocaleString();
         if (!window.confirm(`Há trabalho não salvo de "${snapshot.fileName}" (${when}). Recuperar?`)) {
