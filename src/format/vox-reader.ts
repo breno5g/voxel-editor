@@ -55,7 +55,7 @@ function createCursor(bytes: Uint8Array) {
     for (let count = int32(); count > 0; count--) entries.set(string(), string());
     return entries;
   };
-  return { int32, dict };
+  return { int32, string, dict };
 }
 
 function toInt(value: string | undefined, fallback: number): number {
@@ -130,7 +130,7 @@ export function parseVox(input: Uint8Array): VoxDocument {
   const [main] = readChunks(bytes.subarray(8));
   if (main?.id !== 'MAIN') throw new Error('Missing MAIN chunk');
 
-  const document: VoxDocument = { models: [], nodes: [], palette: createDefaultPalette(), layers: [], meta: new Map(), extras: [] };
+  const document: VoxDocument = { models: [], nodes: [], palette: createDefaultPalette(), layers: [], materials: new Map(), notes: [], meta: new Map(), extras: [] };
   const nodes = new Map<number, SceneNode>();
   let pendingSize: Vec3 | null = null;
 
@@ -168,6 +168,14 @@ export function parseVox(input: Uint8Array): VoxDocument {
     }],
     ['META', (content) => {
       document.meta = createCursor(content).dict();
+    }],
+    ['MATL', (content) => {
+      const cursor = createCursor(content);
+      document.materials.set(cursor.int32(), cursor.dict());
+    }],
+    ['NOTE', (content) => {
+      const cursor = createCursor(content);
+      document.notes = Array.from({ length: Math.max(cursor.int32(), 0) }, () => cursor.string());
     }],
     ['PACK', () => undefined],
   ]);

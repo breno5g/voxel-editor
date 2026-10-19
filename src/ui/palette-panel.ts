@@ -3,7 +3,12 @@ import { COLOR_CHANNELS, fromHex, hsvToRgb, indexRange, rgbToHsv, toHex } from '
 import type { PaletteCommands } from '../editor/palette-commands.ts';
 import { PALETTE_SIZE, paletteColor } from '../format/vox.ts';
 import type { Vec3 } from '../format/vox.ts';
-import { bindButtonGroup, element } from './dom.ts';
+import { bindButtonGroup, downloadBlob, element } from './dom.ts';
+import { createDefaultPalette, createHuePalette } from '../format/defaults.ts';
+import { encodeAct, paletteFromPixels, parseAct } from '../format/palette-file.ts';
+
+/** Palette files open from the palette tools or by dropping them on the window. */
+export const isPaletteFile = (name: string) => /\.(png|act)$/i.test(name);
 
 type ColorSpace = 'hsv' | 'rgb';
 const SPACE_LABELS: Record<ColorSpace, string[]> = { hsv: ['H', 'S', 'V'], rgb: ['R', 'G', 'B'] };
@@ -117,7 +122,48 @@ export function bindPalettePanel(editor: Editor, palette: PaletteCommands): void
     syncEditor();
   });
 
+  const note = element('palette-note', HTMLInputElement);
+  note.addEventListener('change', () => palette.setNote(state.color, note.value));
+  const fileInput = element('palette-input', HTMLInputElement);
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = '';
+    if (file) void importPalette(file);
+  });
+  window.addEventListener('drop', (event) => {
+    const file = event.dataTransfer?.files[0];
+    if (file && isPaletteFile(file.name)) void importPalette(file);
+  });
+
+  const importPalette = async (file: File) => {
+    try {
+      if (/\.act$/i.test(file.name)) return palette.loadPalette(parseAct(new Uint8Array(await file.arrayBuffer()), state.vox.palette), `Paleta ${file.name} aberta`);
+      const bitmap = await createImageBitmap(file);
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Canvas 2D indisponível');
+      context.drawImage(bitmap, 0, 0);
+      palette.loadPalette(paletteFromPixels(context.getImageData(0, 0, bitmap.width, bitmap.height).data, state.vox.palette), `Paleta ${file.name} aberta`);
+    } catch (error) {
+      editor.fail(`Não foi possível abrir a paleta ${file.name}`, error);
+    }
+  };
+
+  const savePng = async () => {
+    const canvas = new OffscreenCanvas(PALETTE_SIZE, 1);
+    const context = canvas.getContext('2d');
+    if (!context) return editor.status('Canvas 2D indisponível', 'error');
+    context.putImageData(new ImageData(Uint8ClampedArray.from(state.vox.palette), PALETTE_SIZE, 1), 0, 0);
+    downloadBlob(await canvas.convertToBlob({ type: 'image/png' }), `${baseName()}-paleta.png`);
+  };
+  const baseName = () => state.fileName.replace(/\.vox$/i, '');
+
   const actions: Record<string, () => void> = {
+    open: () => fileInput.click(),
+    savePng: () => void savePng(),
+    saveAct: () => downloadBlob(new Blob([encodeAct(state.vox.palette)], { type: 'application/octet-stream' }), `${baseName()}-paleta.act`),
+    presetMv: () => palette.loadPalette(createDefaultPalette(), 'Paleta padrão do MagicaVoxel'),
+    presetHue: () => palette.loadPalette(createHuePalette(), 'Paleta de tons'),
     all: () => palette.selectPalette('all'),
     inv: () => palette.selectPalette('inv'),
     none: () => palette.selectPalette('none'),
@@ -155,6 +201,7 @@ export function bindPalettePanel(editor: Editor, palette: PaletteCommands): void
     });
     picker.value = toHex(rgb);
     if (document.activeElement !== hex) hex.value = toHex(rgb);
+    if (document.activeElement !== note) note.value = palette.noteOf(state.color);
   }
 
   const markSelected = () => {

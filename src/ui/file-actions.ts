@@ -6,6 +6,7 @@ import { writeVox } from '../format/vox-writer.ts';
 import { renderSnapshot, renderSpriteSheet } from '../render/image-export.ts';
 import type { Viewport } from '../render/viewport.ts';
 import { downloadBlob, element } from './dom.ts';
+import { isPaletteFile } from './palette-panel.ts';
 
 export type FileActions = ReturnType<typeof createFileActions>;
 
@@ -36,7 +37,7 @@ export function createFileActions(editor: Editor, viewport: Viewport) {
   window.addEventListener('drop', (event) => {
     event.preventDefault();
     const file = event.dataTransfer?.files[0];
-    if (file) void openFile(file);
+    if (file && !isPaletteFile(file.name)) void openFile(file);
   });
   window.addEventListener('beforeunload', (event) => {
     if (editor.state.dirty) event.preventDefault();

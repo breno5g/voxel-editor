@@ -29,11 +29,13 @@ function animatedDocument(): VoxDocument {
   document.layers.push({ id: 0, attrs: new Map([['_name', 'base']]) });
   document.extras.push({ id: 'rCAM', content: Uint8Array.of(1, 2, 3, 4), children: new Uint8Array(0) });
   document.palette[0] = 200;
+  document.materials.set(5, new Map([['_type', '_glass'], ['_trans', '0.5'], ['_ri', '1.3']]));
+  document.notes = ['pele', '', 'metal'];
   return document;
 }
 
 describe('writeVox -> parseVox', () => {
-  it('round-trips scene, animation keys, palette, layers, meta and unknown chunks', () => {
+  it('round-trips scene, animation keys, palette, materials, notes, layers, meta and unknown chunks', () => {
     const document = animatedDocument();
     expect(parseVox(writeVox(document))).toEqual(document);
   });

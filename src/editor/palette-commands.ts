@@ -7,6 +7,8 @@ import { adjustColor, fromHex, gradient, identityMapping, invertMapping, permute
 import type { ColorChannel } from './palette-ops.ts';
 
 const ALL_COLORS = Array.from({ length: PALETTE_SIZE - 1 }, (_unused, slot) => slot + 1);
+/** MagicaVoxel's palette has rows of eight colours, one note each. */
+const NOTE_ROW = 8;
 
 /**
  * MagicaVoxel's palette commands (`pal`, `pal_sel`, `pal_add`, `rand`). Palette edits are one undo
@@ -122,6 +124,24 @@ export function createPaletteCommands(editor: Editor) {
     /** Loads a whole palette (a preset or an imported file) as one undo step. */
     loadPalette(palette: Uint8Array, message: string) {
       replacePalette(palette, message);
+    },
+
+    /** NOTE: the note of the row of eight colours holding `index`. */
+    noteOf: (index: number) => state.vox.notes[Math.floor((index - 1) / NOTE_ROW)] ?? '',
+
+    setNote(index: number, text: string) {
+      const row = Math.floor((index - 1) / NOTE_ROW);
+      const before = state.vox.notes;
+      const after = Array.from({ length: Math.max(before.length, row + 1) }, (_unused, position) => before[position] ?? '');
+      after[row] = text.trim();
+      if (after[row] === (before[row] ?? '')) return;
+      const apply = (notes: string[]) => () => {
+        state.vox.notes = notes;
+        editor.paletteChanged();
+      };
+      apply(after)();
+      editor.history.push({ undo: apply(before), redo: apply(after) });
+      editor.status('Nota da paleta alterada');
     },
 
     /** `pal_sel all/none/inv`. */

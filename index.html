@@ -13,6 +13,7 @@
         <button id="save-file" type="button" title="Salvar .vox (Ctrl+S; salvar como: Ctrl+Shift+S)">Salvar</button>
       </div>
       <input id="file-input" type="file" accept=".vox" hidden />
+      <input id="palette-input" type="file" accept=".png,.act,image/png" hidden />
       <div id="modes" class="segmented" role="group" aria-label="Editor (Tab/Shift+Tab no viewport ou duplo clique alterna)">
         <button type="button" data-value="model" title="Editar os voxels do objeto selecionado (Tab)">Modelo</button>
         <button type="button" data-value="world" title="Organizar e animar objetos (Tab)">Mundo</button>
@@ -66,6 +67,19 @@
               <button type="button" data-palette="copyCode" title="Copiar o código da cor">Copiar</button>
               <button type="button" data-palette="pasteCode" title="Colar um código de cor">Colar</button>
               <button type="button" data-palette="random" title="Colorir os voxels com cores aleatórias da seleção">Aleatório</button>
+            </div>
+            <div class="control-row">
+              <span class="label" title="Nota da linha de 8 cores da cor atual (NOTE)">Nota</span>
+              <input id="palette-note" type="text" aria-label="Nota da linha da paleta" placeholder="linha sem nota" />
+            </div>
+            <div class="segmented" role="group" aria-label="Arquivos de paleta">
+              <button type="button" data-palette="open" title="Abrir paleta .png ou .act (ou solte o arquivo na janela)">Abrir</button>
+              <button type="button" data-palette="savePng" title="Salvar a paleta como PNG 256×1">PNG</button>
+              <button type="button" data-palette="saveAct" title="Salvar a paleta como .act">ACT</button>
+            </div>
+            <div class="segmented" role="group" aria-label="Paletas prontas">
+              <button type="button" data-palette="presetMv" title="Paleta padrão do MagicaVoxel">Padrão</button>
+              <button type="button" data-palette="presetHue" title="Paleta de tons por matiz">Tons</button>
             </div>
             <div class="segmented" role="group" aria-label="Copiar e colar região da paleta">
               <button type="button" data-palette="copyRegion" title="Copiar as cores selecionadas">Copiar região</button>

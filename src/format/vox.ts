@@ -21,8 +21,12 @@ export type VoxDocument = {
   /** RGBA chunk layout: palette index i (1..255) lives at byte (i - 1) * 4. */
   palette: Uint8Array;
   layers: Layer[];
+  /** MATL: material properties per palette index (`_type`, `_rough`, ...), kept as MagicaVoxel writes them. */
+  materials: Map<number, Dict>;
+  /** NOTE: MagicaVoxel's palette notes, one per row of eight colours. */
+  notes: string[];
   meta: Dict;
-  /** Chunks this editor does not model (MATL, rOBJ, rCAM, NOTE, IMAP, ...), written back verbatim. */
+  /** Chunks this editor does not model (rOBJ, rCAM, IMAP, ...), written back verbatim. */
   extras: RawChunk[];
 };
 
