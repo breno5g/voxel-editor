@@ -476,6 +476,104 @@ body {
   background: var(--overlay);
 }
 
+.view-cube {
+  top: 44px;
+  right: 16px;
+  width: 56px;
+  height: 56px;
+  perspective: none;
+}
+
+.view-cube-body {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  transform-style: preserve-3d;
+}
+
+.view-cube-face {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  font-size: 9px;
+  backface-visibility: hidden;
+  background: var(--overlay);
+  border: 1px solid var(--border);
+}
+
+.ruler {
+  overflow: hidden;
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.ruler-yaw {
+  bottom: 44px;
+  left: 50%;
+  width: 320px;
+  height: 22px;
+  transform: translateX(-50%);
+}
+
+.ruler-pitch {
+  right: 8px;
+  top: 50%;
+  width: 26px;
+  height: 240px;
+  transform: translateY(-50%);
+  cursor: ns-resize;
+}
+
+.ruler-tick {
+  position: absolute;
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.ruler-yaw .ruler-tick {
+  bottom: 0;
+  height: 5px;
+  border-left: 1px solid var(--muted);
+}
+
+.ruler-yaw .ruler-tick.major {
+  height: 9px;
+  padding-left: 2px;
+  line-height: 0;
+}
+
+.ruler-pitch .ruler-tick {
+  right: 0;
+  width: 5px;
+  border-top: 1px solid var(--muted);
+}
+
+.ruler-pitch .ruler-tick.major {
+  width: 9px;
+}
+
+.ruler-marker {
+  position: absolute;
+  background: var(--accent);
+}
+
+.ruler-yaw .ruler-marker {
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+}
+
+.ruler-pitch .ruler-marker {
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+}
+
 .camera-settings {
   bottom: 44px;
   left: 8px;

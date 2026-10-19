@@ -36,6 +36,7 @@ import { bindStatusBar } from './ui/status-bar.ts';
 import { bindTimeline } from './ui/timeline.ts';
 import { bindToolbar } from './ui/toolbar.ts';
 import { bindViewportPanel } from './ui/viewport-panel.ts';
+import { bindViewCube } from './ui/view-cube.ts';
 
 const editor = createEditor();
 const viewport = createViewport(element('viewport', HTMLElement));
@@ -47,6 +48,7 @@ const files = createFileActions(editor, viewport);
 const xs = bindXsPanel(editor, models);
 const { focusCamera } = bindViewportPanel(editor, viewport, commands, { placePattern: patterns.placePattern, runShader: xs.runChosen });
 const cameras = bindCameraPanel(editor, viewport);
+bindViewCube(viewport);
 
 bindStatusBar(editor);
 bindToolbar(editor, files, commands, focusCamera);

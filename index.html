@@ -631,8 +631,15 @@
             <button type="button" data-value="focus" title="Como no MagicaVoxel: a roda aproxima do centro de rotação (5 recentraliza)">Foco</button>
           </div>
         </div>
+        <div class="segmented">
+          <button id="camera-ruler-toggle" type="button" title="Régua da câmera: arraste para girar (yaw embaixo, pitch ao lado)">Régua</button>
+          <button id="view-cube-toggle" type="button" title="Cubo de vista: clique numa face para olhar daquele lado">Cubo</button>
+        </div>
         <button id="camera-more" type="button" aria-expanded="false" aria-controls="camera-settings" title="Centro, distância, ângulos e campo de visão da câmera" aria-label="Mais opções da câmera">⋯</button>
       </div>
+      <div id="view-cube" class="overlay view-cube" aria-label="Cubo de vista"><div id="view-cube-body" class="view-cube-body"></div></div>
+      <div id="ruler-yaw" class="overlay ruler ruler-yaw" role="slider" aria-label="Régua de yaw da câmera" hidden></div>
+      <div id="ruler-pitch" class="overlay ruler ruler-pitch" role="slider" aria-label="Régua de pitch da câmera" hidden></div>
       <div id="camera-settings" class="overlay camera-settings stack" role="group" aria-label="Detalhes da câmera" hidden>
         <div class="control-row"><span class="label">Centro</span><div class="size-fields"><input data-camera-field="x" type="number" step="any" aria-label="Centro X" /><input data-camera-field="y" type="number" step="any" aria-label="Centro Y" /><input data-camera-field="z" type="number" step="any" aria-label="Centro Z" /></div></div>
         <label class="control-row" title="Distância do olho ao centro (meia altura da vista em Orto e Iso)"><span class="label">Distância</span><input data-camera-field="distance" type="number" min="0.001" step="any" /></label>
