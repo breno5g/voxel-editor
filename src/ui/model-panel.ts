@@ -1,12 +1,18 @@
 import type { ModelCommands } from '../editor/model-commands.ts';
-import { element } from './dom.ts';
 
-/** Model editor actions on the whole volume (MagicaVoxel's edit panel). */
+/**
+ * MagicaVoxel's model edit panel: each button carries its console command in `data-command`
+ * (`rot90 x`, `prim cone`), and each argument field the command its text completes (`loop` + `z 2`).
+ */
 export function bindModelPanel(models: ModelCommands): void {
-  const actions: [string, () => void][] = [
-    ['model-full', models.full],
-    ['model-fill', models.fill],
-    ['model-zero', models.zero],
-  ];
-  actions.forEach(([id, action]) => element(id, HTMLButtonElement).addEventListener('click', action));
+  document.querySelectorAll<HTMLButtonElement>('[data-command]').forEach((button) =>
+    button.addEventListener('click', () => models.run(button.dataset.command ?? '')),
+  );
+  document.querySelectorAll<HTMLInputElement>('[data-command-args]').forEach((input) =>
+    input.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      models.run(`${input.dataset.commandArgs} ${input.value}`);
+    }),
+  );
 }

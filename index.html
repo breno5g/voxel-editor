@@ -188,9 +188,102 @@
       <section aria-labelledby="model-title" data-only-mode="model">
         <h2 id="model-title">Modelo</h2>
         <div class="segmented" role="group" aria-label="Volume inteiro">
-          <button id="model-full" type="button" title="Encher o volume com a cor atual (U)">Encher</button>
-          <button id="model-fill" type="button" title="Pintar todos os voxels com a cor atual (I)">Pintar tudo</button>
-          <button id="model-zero" type="button" title="Apagar todos os voxels (Delete)">Limpar</button>
+          <button type="button" data-command="full" title="Encher o volume com a cor atual (U)">Encher</button>
+          <button type="button" data-command="fill" title="Pintar todos os voxels com a cor atual (I)">Pintar</button>
+          <button type="button" data-command="zero" title="Apagar todos os voxels (Delete)">Limpar</button>
+        </div>
+        <div class="segmented" role="group" aria-label="Inverter e redimensionar">
+          <button type="button" data-command="rev" title="O espaço vazio vira voxel na cor atual e os voxels somem">Inverter</button>
+          <button type="button" data-command="x2" title="Dobrar o tamanho do modelo">2×</button>
+          <button type="button" data-command="xh" title="Reduzir o modelo à metade">½</button>
+        </div>
+      </section>
+      <section aria-labelledby="transform-title" data-only-mode="model">
+        <h2 id="transform-title">Transformar</h2>
+          <div class="control-row">
+            <span class="label" id="rot90-label">Girar 90°</span>
+            <div class="segmented" role="group" aria-labelledby="rot90-label">
+              <button type="button" data-command="rot90 x" title="Girar o volume 90° em X">X</button>
+              <button type="button" data-command="rot90 y" title="Girar o volume 90° em Y">Y</button>
+              <button type="button" data-command="rot90 z" title="Girar o volume 90° em Z">Z</button>
+            </div>
+          </div>
+          <div class="control-row">
+            <span class="label" id="flip-model-label">Virar</span>
+            <div class="segmented" role="group" aria-labelledby="flip-model-label">
+              <button type="button" data-command="flip x" title="Virar o volume em X">X</button>
+              <button type="button" data-command="flip y" title="Virar o volume em Y">Y</button>
+              <button type="button" data-command="flip z" title="Virar o volume em Z">Z</button>
+            </div>
+          </div>
+          <div class="control-row">
+            <span class="label" id="mir-label">Simetria</span>
+            <div class="segmented" role="group" aria-labelledby="mir-label">
+              <button type="button" data-command="mir x" title="Copiar a metade de baixo espelhada para a de cima em X">X</button>
+              <button type="button" data-command="mir y" title="Copiar a metade de baixo espelhada para a de cima em Y">Y</button>
+              <button type="button" data-command="mir z" title="Copiar a metade de baixo espelhada para a de cima em Z">Z</button>
+            </div>
+          </div>
+          <div class="control-row">
+            <span class="label" id="dia-label">Diagonal</span>
+            <div class="segmented" role="group" aria-labelledby="dia-label">
+              <button type="button" data-command="dia x" title="Espelhar pela diagonal dos outros eixos, em torno de X">X</button>
+              <button type="button" data-command="dia y" title="Espelhar pela diagonal dos outros eixos, em torno de Y">Y</button>
+              <button type="button" data-command="dia z" title="Espelhar pela diagonal dos outros eixos, em torno de Z">Z</button>
+            </div>
+          </div>
+          <div class="control-row">
+            <span class="label" id="loop-label">Deslocar</span>
+            <div class="segmented" role="group" aria-labelledby="loop-label">
+              <button type="button" data-command="loop x -1" title="Deslocar −1 em X, dando a volta">−X</button>
+              <button type="button" data-command="loop x 1" title="Deslocar +1 em X, dando a volta">+X</button>
+              <button type="button" data-command="loop y -1" title="Deslocar −1 em Y, dando a volta">−Y</button>
+              <button type="button" data-command="loop y 1" title="Deslocar +1 em Y, dando a volta">+Y</button>
+              <button type="button" data-command="loop z -1" title="Deslocar −1 em Z, dando a volta">−Z</button>
+              <button type="button" data-command="loop z 1" title="Deslocar +1 em Z, dando a volta">+Z</button>
+            </div>
+          </div>
+          <label class="control-row" title="Deslocar: eixos e deslocamento. Enter aplica">
+            <span class="label">Mover</span>
+            <input type="text" data-command-args="loop" value="z 2" spellcheck="false" />
+          </label>
+          <label class="control-row" title="Escalar: eixos e escala. Enter aplica">
+            <span class="label">Escalar</span>
+            <input type="text" data-command-args="scale" value="xyz 2" spellcheck="false" />
+          </label>
+          <label class="control-row" title="Cisalhar: eixo e duas escalas. Enter aplica">
+            <span class="label">Cisalhar</span>
+            <input type="text" data-command-args="shear" value="z 0.2 0.2" spellcheck="false" />
+          </label>
+          <label class="control-row" title="Girar: eixo e ângulo em graus. Enter aplica">
+            <span class="label">Girar</span>
+            <input type="text" data-command-args="rot" value="z 45" spellcheck="false" />
+          </label>
+          <label class="control-row" title="Repetir: eixos e número de vezes. Enter aplica">
+            <span class="label">Repetir</span>
+            <input type="text" data-command-args="repeat" value="xy 2" spellcheck="false" />
+          </label>
+      </section>
+      <section aria-labelledby="generate-title" data-only-mode="model">
+        <h2 id="generate-title">Gerar</h2>
+        <div class="segmented columns-2" role="group" aria-label="Forma na cor atual, ocupando o volume">
+          <button type="button" data-command="prim elli" title="Elipsoide que ocupa o volume">Elipsoide</button>
+          <button type="button" data-command="prim cyli" title="Cilindro vertical que ocupa o volume">Cilindro</button>
+          <button type="button" data-command="prim pyra" title="Pirâmide que ocupa o volume">Pirâmide</button>
+          <button type="button" data-command="prim cone" title="Cone que ocupa o volume">Cone</button>
+        </div>
+        <div class="segmented" role="group" aria-label="Gerar padrões">
+          <button type="button" data-command="maze" title="Labirinto de corredores na cor atual">Labirinto</button>
+          <button type="button" data-command="noise -1" title="Ruído Perlin com semente aleatória">Ruído</button>
+        </div>
+      </section>
+      <section aria-labelledby="modify-title" data-only-mode="model">
+        <h2 id="modify-title">Modificar</h2>
+        <div class="segmented columns-2" role="group" aria-labelledby="modify-title">
+          <button type="button" data-command="flood 0" title="Remover os voxels que não aparecem de fora">Casca</button>
+          <button type="button" data-command="flood" title="Preencher o espaço fechado por dentro com a cor atual">Inundar</button>
+          <button type="button" data-command="dil" title="Crescer uma camada na cor atual">Dilatar</button>
+          <button type="button" data-command="ero" title="Remover a camada externa">Erodir</button>
         </div>
       </section>
     </aside>
