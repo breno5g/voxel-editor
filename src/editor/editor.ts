@@ -5,14 +5,14 @@ import { clampFrame, DEFAULT_RANGE, formatRange, parseRange, RANGE_META_KEY } fr
 import type { FrameRange } from '../scene/keyframes.ts';
 import { evaluateScene } from '../scene/scene-graph.ts';
 import type { Instance } from '../scene/scene-graph.ts';
-import type { CenterOptions, FaceConnectivity, GeoShape, StampShape } from './brush-shapes.ts';
+import type { CenterOptions, FaceConnectivity, GeoShape, RegionOptions, StampShape } from './brush-shapes.ts';
 import { createHistory } from './history.ts';
 
 /** MagicaVoxel's editors: `model` edits the selected object's voxels, `world` arranges objects. */
 export const MODES = ['model', 'world'] as const;
 export type Mode = (typeof MODES)[number];
-/** MagicaVoxel `b_type`. */
-export const BRUSH_TYPES = ['attach', 'erase', 'paint'] as const;
+/** MagicaVoxel `b_type`: brush actions, then one-click actions on a colour region (`pick` takes its colour). */
+export const BRUSH_TYPES = ['attach', 'erase', 'paint', 'pick', 'remove', 'replace'] as const;
 export type BrushType = (typeof BRUSH_TYPES)[number];
 /**
  * MagicaVoxel `b_mode`: `vox` stamps under the pointer, `face` works on the flat face region
@@ -70,6 +70,7 @@ export type EditorState = {
   voxBrush: VoxBrush;
   faceBrush: FaceBrush;
   geoBrush: GeoBrush;
+  regionBrush: RegionOptions;
   color: number;
   /** Shows the previous model frame translucent while editing frame-by-frame animation. */
   onionSkin: boolean;
@@ -122,6 +123,7 @@ export function createEditor() {
     voxBrush: { size: 1, shape: 'cube', volume: true },
     faceBrush: { usePalette: true, byColor: false, neighbors: 4 },
     geoBrush: { shape: 'line', project: false, fill: true, even: false },
+    regionBrush: { connected: true, byColor: true, neighbors: 6 },
     color: DEFAULT_COLOR,
     onionSkin: false,
     display: { grid: true, frame: true, edges: false, backgroundObjects: true },
@@ -236,6 +238,11 @@ export function createEditor() {
 
     toggleAxis(axis: Axis) {
       state.axes = toggled(state.axes, axis);
+      emit({ type: 'tool' });
+    },
+
+    setRegionBrush(changes: Partial<RegionOptions>) {
+      state.regionBrush = { ...state.regionBrush, ...changes };
       emit({ type: 'tool' });
     },
 

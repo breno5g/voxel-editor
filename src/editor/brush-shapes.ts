@@ -1,5 +1,5 @@
 import type { Axis } from '../format/rotation.ts';
-import { EMPTY_VOXEL, isInside, voxelIndex } from '../format/vox.ts';
+import { cellOf, EMPTY_VOXEL, isInside, voxelIndex } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
 
 export const AXES: readonly Axis[] = [0, 1, 2];
@@ -74,6 +74,45 @@ export function lineCells(from: Vec3, to: Vec3): Vec3[] {
     const t = steps === 0 ? 0 : step / steps;
     return [Math.round(from[0] + (to[0] - from[0]) * t), Math.round(from[1] + (to[1] - from[1]) * t), Math.round(from[2] + (to[2] - from[2]) * t)];
   });
+}
+
+/**
+ * Region options: MagicaVoxel `b_region` (every voxel of the clicked colour, or only the connected
+ * ones), `b_rsel_col` (connect through the same colour only) and `b_rsel_4`, whose 4/8 neighbour
+ * choice becomes 6 (faces) or 26 (faces, edges, corners) in a volume.
+ */
+export type RegionOptions = { connected: boolean; byColor: boolean; neighbors: 6 | 26 };
+
+const NEIGHBORS_26: Vec3[] = [];
+for (let dz = -1; dz <= 1; dz++) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx || dy || dz) NEIGHBORS_26.push([dx, dy, dz]);
+const NEIGHBORS_6 = NEIGHBORS_26.filter((offset) => Math.abs(offset[0]) + Math.abs(offset[1]) + Math.abs(offset[2]) === 1);
+
+/** The voxels a region action (remove, replace, region select) applies to, starting from a filled voxel. */
+export function colorRegion(model: VoxModel, start: Vec3, { connected, byColor, neighbors }: RegionOptions): Vec3[] {
+  const startColor = colorAt(model, start);
+  if (startColor === EMPTY_VOXEL) return [];
+  if (!connected) {
+    const cells: Vec3[] = [];
+    model.voxels.forEach((color, index) => {
+      if (color === startColor) cells.push(cellOf(model.size, index));
+    });
+    return cells;
+  }
+  const offsets = neighbors === 26 ? NEIGHBORS_26 : NEIGHBORS_6;
+  const seen = new Set([voxelIndex(model.size, start[0], start[1], start[2])]);
+  const region = [start];
+  for (let index = 0; index < region.length; index++) {
+    for (const offset of offsets) {
+      const next = addScaled(region[index], offset, 1);
+      const color = colorAt(model, next);
+      if (color === EMPTY_VOXEL || (byColor && color !== startColor)) continue;
+      const key = voxelIndex(model.size, next[0], next[1], next[2]);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      region.push(next);
+    }
+  }
+  return region;
 }
 
 /** Geometry brush shapes, MagicaVoxel `b_geo`. */

@@ -43,6 +43,23 @@
           <button type="button" data-value="attach" title="Adicionar voxels (T)">Adicionar</button>
           <button type="button" data-value="erase" title="Apagar voxels (R)">Apagar</button>
           <button type="button" data-value="paint" title="Pintar voxels (G)">Pintar</button>
+          <button type="button" data-value="pick" title="Pegar a cor do voxel clicado (ou Alt + clique)">Conta-gotas</button>
+          <button type="button" data-value="remove" title="Apagar a região de cor clicada">Remover região</button>
+          <button type="button" data-value="replace" title="Pintar a região clicada com a cor atual">Substituir região</button>
+        </div>
+        <div class="brush-options" data-region-options>
+          <div id="region-scope" class="tools" role="group" aria-label="Alcance da região">
+            <button type="button" data-value="connected" title="Só os voxels ligados ao clicado">Conectada</button>
+            <button type="button" data-value="color" title="Todos os voxels da cor clicada">Toda a cor</button>
+          </div>
+          <div id="region-connect" class="tools" role="group" aria-label="Conexão da região">
+            <button type="button" data-value="color" title="Só atravessa a mesma cor">Mesma cor</button>
+            <button type="button" data-value="geometry" title="Atravessa qualquer voxel">Geometria</button>
+          </div>
+          <div id="region-neighbors" class="tools" role="group" aria-label="Vizinhança">
+            <button type="button" data-value="6" title="Só faces">6 vizinhos</button>
+            <button type="button" data-value="26" title="Faces, arestas e cantos">26 vizinhos</button>
+          </div>
         </div>
         <div id="mirror" class="tools" role="group" aria-label="Espelho do pincel">
           <button type="button" data-axis="0" title="Espelhar o pincel em X (1)">↔X</button>

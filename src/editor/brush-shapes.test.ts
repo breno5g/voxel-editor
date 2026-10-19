@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createModel, voxelIndex } from '../format/vox.ts';
 import type { Vec3 } from '../format/vox.ts';
-import { alongAxes, cellsBetween, centeredShape, faceRegion, lineCells, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
+import { alongAxes, cellsBetween, centeredShape, colorRegion, faceRegion, lineCells, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
 
 describe('stampCells', () => {
   it('is the centre cell at size 1', () => {
@@ -52,6 +52,39 @@ describe('faceRegion', () => {
 
   it('is empty when the clicked face is covered', () => {
     expect(faceRegion(slab(), [2, 2, 0], [0, 0, 1], { byColor: false, neighbors: 4 })).toEqual([]);
+  });
+});
+
+describe('colorRegion', () => {
+  /** Two red runs (one touching blue, one apart) and a diagonal red voxel. */
+  const scene = () => {
+    const model = createModel([6, 3, 3]);
+    const set = ([x, y, z]: Vec3, color: number) => (model.voxels[voxelIndex(model.size, x, y, z)] = color);
+    const reds: Vec3[] = [
+      [0, 0, 0],
+      [1, 0, 0],
+      [4, 0, 0],
+    ];
+    reds.forEach((cell) => set(cell, 1));
+    set([2, 0, 0], 2);
+    set([2, 1, 1], 1);
+    return model;
+  };
+
+  it('takes every voxel of the colour when not connected', () => {
+    expect(colorRegion(scene(), [0, 0, 0], { connected: false, byColor: true, neighbors: 6 })).toHaveLength(4);
+  });
+
+  it('follows face neighbours of the same colour', () => {
+    expect(colorRegion(scene(), [0, 0, 0], { connected: true, byColor: true, neighbors: 6 })).toEqual([
+      [0, 0, 0],
+      [1, 0, 0],
+    ]);
+  });
+
+  it('crosses other colours by geometry and reaches diagonals with 26 neighbours', () => {
+    expect(colorRegion(scene(), [0, 0, 0], { connected: true, byColor: false, neighbors: 6 })).toHaveLength(3);
+    expect(colorRegion(scene(), [0, 0, 0], { connected: true, byColor: false, neighbors: 26 })).toHaveLength(4);
   });
 });
 

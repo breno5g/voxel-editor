@@ -42,7 +42,12 @@ export function bindBrushPanel(editor: Editor): void {
   geoChecks.project.addEventListener('change', () => editor.setGeoBrush({ project: geoChecks.project.checked }));
   geoChecks.fill.addEventListener('change', () => editor.setGeoBrush({ fill: geoChecks.fill.checked }));
   geoChecks.even.addEventListener('change', () => editor.setGeoBrush({ even: geoChecks.even.checked }));
+  const showRegionScope = bindButtonGroup('region-scope', flag('connected', 'color'), (connected) => editor.setRegionBrush({ connected }));
+  const showRegionConnect = bindButtonGroup('region-connect', flag('color', 'geometry'), (byColor) => editor.setRegionBrush({ byColor }));
+  const showRegionNeighbors = bindButtonGroup('region-neighbors', (raw) => (raw === '6' ? 6 : raw === '26' ? 26 : undefined), (neighbors) => editor.setRegionBrush({ neighbors }));
   const optionSections = [...document.querySelectorAll<HTMLElement>('[data-brush-options]')];
+  const regionOptions = [...document.querySelectorAll<HTMLElement>('[data-region-options]')];
+  const isStroke = () => state.brushType === 'attach' || state.brushType === 'erase' || state.brushType === 'paint';
 
   const sync = () => {
     showMode(state.brushMode);
@@ -62,7 +67,11 @@ export function bindBrushPanel(editor: Editor): void {
     geoChecks.project.disabled = state.geoBrush.shape !== 'line';
     geoChecks.fill.disabled = state.geoBrush.shape === 'line';
     geoChecks.even.disabled = state.geoBrush.shape === 'line';
-    optionSections.forEach((section) => (section.hidden = section.dataset.brushOptions !== state.brushMode));
+    showRegionScope(state.regionBrush.connected);
+    showRegionConnect(state.regionBrush.byColor);
+    showRegionNeighbors(state.regionBrush.neighbors);
+    optionSections.forEach((section) => (section.hidden = !isStroke() || section.dataset.brushOptions !== state.brushMode));
+    regionOptions.forEach((section) => (section.hidden = state.brushType !== 'remove' && state.brushType !== 'replace'));
   };
   sync();
   editor.subscribe((event) => {

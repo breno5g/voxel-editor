@@ -3,8 +3,8 @@ import { cellOf, EMPTY_VOXEL, isInside, voxelIndex } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
 import { chunksTouching } from '../geometry/mesher.ts';
 import type { Viewport } from '../render/viewport.ts';
-import { addScaled, alongAxes, axisOf, cellsBetween, centeredShape, faceRegion, lineCells, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
-import type { Editor } from './editor.ts';
+import { addScaled, alongAxes, axisOf, cellsBetween, centeredShape, colorRegion, faceRegion, lineCells, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
+import type { BrushType, Editor } from './editor.ts';
 
 /** A brush cell and the face plane it was found on; attach strokes keep that plane while dragging. */
 type Target = { cell: Vec3; axis: Axis; plane: number };
@@ -22,6 +22,12 @@ type Stroke = {
   /** Client position of the press, for lines projected onto the surface. */
   start: [number, number];
 };
+
+type Effect = 'attach' | 'erase' | 'paint';
+/** What each brush action does to a cell; `pick` changes nothing. */
+const EFFECTS: Record<BrushType, Effect | null> = { attach: 'attach', erase: 'erase', paint: 'paint', remove: 'erase', replace: 'paint', pick: null };
+/** Actions that apply once to the region under the click, ignoring brush mode, mirror and axis mode. */
+const isRegionAction = (type: BrushType) => type === 'pick' || type === 'remove' || type === 'replace';
 
 /** Screen pixels between surface samples of a projected line. */
 const PROJECTION_STEP = 2;
@@ -43,7 +49,8 @@ const regionBounds = (region: Vec3[]): [Vec3, Vec3] => [
  * - `box` previews the box between press and pointer live, reverting and redrawing it;
  * - `geo` previews a line, square or circle on the plane where the drag started (a projected
  *   line instead follows the surface under the dragged screen segment).
- * Every stroke goes through axis mode and mirror, and is one undo step. Alt+click picks a colour.
+ * Every stroke goes through axis mode and mirror, and is one undo step. Alt+click (or `pick`) takes
+ * the colour under the pointer; `remove` and `replace` clear or recolour the region under the click.
  */
 export function createVoxelTools(editor: Editor, viewport: Viewport) {
   const { state } = editor;
@@ -96,16 +103,18 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
     return path.flatMap((cell) => stamp({ ...target, cell }));
   };
 
-  /** Applies the brush type to `cells` after axis mode and mirror, adding the chunks it touched to `chunks`. */
+  /** Applies the brush action to `cells` (after axis mode and mirror for strokes), adding the chunks it touched to `chunks`. */
   const apply = (active: Stroke, cells: Iterable<Vec3>, chunks: Set<number>, colorFor: (cell: Vec3) => number = () => state.color) => {
     const { model, changes } = active;
-    const { brushType } = state;
-    for (const cell of withMirrors(alongAxes(cells, model.size, state.axes), model.size, state.mirror)) {
+    const effect = EFFECTS[state.brushType];
+    if (!effect) return;
+    const reached = isRegionAction(state.brushType) ? cells : withMirrors(alongAxes(cells, model.size, state.axes), model.size, state.mirror);
+    for (const cell of reached) {
       if (!isInside(model.size, cell)) continue;
       const index = voxelIndex(model.size, cell[0], cell[1], cell[2]);
       const current = model.voxels[index];
-      const after = brushType === 'erase' ? EMPTY_VOXEL : colorFor(cell);
-      const skips = current === after || (brushType === 'paint' && current === EMPTY_VOXEL) || (brushType === 'attach' && current !== EMPTY_VOXEL);
+      const after = effect === 'erase' ? EMPTY_VOXEL : colorFor(cell);
+      const skips = current === after || (effect === 'paint' && current === EMPTY_VOXEL) || (effect === 'attach' && current !== EMPTY_VOXEL);
       if (skips) continue;
       changes.set(index, [changes.get(index)?.[0] ?? current, after]);
       model.voxels[index] = after;
@@ -200,6 +209,17 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
     drawFace(stroke, face);
   };
 
+  /** `remove` / `replace`: one click clears or recolours the region under it (one undo step on release). */
+  const applyRegion = (object: { transformId: number; model: VoxModel }, clientX: number, clientY: number) => {
+    const hit = viewport.pick(clientX, clientY, object.transformId)?.hit;
+    if (!hit) return;
+    const target: Target = { cell: hit.voxel, axis: axisOf(hit.normal), plane: 0 };
+    stroke = { ...object, anchor: target, last: target, changes: new Map(), face: null, start: [clientX, clientY] };
+    const chunks = new Set<number>();
+    apply(stroke, colorRegion(object.model, hit.voxel, state.regionBrush), chunks);
+    if (chunks.size > 0) editor.voxelsChanged(object.model, chunks);
+  };
+
   /** Hover outline of the face region under the pointer, cached while the pointer stays on the same face. */
   let hoverKey = '';
   let hoverBounds: [Vec3, Vec3] | null = null;
@@ -235,8 +255,9 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
 
   return {
     begin(clientX: number, clientY: number, isColorPick: boolean) {
-      if (isColorPick) return pickColor(clientX, clientY);
+      if (isColorPick || state.brushType === 'pick') return pickColor(clientX, clientY);
       const object = edited();
+      if (object && isRegionAction(state.brushType)) return applyRegion(object, clientX, clientY);
       if (object && state.brushMode === 'face') return beginFace(object, clientX, clientY);
       const target = object && targetAt(clientX, clientY, object.model, object.transformId);
       if (!object || !target) return;
@@ -256,7 +277,7 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
       const target = object && targetAt(clientX, clientY, object.model, object.transformId);
       if (stroke?.anchor && state.brushMode === 'box') viewport.showHover(stroke.transformId, stroke.anchor.cell, target?.cell ?? stroke.anchor.cell);
       else viewport.showHover(object && target ? object.transformId : null, target?.cell);
-      if (stroke && target) draw(stroke, target, [clientX, clientY]);
+      if (stroke && target && !isRegionAction(state.brushType)) draw(stroke, target, [clientX, clientY]);
     },
 
     end() {
