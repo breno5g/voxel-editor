@@ -74,6 +74,8 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, files: F
       ['Delete', commands.deleteSelected],
       ['Backspace', commands.deleteSelected],
       ['ctrl+d', () => editor.select(null)],
+      ['ctrl+h', () => state.selected !== null && commands.toggleHidden(state.selected)],
+      ['g', commands.groundSelected],
       ['ArrowLeft', move([-1, 0, 0])],
       ['ArrowRight', move([1, 0, 0])],
       ['ArrowUp', move([0, 1, 0])],

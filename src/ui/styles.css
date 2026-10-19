@@ -327,3 +327,7 @@ label.track-shape {
   margin-top: 12px;
   text-align: right;
 }
+
+.viewport canvas:focus-visible {
+  outline-offset: -2px;
+}

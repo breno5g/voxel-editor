@@ -14,6 +14,7 @@ export type Track = 'transform' | 'shape';
 type Selection = { transformId: number; transform: TransformNode; shape: ShapeNode; model: number };
 
 const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const isZero = (vector: Vec3) => vector.every((axis) => axis === 0);
 const uniqueModels = (shape: ShapeNode) => [...new Set(shape.keys.map((key) => key.model))];
 
 /** Object-level edits (keys, transforms, size, lifecycle); every one is a single undo step. */
@@ -124,6 +125,41 @@ export function createObjectCommands(editor: Editor) {
 
     moveSelected(delta: Vec3) {
       changeTransform((current) => ({ ...current, translation: add(current.translation, delta) }));
+    },
+
+    /**
+     * Live move for a pointer drag: `preview` repositions the object without touching
+     * history, `commit` records the whole drag as one undo step.
+     */
+    dragSelected() {
+      const selected = selection();
+      if (!selected) return null;
+      const { transform } = selected;
+      const before = transform.keys;
+      const start = evaluateTransform(before, state.frame, isLooping(transform.attrs));
+      return {
+        preview(delta: Vec3) {
+          transform.keys = isZero(delta) ? before : setTransformAt(before, state.frame, { ...start, translation: add(start.translation, delta) });
+          editor.sceneChanged();
+        },
+        commit() {
+          const after = transform.keys;
+          if (after !== before) change(() => (transform.keys = after), () => (transform.keys = before), 'Objeto movido');
+        },
+      };
+    },
+
+    /** MagicaVoxel `omove g`: drops the object until the bottom of its model box rests on z = 0. */
+    groundSelected() {
+      const selected = selection();
+      if (!selected) return;
+      const { size } = state.vox.models[selected.model];
+      const pivot = modelPivot(size);
+      changeTransform((current) => {
+        const rows = rotationRows(current.rotation);
+        const bottom = [0, 1, 2].reduce((sum, axis) => sum + Math.min(-rows[6 + axis] * pivot[axis], rows[6 + axis] * (size[axis] - pivot[axis])), 0);
+        return { ...current, translation: [current.translation[0], current.translation[1], -bottom] };
+      }, 'Objeto apoiado no chão');
     },
 
     rotateSelected(axis: Axis, direction: 1 | -1) {

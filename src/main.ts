@@ -21,7 +21,7 @@ const editor = createEditor();
 const viewport = createViewport(element('viewport', HTMLElement));
 const commands = createObjectCommands(editor);
 const files = createFileActions(editor, viewport);
-const { frameScene } = bindViewportPanel(editor, viewport);
+const { frameScene } = bindViewportPanel(editor, viewport, commands);
 
 bindStatusBar(editor);
 bindToolbar(editor, files, commands, frameScene);

@@ -109,11 +109,16 @@ export function createViewport(container: HTMLElement) {
     overlays.showSelection(view?.model ? view.group.matrix : null, view?.model?.size);
   };
 
-  const modelRay = (view: ObjectView, clientX: number, clientY: number): ModelRay | null => {
-    if (!view.model) return null;
+  /** Points the raycaster through a client-space position. */
+  const aim = (clientX: number, clientY: number) => {
     const bounds = renderer.domElement.getBoundingClientRect();
     const pointer = new THREE.Vector2(((clientX - bounds.left) / bounds.width) * 2 - 1, -((clientY - bounds.top) / bounds.height) * 2 + 1);
     raycaster.setFromCamera(pointer, camera);
+  };
+
+  const modelRay = (view: ObjectView, clientX: number, clientY: number): ModelRay | null => {
+    if (!view.model) return null;
+    aim(clientX, clientY);
     const inverse = view.group.matrix.clone().invert();
     const pivot = new THREE.Vector3(...modelPivot(view.model.size));
     return {
@@ -227,6 +232,13 @@ export function createViewport(container: HTMLElement) {
         if (hit && (!nearest || hit.distance < nearest.hit.distance)) nearest = { transformId, hit };
       }
       return nearest;
+    },
+
+    /** Where the pointer ray crosses the horizontal plane at height `z`, in world space. */
+    planePoint(clientX: number, clientY: number, z: number): Vec3 | null {
+      aim(clientX, clientY);
+      const point = raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), -z), new THREE.Vector3());
+      return point && toVec3(point);
     },
 
     floorCell(clientX: number, clientY: number, transformId: number): Vec3 | null {

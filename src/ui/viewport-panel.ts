@@ -1,5 +1,7 @@
 import type { Editor } from '../editor/editor.ts';
+import type { ObjectCommands } from '../editor/object-commands.ts';
 import { createVoxelTools } from '../editor/voxel-tools.ts';
+import { createWorldTools } from '../editor/world-tools.ts';
 import type { Viewport } from '../render/viewport.ts';
 import { isLooping, previousShapeModel } from '../scene/keyframes.ts';
 import { evaluateScene } from '../scene/scene-graph.ts';
@@ -12,9 +14,11 @@ const MAIN_BUTTON = 0;
  * belong to the camera). Tab switches editors while the canvas has focus, so it still
  * moves focus everywhere else; Esc hands focus back to the page.
  */
-export function bindViewportPanel(editor: Editor, viewport: Viewport) {
+export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: ObjectCommands) {
   const { state } = editor;
-  const tools = createVoxelTools(editor, viewport);
+  const voxelTools = createVoxelTools(editor, viewport);
+  const worldTools = createWorldTools(editor, commands, viewport);
+  const tools = () => (state.mode === 'model' ? voxelTools : worldTools);
   const { canvas } = viewport;
 
   canvas.tabIndex = 0;
@@ -29,14 +33,30 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport) {
   canvas.addEventListener('pointerdown', (event) => {
     if (event.button !== MAIN_BUTTON) return;
     canvas.setPointerCapture(event.pointerId);
-    if (state.mode === 'world') return editor.select(viewport.pick(event.clientX, event.clientY)?.transformId ?? null);
-    tools.begin(event.clientX, event.clientY, event.altKey);
+    tools().begin(event.clientX, event.clientY, event.altKey);
   });
-  canvas.addEventListener('pointermove', (event) => {
-    if (state.mode === 'model') tools.move(event.clientX, event.clientY);
-  });
+  canvas.addEventListener('pointermove', (event) => tools().move(event.clientX, event.clientY));
   canvas.addEventListener('pointerup', (event) => {
-    if (event.button === MAIN_BUTTON && state.mode === 'model') tools.end();
+    if (event.button === MAIN_BUTTON) tools().end();
+  });
+
+  const isOnEditedModel = (clientX: number, clientY: number) =>
+    state.selected !== null && (viewport.pick(clientX, clientY, state.selected) !== null || viewport.floorCell(clientX, clientY, state.selected) !== null);
+
+  /**
+   * MagicaVoxel: double click enters the clicked object's model, switches to another
+   * object from model mode, or leaves to the world from empty space. On the edited
+   * model itself the clicks are just brush strokes.
+   */
+  canvas.addEventListener('dblclick', ({ clientX, clientY }) => {
+    if (state.mode === 'world') {
+      if (viewport.pick(clientX, clientY)) editor.setMode('model');
+      return;
+    }
+    if (isOnEditedModel(clientX, clientY)) return;
+    const other = viewport.pick(clientX, clientY);
+    if (other) editor.select(other.transformId);
+    else editor.setMode('world');
   });
   canvas.addEventListener('pointerleave', () => viewport.showHover(null));
 

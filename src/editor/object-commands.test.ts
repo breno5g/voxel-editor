@@ -62,6 +62,28 @@ describe('object commands', () => {
     expect(editor.state.vox.models[0].size).toEqual([4, 4, 3]);
   });
 
+  it('grounds an object on z = 0 using the height of its rotated model box', () => {
+    const { editor, commands } = setup();
+    commands.moveSelected([0, 0, 5]);
+    commands.groundSelected();
+    expect(transformKeys(editor)[0].translation).toEqual([0, 0, 1]);
+    commands.rotateSelected(0, 1);
+    commands.groundSelected();
+    // Quarter turn about X stands the model on its Y extent: 4 deep, pivot 2.
+    expect(transformKeys(editor)[0].translation).toEqual([0, 0, 2]);
+  });
+
+  it('records a pointer drag as a single undo step', () => {
+    const { editor, commands } = setup();
+    const drag = commands.dragSelected();
+    drag?.preview([1, 0, 0]);
+    drag?.preview([3, -2, 0]);
+    drag?.commit();
+    expect(transformKeys(editor)[0].translation).toEqual([3, -2, 1]);
+    editor.history.undo();
+    expect(transformKeys(editor)[0].translation).toEqual([0, 0, 1]);
+  });
+
   it('rejects sizes outside 1..256', () => {
     const { editor, commands } = setup();
     commands.resizeSelected([0, 4, 4]);
