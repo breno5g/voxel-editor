@@ -119,4 +119,4 @@ Pendências da v1.0:
 - [x] Meios (`_media`): absorver (Beer–Lambert colorido), espalhar e SSS (distância livre e fase `_g`), emitir; sombras atravessam os meios
 - [x] Reflexo de metal e mistura com microfacetas GGX e MIS (`pt_mis_ggx`): o sol entra amostrado direto e pelo raio refletido, pesados pela heurística da potência; espelhos mostram o sol mesmo com o disco oculto
 - [ ] MIS no espalhamento (`pt_mis_cloud`): névoa e meios amostram só o sol; as opções estocástico e volume esparso não têm equivalente separado (sempre ligados)
-- [ ] Escalas inferidas do path tracer (área do sol, névoa, abertura, emissão, atmosfera; ver [RE §8](magicavoxel-re.md)) conferidas contra renders do MagicaVoxel
+- [x] Escalas do path tracer lidas do setup de uniforms do MagicaVoxel ([RE §8](magicavoxel-re.md)): sol (raio `_area·20°`, força `5·_i`, ×2 na atmosfera, direção), gama do filme em todas as cores, IBL normalizada, coeficientes da atmosfera `10^(1,5·d) − 1`, névoa, horizonte, abertura, emissão `1 + 3·_emit·10^_flux`, ACES ×0,6 e bloom ×0,7; seguem inferidos a profundidade da atmosfera e a convenção da abertura

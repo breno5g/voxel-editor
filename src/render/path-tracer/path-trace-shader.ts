@@ -57,6 +57,8 @@ uniform bool u_sunDisk;
 uniform int u_environment;
 uniform vec3 u_sky;
 uniform float u_iblIntensity;
+/** The film gamma, which also linearizes the palette. */
+uniform float u_gamma;
 uniform mat3 u_iblRotation;
 uniform bool u_hasIbl;
 uniform vec3 u_rayleigh;
@@ -353,9 +355,9 @@ float airMass(vec3 direction) {
   return 1.0 / (max(direction.z, 0.0) + 0.1);
 }
 
-/** Atmosphere extinction per air mass: Rayleigh and Mie scatter, ozone only absorbs. */
+/** Atmosphere extinction per air mass, as MagicaVoxel's \`k_ext\`: Rayleigh scatters, Mie also absorbs a tenth, ozone only absorbs. */
 vec3 extinction() {
-  return u_rayleigh * 2.0 + u_mie * 0.2 + u_ozone * 0.1;
+  return u_rayleigh + u_mie * 1.1 + u_ozone;
 }
 
 /** The sun's light after crossing \`depth\` of the air toward it: redder and dimmer as it sets. */
@@ -367,12 +369,12 @@ vec3 sunlight() {
   return sunlightAt(0.5);
 }
 
-// ponytail: single scattering with a uniform-density sky, tuned by eye; not MagicaVoxel's atmosphere model.
+// ponytail: single scattering in a uniform-density sky with MagicaVoxel's coefficients; its planet model is in the encoded shader.
 /** Rayleigh blue overhead, a white Mie glow around the sun, both washing out toward the horizon. */
 vec3 atmosphere(vec3 direction) {
   float cosSun = dot(direction, u_sunDirection);
   vec3 total = extinction();
-  vec3 scattered = u_rayleigh * 2.0 * 0.75 * (1.0 + cosSun * cosSun) + u_mie * 0.2 * phaseHG(cosSun, u_miePhase) * 4.0 * PI;
+  vec3 scattered = u_rayleigh * 3.0 / (16.0 * PI) * (1.0 + cosSun * cosSun) + u_mie * phaseHG(cosSun, u_miePhase);
   /* Air seen higher up is lit by sunlight that crossed less of the atmosphere: blue zenith over an orange sunset. */
   vec3 light = sunlightAt(0.5 * (1.0 - 0.8 * max(direction.z, 0.0)));
   return light * PI * scattered / max(total, vec3(1e-4)) * (1.0 - exp(-total * airMass(direction)));
@@ -483,7 +485,7 @@ vec3 sunlightThrough(vec3 origin, vec3 direction) {
     int kind = int(shape.x + 0.5);
     if (kind == MEDIA_KIND) {
       vec4 extra = texelFetch(u_materials, ivec2(int(surface.color), 1), 0);
-      vec3 albedo = pow(texelFetch(u_palette, ivec2(int(surface.color), 0), 0).rgb, vec3(2.2));
+      vec3 albedo = pow(texelFetch(u_palette, ivec2(int(surface.color), 0), 0).rgb, vec3(u_gamma));
       float span = mediumLength(surface.position, direction, surface.cell);
       transmittance *= exp(-mediumDensity(extra) * span * (int(shape.y + 0.5) == MEDIA_ABSORB ? 1.0 - albedo : vec3(1.0)));
       origin = surface.position + direction * (span + 2e-3);
@@ -492,7 +494,7 @@ vec3 sunlightThrough(vec3 origin, vec3 direction) {
     if (!u_translucentShadows) return vec3(0.0);
     float transparency = kind == 2 || kind == 4 ? texelFetch(u_materials, ivec2(int(surface.color), 1), 0).x : 0.0;
     if (transparency <= 0.0) return vec3(0.0);
-    transmittance *= transparency * pow(texelFetch(u_palette, ivec2(int(surface.color), 0), 0).rgb, vec3(2.2));
+    transmittance *= transparency * pow(texelFetch(u_palette, ivec2(int(surface.color), 0), 0).rgb, vec3(u_gamma));
     origin = surface.position + direction * 2e-3 * max(max(u_scale.x, u_scale.y), max(u_scale.z, 1.0));
   }
   return vec3(0.0);
@@ -683,7 +685,7 @@ void main() {
     vec4 shape = vec4(0.0, 1.0, 0.0, 1.5);
     vec4 extra = vec4(0.0);
     if (!surface.ground) {
-      albedo = pow(texelFetch(u_palette, ivec2(int(surface.color), 0), 0).rgb, vec3(2.2));
+      albedo = pow(texelFetch(u_palette, ivec2(int(surface.color), 0), 0).rgb, vec3(u_gamma));
       shape = texelFetch(u_materials, ivec2(int(surface.color), 0), 0);
       extra = texelFetch(u_materials, ivec2(int(surface.color), 1), 0);
     }
@@ -875,7 +877,8 @@ void main() {
   float coverage = sampled.a;
   vec3 color = coverage > 0.0 ? sampled.rgb / coverage * u_exposure : vec3(0.0);
   color += texture(u_bloom, gl_FragCoord.xy / u_resolution).rgb * u_bloomMix;
-  color = u_aces ? aces(color) : clamp(color, 0.0, 1.0);
+  /* MagicaVoxel scales by 0.6 ahead of the fitted curve (its \`aces\` uniform), as Narkowicz's fit expects. */
+  color = u_aces ? aces(color * 0.6) : clamp(color, 0.0, 1.0);
   color = pow(color, vec3(1.0 / max(u_gamma, 0.1)));
   vec2 uv = gl_FragCoord.xy / u_resolution - 0.5;
   color *= clamp(1.0 - u_vignette * dot(uv, uv) * 2.0, 0.0, 1.0);

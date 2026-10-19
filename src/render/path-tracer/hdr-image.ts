@@ -60,3 +60,20 @@ export function parseHdr(bytes: Uint8Array): HdrImage {
   }
   return { width, height, pixels };
 }
+
+/** Rec. 709 luminance weights. */
+const LUMINANCE: [number, number, number] = [0.2126, 0.7152, 0.0722];
+
+/** ∫ luminance dω over the sphere of an equirectangular image (rows from the zenith down). */
+export function sphereLuminance({ width, height, pixels }: HdrImage): number {
+  const pixelArea = (2 * Math.PI / width) * (Math.PI / height);
+  let total = 0;
+  for (let y = 0; y < height; y++) {
+    const solidAngle = Math.sin(((y + 0.5) / height) * Math.PI) * pixelArea;
+    for (let x = 0; x < width; x++) {
+      const at = (y * width + x) * 3;
+      total += (pixels[at] * LUMINANCE[0] + pixels[at + 1] * LUMINANCE[1] + pixels[at + 2] * LUMINANCE[2]) * solidAngle;
+    }
+  }
+  return total;
+}

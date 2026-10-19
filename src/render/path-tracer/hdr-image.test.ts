@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseHdr } from './hdr-image.ts';
+import { parseHdr, sphereLuminance } from './hdr-image.ts';
 
 const header = (width: number, height: number) => new TextEncoder().encode(`#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y ${height} +X ${width}\n`);
 const concat = (...parts: ArrayLike<number>[]) => Uint8Array.from(parts.flatMap((part) => Array.from(part)));
@@ -21,5 +21,12 @@ describe('parseHdr', () => {
 
   it('rejects truncated data', () => {
     expect(() => parseHdr(concat(header(2, 2), [1, 2, 3]))).toThrow(/truncados/);
+  });
+});
+
+describe('sphereLuminance', () => {
+  it('integrates a uniform white sky to 4π', () => {
+    const [width, height] = [64, 32];
+    expect(sphereLuminance({ width, height, pixels: new Float32Array(width * height * 3).fill(1) })).toBeCloseTo(4 * Math.PI, 1);
   });
 });

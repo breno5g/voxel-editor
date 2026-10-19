@@ -4,6 +4,7 @@ import type { RenderSettings } from '../../format/render-settings.ts';
 import { PALETTE_BYTES, PALETTE_SIZE } from '../../format/vox.ts';
 import type { Vec3 } from '../../format/vox.ts';
 import { linkFullScreenProgram } from '../gl-program.ts';
+import { sphereLuminance } from './hdr-image.ts';
 import type { HdrImage } from './hdr-image.ts';
 import { MATERIAL_ROWS } from './material-table.ts';
 import { BLOOM_BLUR_FRAGMENT, BLOOM_DOWNSAMPLE, BLOOM_EXTRACT_FRAGMENT, DENOISE_FRAGMENT, DISPLAY_FRAGMENT, pathTraceFragment } from './path-trace-shader.ts';
@@ -23,15 +24,25 @@ export type VoxelShape = (typeof VOXEL_SHAPES)[number];
 export const MAX_SAMPLES = 2048;
 /** How far behind an orthographic camera its rays start, so nothing in front of the scene is cut. */
 const ORTHOGRAPHIC_PULLBACK = 10000;
-// ponytail: the scales below are inferred from MagicaVoxel's slider ranges, not read from its binary.
-/** `_area` as a fraction of a right angle: the sun's angular radius. */
-const SUN_AREA_ANGLE = Math.PI / 2;
+/* MagicaVoxel's scales, as its uniform setup computes them (docs/magicavoxel-re.md §8). */
+/** `_area` 1 is a sun 20° in radius. */
+const SUN_AREA_ANGLE = THREE.MathUtils.degToRad(20);
+/** `_inf _i` 1 is a sun of this strength; twice that under the atmosphere, which dims it. */
+const SUN_SCALE = 5;
 /** `_fog_uni _d`: extinction per 1000 voxels. */
 const FOG_SCALE = 0.001;
-/** `_ground _hor`: how fast the ground fades, per 100 voxels. */
-const HORIZON_SCALE = 0.01;
+/** `_ground _hor`: the ground's extinction per voxel of distance. */
+const HORIZON_SCALE = 0.0005;
+// ponytail: MagicaVoxel passes `_aperture`·0.03; reading it as relative to the focus distance is inferred.
 /** `_lens _aperture`: lens radius as a fraction of the focus distance. */
-const APERTURE_SCALE = 0.02;
+const APERTURE_SCALE = 0.03;
+/** `_bloom _mix` 1 adds this much of the blurred glow. */
+const BLOOM_MIX_SCALE = 0.7;
+/** `_atm`: each coefficient is colour · (10^(1.5·d) − 1) · scale. */
+const AIR_SCALE = { rayleigh: 0.05, mie: 1 / 300, ozone: 0.05 };
+// ponytail: MagicaVoxel's planet (radius 10000) and air profile live in its encoded shader; this depth keeps the default sky.
+/** Air masses of the uniform stand-in atmosphere per unit of coefficient. */
+const AIR_DEPTH = 5;
 
 /** Units for the trace pass, then for the bloom and display passes (which bind only 2D textures). */
 const TEXTURE_UNITS = { volume: 0, bricks: 1, palette: 2, materials: 3, ibl: 4, previous: 5, density: 6, previousNormal: 7, accumulation: 0, bloom: 1, albedo: 1, normal: 2 } as const;
@@ -44,7 +55,11 @@ const DENOISE_COLOR_SIGMA = 0.8;
 /** Clay is occupancy blurred this many times; marching cubes uses it as is. */
 const CLAY_BLUR_PASSES = 2;
 
-const linear = (color: Vec3): Vec3 => [Math.pow(color[0] / 255, 2.2), Math.pow(color[1] / 255, 2.2), Math.pow(color[2] / 255, 2.2)];
+/** An 8-bit colour in linear light, by the film's gamma as MagicaVoxel does for every colour it lights with. */
+const linear = (color: Vec3, gamma: number): Vec3 => [Math.pow(color[0] / 255, gamma), Math.pow(color[1] / 255, gamma), Math.pow(color[2] / 255, gamma)];
+const unit = (color: Vec3): Vec3 => [Math.min(color[0] / 255, 1), Math.min(color[1] / 255, 1), Math.min(color[2] / 255, 1)];
+/** An `_atm` scattering coefficient from its colour and density slider. */
+const airCoefficient = (color: Vec3, density: number, scale: number) => scaled(unit(color), (Math.pow(10, 1.5 * density) - 1) * scale * AIR_DEPTH);
 const scaled = (color: Vec3, factor: number): Vec3 => [color[0] * factor, color[1] * factor, color[2] * factor];
 const radians = THREE.MathUtils.degToRad;
 
@@ -175,6 +190,8 @@ export function createPathTracer(container: HTMLElement) {
   let settings: RenderSettings | null = null;
   let options: TraceOptions = { shadows: true, translucentShadows: true, antialias: true, pixelated: false, shape: 'cube', bloom: false, denoise: false };
   let hasIbl = false;
+  /** ∫ luminance dω of the loaded map, which its intensity is normalized by. */
+  let iblLuminance = 0;
   let samples = 0;
   let current = 0;
   let lastView = '';
@@ -220,37 +237,42 @@ export function createPathTracer(container: HTMLElement) {
   };
 
   const applySettings = (active: RenderSettings) => {
-    const { sun, sky, ibl, atmosphere, fog, lens, ground, edge, grid, show, bounce } = active;
+    const { sun, sky, ibl, atmosphere, fog, lens, ground, edge, grid, show, bounce, film } = active;
+    const gamma = Math.max(film.gamma, 0.1);
+    const lit = (color: Vec3) => linear(color, gamma);
     const uniform3 = (name: string, value: Vec3) => gl.uniform3fv(at(traceProgram, name), value);
     const uniform1 = (name: string, value: number) => gl.uniform1f(at(traceProgram, name), value);
     const uniformInt = (name: string, value: number | boolean) => gl.uniform1i(at(traceProgram, name), Number(value));
     const [pitch, yaw] = [radians(sun.pitch), radians(sun.yaw)];
-    uniform3('u_sunDirection', [Math.cos(pitch) * Math.cos(yaw), Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch)]);
-    uniform3('u_sunRadiance', scaled(linear(sun.color), sun.intensity));
+    uniform3('u_sunDirection', [Math.cos(pitch) * Math.sin(yaw), -Math.cos(pitch) * Math.cos(yaw), Math.sin(pitch)]);
+    uniform3('u_sunRadiance', scaled(lit(sun.color), sun.intensity * SUN_SCALE * (active.environment === 'atmosphere' ? 2 : 1)));
     uniform1('u_sunCos', Math.cos(Math.min(sun.area, 1) * SUN_AREA_ANGLE));
     uniformInt('u_sunDisk', sun.disk);
     uniformInt('u_environment', ENVIRONMENTS.indexOf(active.environment));
-    uniform3('u_sky', scaled(linear(sky.color), sky.intensity));
-    uniform1('u_iblIntensity', ibl.intensity);
+    uniform3('u_sky', scaled(lit(sky.color), sky.intensity));
+    /* MagicaVoxel normalizes the map: intensity 1 is a mean radiance of 1, whatever the file's exposure. */
+    uniform1('u_iblIntensity', iblLuminance > 0 ? (ibl.intensity * 4 * Math.PI) / iblLuminance : ibl.intensity);
     gl.uniformMatrix3fv(at(traceProgram, 'u_iblRotation'), false, new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationZ(-radians(ibl.yaw))).elements);
     uniformInt('u_hasIbl', hasIbl);
     /* Scattering colours are coefficients, not sRGB: the default Rayleigh 45 104 255 is the physical β ratio. */
-    uniform3('u_rayleigh', scaled(atmosphere.rayleighColor, atmosphere.rayleigh / 255));
-    uniform3('u_mie', scaled(atmosphere.mieColor, atmosphere.mie / 255));
+    uniform3('u_rayleigh', airCoefficient(atmosphere.rayleighColor, atmosphere.rayleigh, AIR_SCALE.rayleigh));
+    uniform3('u_mie', airCoefficient(atmosphere.mieColor, atmosphere.mie, AIR_SCALE.mie));
     uniform1('u_miePhase', atmosphere.miePhase);
-    uniform3('u_ozone', scaled(atmosphere.ozoneColor, atmosphere.ozone / 255));
+    uniform3('u_ozone', airCoefficient(atmosphere.ozoneColor, atmosphere.ozone, AIR_SCALE.ozone));
     uniform1('u_fogDensity', fog.density * FOG_SCALE);
-    uniform3('u_fogColor', linear(fog.color));
+    /* Fog's colour is its scattering albedo, taken as is. */
+    uniform3('u_fogColor', unit(fog.color));
     uniform1('u_fogPhase', fog.phase);
     uniformInt('u_ground', show.ground);
-    uniform3('u_groundColor', linear(ground.color));
+    uniform3('u_groundColor', lit(ground.color));
     uniform1('u_horizon', ground.horizon * HORIZON_SCALE);
     uniformInt('u_flatBackground', show.backgroundColor || show.transparent);
     uniformInt('u_edges', show.edge);
-    uniform3('u_edgeColor', linear(edge.color));
+    uniform3('u_edgeColor', lit(edge.color));
     uniform1('u_edgeWidth', edge.width);
     uniformInt('u_grid', show.grid);
-    uniform3('u_gridColor', linear(grid.color));
+    uniform3('u_gridColor', lit(grid.color));
+    uniform1('u_gamma', gamma);
     uniform1('u_gridSpacing', grid.spacing);
     uniform1('u_gridWidth', grid.width);
     uniformInt('u_gridGroundOnly', grid.groundOnly);
@@ -343,7 +365,7 @@ export function createPathTracer(container: HTMLElement) {
     bind(TEXTURE_UNITS.bloom, gl.TEXTURE_2D, bloomTargets[0].texture);
     gl.uniform1i(at(displayProgram, 'u_accumulation'), TEXTURE_UNITS.accumulation);
     gl.uniform1i(at(displayProgram, 'u_bloom'), TEXTURE_UNITS.bloom);
-    gl.uniform1f(at(displayProgram, 'u_bloomMix'), options.bloom ? bloom.mix : 0);
+    gl.uniform1f(at(displayProgram, 'u_bloomMix'), options.bloom ? bloom.mix * BLOOM_MIX_SCALE : 0);
     gl.uniform2f(at(displayProgram, 'u_resolution'), width, height);
     gl.uniform1f(at(displayProgram, 'u_exposure'), film.exposure);
     gl.uniform1i(at(displayProgram, 'u_aces'), Number(film.aces));
@@ -428,6 +450,7 @@ export function createPathTracer(container: HTMLElement) {
     setIbl(image: HdrImage | null) {
       uploadIbl(image);
       hasIbl = image !== null;
+      iblLuminance = image ? sphereLuminance(image) : 0;
       reset();
     },
 

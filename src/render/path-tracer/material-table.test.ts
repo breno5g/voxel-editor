@@ -11,9 +11,9 @@ describe('materialTable', () => {
     expect(row(table, 3, 1)[0]).toBeCloseTo(0.7);
   });
 
-  it('scales emission by four per flux step', () => {
-    const table = materialTable(new Map([[5, new Map([['_type', '_emit'], ['_emit', '0.5'], ['_flux', '2']])]]));
-    expect(row(table, 5, 1)[1]).toBeCloseTo(8);
+  it('makes emitters shine at 1 + 3·emit·10^flux their colour', () => {
+    const table = materialTable(new Map([[5, new Map([['_type', '_emit'], ['_emit', '0.5'], ['_flux', '2']])], [6, new Map([['_type', '_emit'], ['_emit', '0']])]]));
+    expect([row(table, 5, 1)[1], row(table, 6, 1)[1]]).toEqual([expect.closeTo(151), 1]);
   });
 
   it('leaves metal and transparency off for diffuse colours', () => {
