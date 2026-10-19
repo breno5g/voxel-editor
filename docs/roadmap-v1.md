@@ -30,17 +30,25 @@ Pendências da v0.6:
 - [ ] Sombra (`Ctrl+W`), wireframe (`Ctrl+M`), cubo de vista e régua da câmera
 - [ ] `Ctrl+N`, `Ctrl+T` e `Ctrl+W` são reservados pelo navegador: só chegam ao editor numa janela própria (PWA ou app desktop)
 
-## v0.7: pincéis
+## v0.7: pincéis (feito)
 
-- [ ] Voxel com tamanho 1–64, cubo/esfera, 2D/3D (`b_vox_*`)
-- [ ] Face: extrusão por arrasto, cor da paleta ou do voxel, vizinhança 4/8 (`b_face_*`)
-- [ ] Geometria: linha, quadrado, círculo, projetar na superfície, centro, tamanho par (`b_geo`, `b_line_proj`, `b_center_*`)
-- [ ] Modo eixo X/Y/Z (`Ctrl+1/2/3`)
-- [ ] Seleção por região: mesma cor ou conectada, 4/8 vizinhos; remover e substituir região
+- [x] Voxel com tamanho 1–64 (`-`/`+`), cubo/esfera, 2D/3D (`b_vox_*`); adicionar arrastando desenha no plano onde começou, sem buracos
+- [x] Face (`F`): extrusão e escavação por arrasto, pintura da região, cor da paleta ou do voxel, conexão por geometria ou cor, 4/8 vizinhos (`b_face_*`)
+- [x] Geometria (`L`): linha, quadrado, círculo, projetar linha na superfície, preencher centro, tamanho par (`b_geo`, `b_line_proj`, `b_center_*`)
+- [x] Caixa com preview ao vivo
+- [x] Modo eixo X/Y/Z (`Ctrl+1/2/3`): o traço atravessa o modelo (semântica inferida, ver o comentário em `brush-shapes.ts`)
+- [x] Remover e substituir região, conta-gotas (`b_type` `remove`, `replace`, `pick`): mesma cor ou conectada, por geometria ou cor, 6/26 vizinhos
+
+Pendências da v0.7:
+
+- [ ] Redimensionar o pincel com `Ctrl+Alt+arrastar`
+- [ ] Contorno da região de face no hover (hoje mostra a caixa que a envolve)
+- [ ] Modos `code` (`C`, shader XS como pincel) e `pattern` (`P`) dependem da v0.13
 
 ## v0.8: seleção e operações de modelo
 
 - [ ] Seleção retangular, por pincel e por caixa; somar (`Shift`) e subtrair (`Shift+Alt`); `sel_all`/`sel_none`/`sel_inv`, `sel_col`
+- [ ] Seleção por região (`b_type asel`, `N`), reaproveitando a busca de região da v0.7
 - [ ] Copiar/recortar/colar voxels; gizmo mover/loop, escalar, wrap, girar (`Enter`/`Esc`)
 - [ ] `full`, `fill`, `zero`, `rev`, `x2`, `xh`, `rot90`, `flip`, `loop`, `mir`, `dia`
 - [ ] Mover/escalar/cisalhar/girar/repetir com argumentos
