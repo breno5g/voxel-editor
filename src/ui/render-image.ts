@@ -153,9 +153,11 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
     if (!job) describe();
   });
   for (const input of [...Object.values(inputs), element('render-preview-spp', HTMLInputElement)]) {
-    input.addEventListener('input', () => {
-      if (!job) describe();
-    });
+    for (const type of ['input', 'change']) {
+      input.addEventListener(type, () => {
+        if (!job) describe();
+      });
+    }
   }
   sync();
 }
