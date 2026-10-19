@@ -101,6 +101,14 @@ export function createPatternCommands(editor: Editor, models: ModelCommands, obj
       editor.setPattern(turned);
     },
 
+    /** Pattern mode `Dir`/`Page` nudge the stamp from the pointer; `Home` (no delta) recentres it. */
+    movePattern(delta: Vec3 | null) {
+      if (!requirePattern()) return;
+      const [x, y, z] = state.patternOffset;
+      editor.setPatternOffset(delta ? [x + delta[0], y + delta[1], z + delta[2]] : [0, 0, 0]);
+      editor.status(`Padrão deslocado ${state.patternOffset.join(', ')}`);
+    },
+
     /** `onewpatt`: the pattern as a new object, resting on the ground at `at` (or beside the scene). */
     placePattern(at?: Vec3) {
       const pattern = requirePattern();

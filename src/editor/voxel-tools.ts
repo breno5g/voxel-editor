@@ -52,6 +52,13 @@ const EFFECTS: Record<BrushType, Effect | null> = {
   resize: null,
 };
 /** Actions that apply once to the region under the click, ignoring brush mode, mirror and axis mode. */
+/** Code mode: the box between two cells, as a mask clipped to the model. */
+function boxMask(size: Vec3, from: Vec3, to: Vec3): Uint8Array {
+  const mask = new Uint8Array(size[0] * size[1] * size[2]);
+  for (const cell of cellsBetween(from, to)) if (isInside(size, cell)) mask[voxelIndex(size, cell[0], cell[1], cell[2])] = 1;
+  return mask;
+}
+
 const isRegionAction = (type: BrushType) => type === 'pick' || type === 'remove' || type === 'replace' || type === 'asel';
 /** A click without a drag selects the voxel under it instead of a rectangle. */
 const MARQUEE_CLICK = 3;
@@ -79,11 +86,13 @@ const regionBounds = (region: Vec3[]): [Vec3, Vec3] => [
  * Every stroke goes through axis mode and mirror, and is one undo step. Alt+click (or `pick`) takes
  * the colour under the pointer; `remove` and `replace` clear or recolour the region under the click.
  */
-export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag: ObjectCommands['resizeDrag']) {
+export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag: ObjectCommands['resizeDrag'], runShader: (region: Uint8Array) => void) {
   const { state } = editor;
   let stroke: Stroke | null = null;
   let marquee: Marquee | null = null;
   let move: Move | null = null;
+  /** Code mode: the box being dragged, handed to the XS shader on release. */
+  let codeBox: { transformId: number; model: VoxModel; anchor: Vec3; last: Vec3 } | null = null;
   const transform = createTransformTool(editor, viewport);
   let transforming = false;
   let resizing: { drag: NonNullable<ReturnType<typeof resizeDrag>>; axis: Axis; side: 1 | -1; start: [number, number]; screenNormal: [number, number]; twoSided: boolean; cells: number } | null = null;
@@ -167,6 +176,7 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
       cell[u] += px - Math.floor(width / 2);
       cell[v] += py - Math.floor(depth / 2);
       cell[target.axis] += pz * height;
+      AXES.forEach((axis) => (cell[axis] += state.patternOffset[axis]));
       cells.set(cell, state.patternUsesPalette ? state.color : color);
     });
     return cells;
@@ -461,6 +471,10 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
       if (isRegionAction(brushType)) return applyRegion(object, clientX, clientY, selection);
       if (brushMode() === 'face') return beginFace(object, clientX, clientY, selection);
       const target = targetAt(clientX, clientY, object.model, object.transformId);
+      if (brushMode() === 'code' && !selection) {
+        codeBox = target && { ...object, anchor: target.cell, last: target.cell };
+        return codeBox && viewport.showHover(codeBox.transformId, codeBox.anchor, codeBox.last);
+      }
       if (!target) return selection?.mode === 'replace' ? editor.setVoxelSelection(null) : undefined;
       stroke = { ...object, anchor: target, last: target, changes: new Map(), face: null, start: [clientX, clientY], selection };
       draw(stroke, target, [clientX, clientY]);
@@ -475,6 +489,11 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
       if (transforming) return transform.move(clientX, clientY);
       if (resizing) return dragResize(resizing, clientX, clientY);
       if (state.brushType === 'resize') return viewport.showHover(null);
+      if (codeBox) {
+        const target = targetAt(clientX, clientY, codeBox.model, codeBox.transformId);
+        if (target) codeBox.last = target.cell;
+        return viewport.showHover(codeBox.transformId, codeBox.anchor, codeBox.last);
+      }
       if (stroke?.face) {
         const layers = layersAt(stroke.face, clientX, clientY);
         if (layers !== stroke.face.layers) drawFace(stroke, { ...stroke.face, layers });
@@ -497,6 +516,8 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
       resizing = null;
       if (marquee) finishMarquee(marquee);
       marquee = null;
+      if (codeBox) runShader(boxMask(codeBox.model.size, codeBox.anchor, codeBox.last));
+      codeBox = null;
       const moved = move;
       const finished = stroke ?? move;
       stroke = null;

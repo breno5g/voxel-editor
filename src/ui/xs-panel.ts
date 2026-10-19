@@ -19,7 +19,7 @@ function storedShaders(): XsShader[] {
 }
 
 /** MagicaVoxel's XS shader panel and `xs <name> [args…]` console command: arguments come from each shader's header. */
-export function bindXsPanel(editor: Editor, models: ModelCommands): void {
+export function bindXsPanel(editor: Editor, models: ModelCommands) {
   const { state } = editor;
   const runner = createXsRunner();
   const select = element('xs-shader', HTMLSelectElement);
@@ -57,7 +57,7 @@ export function bindXsPanel(editor: Editor, models: ModelCommands): void {
     renderArgs();
   };
 
-  const run = (shader: XsShader, args: number[], passes: number) => {
+  const run = (shader: XsShader, args: number[], passes: number, region: Uint8Array | null = null) => {
     try {
       models.apply(
         (model) =>
@@ -74,16 +74,20 @@ export function bindXsPanel(editor: Editor, models: ModelCommands): void {
             random: Math.random,
           }),
         `Shader ${shader.name} aplicado`,
+        region,
       );
     } catch (error) {
       editor.fail(`Shader ${shader.name}`, error);
     }
   };
 
-  element('xs-run', HTMLButtonElement).addEventListener('click', () => {
+  /** The shader, arguments and iterations chosen in the panel, on the model, its selection, or `region`. */
+  const runChosen = (region: Uint8Array | null = null) => {
     const shader = library.get(select.value);
-    if (shader) run(shader, argInputs.map((input) => input.valueAsNumber), Math.max(1, Math.round(iterations.valueAsNumber) || 1));
-  });
+    if (!shader) return editor.status('Escolha um shader XS no painel', 'error');
+    run(shader, argInputs.map((input) => input.valueAsNumber), Math.max(1, Math.round(iterations.valueAsNumber) || 1), region);
+  };
+  element('xs-run', HTMLButtonElement).addEventListener('click', () => runChosen());
   select.addEventListener('change', renderArgs);
   element('xs-open', HTMLButtonElement).addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', async () => {
@@ -107,4 +111,5 @@ export function bindXsPanel(editor: Editor, models: ModelCommands): void {
   });
 
   renderOptions();
+  return { runChosen };
 }

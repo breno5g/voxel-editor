@@ -44,7 +44,7 @@ Pendências da v0.7:
 
 - [ ] Redimensionar o pincel com `Ctrl+Alt+arrastar`
 - [ ] Contorno da região de face no hover (hoje mostra a caixa que a envolve)
-- [ ] Modos `code` (`C`, shader XS como pincel) e `pattern` (`P`) dependem da v0.13
+- [x] Modos `code` (`C`, o shader XS roda na caixa arrastada) e `pattern` (`P`)
 
 ## v0.8: seleção e operações de modelo
 

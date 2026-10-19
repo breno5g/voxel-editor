@@ -94,19 +94,22 @@ export function createModelCommands(editor: Editor) {
   /**
    * Swaps the edited model for `operation(model)`, which may change its size; the object keeps its position.
    * With a selection the operation runs on the selected voxels' bounding box only, and the selection follows.
+   * An explicit `region` mask (a brush box) takes the selection's place and is not kept as a selection.
    */
-  const replace = (operation: (model: VoxModel) => VoxModel, message: string) => {
+  const replace = (operation: (model: VoxModel) => VoxModel, message: string, region: Uint8Array | null = null) => {
     const edited = editedModel();
     if (!edited) return;
     const { index, model: before, mask } = edited;
-    const after = mask ? transformSelection(before, mask, operation) : { model: operation(before), mask: null };
+    const area = region ?? mask;
+    const after = area ? transformSelection(before, area, operation) : { model: operation(before), mask: null };
+    const kept = region ? null : after.mask;
     const assign = (model: VoxModel, selection: Uint8Array | null) => () => {
       state.vox.models[index] = model;
       editor.sceneChanged();
       editor.setVoxelSelection(selection && { model, mask: selection });
     };
-    assign(after.model, after.mask)();
-    editor.history.push({ undo: assign(before, mask), redo: assign(after.model, after.mask) });
+    assign(after.model, kept)();
+    editor.history.push({ undo: assign(before, mask), redo: assign(after.model, kept) });
     editor.status(message);
   };
 
@@ -255,7 +258,7 @@ export function createModelCommands(editor: Editor) {
     fill,
     zero,
 
-    /** Replaces the edited model (or its selection's box) with `operation`'s result, as one undo step. */
+    /** Replaces the edited model (or its selection's box, or `region`'s) with `operation`'s result, as one undo step. */
     apply: replace,
 
     /** Adds a console command handled elsewhere (e.g. `xs`, which needs the GPU). */

@@ -1,11 +1,11 @@
 import type { Editor } from '../editor/editor.ts';
 import type { ObjectCommands } from '../editor/object-commands.ts';
-import type { PatternCommands } from '../editor/pattern-commands.ts';
 import { createVoxelTools } from '../editor/voxel-tools.ts';
 import { selectedVoxels } from '../editor/voxel-selection.ts';
 import { createWorldTools } from '../editor/world-tools.ts';
 import type { CameraDrag } from '../render/camera-rig.ts';
 import type { Viewport } from '../render/viewport.ts';
+import type { Vec3 } from '../format/vox.ts';
 import { isLooping, previousShapeModel } from '../scene/keyframes.ts';
 import { evaluateScene } from '../scene/scene-graph.ts';
 import { isUnder, parentMap } from '../scene/scene-tree.ts';
@@ -21,10 +21,13 @@ const CAMERA_DRAG_KEYS: Record<string, CameraDrag> = { Space: 'pan', KeyZ: 'zoom
  * belong to the camera). Tab and Shift+Tab move between levels (`olevel`) while the canvas has focus, so they still
  * moves focus everywhere else; Esc hands focus back to the page.
  */
-export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: ObjectCommands, patterns: PatternCommands) {
+/** What the pattern and code brushes hand off: placing the pattern as an object, running the XS shader on a box. */
+export type BrushHandoffs = { placePattern: (at: Vec3) => void; runShader: (region: Uint8Array) => void };
+
+export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: ObjectCommands, handoffs: BrushHandoffs) {
   const { state } = editor;
-  const voxelTools = createVoxelTools(editor, viewport, commands.resizeDrag);
-  const worldTools = createWorldTools(editor, commands, viewport, patterns.placePattern);
+  const voxelTools = createVoxelTools(editor, viewport, commands.resizeDrag, handoffs.runShader);
+  const worldTools = createWorldTools(editor, commands, viewport, handoffs.placePattern);
   const tools = () => (state.mode === 'model' ? voxelTools : worldTools);
   const { canvas } = viewport;
 

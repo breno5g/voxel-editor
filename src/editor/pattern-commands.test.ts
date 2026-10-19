@@ -68,6 +68,17 @@ describe('pattern use', () => {
     expect([...(editor.state.pattern?.voxels ?? [])]).toEqual([5, 6]);
   });
 
+  it('nudges the stamp and recentres it, keeping the nudge across turns', () => {
+    const { editor, patterns } = setup();
+    patterns.patternFromSelection();
+    patterns.movePattern([1, 0, 0]);
+    patterns.movePattern([0, 0, -1]);
+    patterns.rotatePattern(2, 1);
+    expect(editor.state.patternOffset).toEqual([1, 0, -1]);
+    patterns.movePattern(null);
+    expect(editor.state.patternOffset).toEqual([0, 0, 0]);
+  });
+
   it('places the pattern as a new object centred on the point, and undoes it', () => {
     const { editor, patterns } = setup();
     patterns.patternFromSelection();

@@ -134,4 +134,14 @@ describe('selection-aware commands', () => {
     editor.history.undo();
     expect(voxels().filter((color) => color === 7)).toHaveLength(1);
   });
+  it('runs an operation inside a brush region without leaving a selection', () => {
+    const { editor, models, voxels } = twoVoxels();
+    const region = new Uint8Array(12);
+    region[voxelIndex([3, 2, 2], 2, 1, 1)] = 1;
+    models.apply((part) => ({ size: part.size, voxels: part.voxels.map(() => 3) }), 'pintado', region);
+    expect(voxels().filter((color) => color !== 0).sort()).toEqual([3, 9]);
+    expect(editor.state.voxelSelection).toBeNull();
+    editor.history.undo();
+    expect(voxels().filter((color) => color !== 0).sort()).toEqual([7, 9]);
+  });
 });

@@ -33,9 +33,9 @@ export type TransformTool = (typeof TRANSFORM_TOOLS)[number];
 /**
  * MagicaVoxel `b_mode`: `vox` stamps under the pointer, `face` works on the flat face region
  * under it, `box` fills the cells between press and release, `geo` draws lines and shapes,
- * `pattern` stamps the current pattern on the face under the pointer.
+ * `code` runs the XS shader on a dragged box, `pattern` stamps the current pattern on the face under the pointer.
  */
-export const BRUSH_MODES = ['vox', 'face', 'box', 'geo', 'pattern'] as const;
+export const BRUSH_MODES = ['vox', 'face', 'box', 'geo', 'code', 'pattern'] as const;
 export type BrushMode = (typeof BRUSH_MODES)[number];
 /** MagicaVoxel `rm_b_grid`, `rm_b_frame`, `rm_b_edge`, `rm_b_bo`. */
 export const DISPLAY_OPTIONS = ['grid', 'frame', 'edges', 'backgroundObjects'] as const;
@@ -122,6 +122,8 @@ export type EditorState = {
   pattern: VoxModel | null;
   /** MagicaVoxel `b_patt_pal`: stamped patterns take the current colour instead of their own. */
   patternUsesPalette: boolean;
+  /** Pattern mode `Dir`/`Page`/`Home`: where the stamp sits relative to the pointer, in model cells. */
+  patternOffset: Vec3;
   /** Shows the previous model frame translucent while editing frame-by-frame animation. */
   onionSkin: boolean;
   display: Display;
@@ -195,6 +197,7 @@ export function createEditor() {
     globalTime: true,
     pattern: null,
     patternUsesPalette: false,
+    patternOffset: [0, 0, 0],
     autoKey: true,
     pendingKeys: new Map(),
     onionSkin: false,
@@ -439,6 +442,11 @@ export function createEditor() {
 
     setPattern(pattern: VoxModel | null) {
       state.pattern = pattern;
+      emit({ type: 'tool' });
+    },
+
+    setPatternOffset(offset: Vec3) {
+      state.patternOffset = offset;
       emit({ type: 'tool' });
     },
 

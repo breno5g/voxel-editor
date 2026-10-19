@@ -42,7 +42,8 @@ const models = createModelCommands(editor);
 const keys = createKeyCommands(editor);
 const patterns = createPatternCommands(editor, models, commands);
 const files = createFileActions(editor, viewport);
-const { focusCamera } = bindViewportPanel(editor, viewport, commands, patterns);
+const xs = bindXsPanel(editor, models);
+const { focusCamera } = bindViewportPanel(editor, viewport, commands, { placePattern: patterns.placePattern, runShader: xs.runChosen });
 const cameras = bindCameraPanel(editor, viewport);
 
 bindStatusBar(editor);
@@ -59,7 +60,6 @@ bindExportActions(editor);
 bindProjectsPanel(editor, createProjectStore(editor));
 bindObjectInspector(editor, commands);
 bindModelPanel(models);
-bindXsPanel(editor, models);
 bindPatternPanel(editor, patterns);
 bindTimeline(editor, commands, keys);
 bindShortcuts(editor, commands, models, files, {

@@ -10,6 +10,17 @@ import type { FileActions } from './file-actions.ts';
 
 type Keymap = Map<string, () => void>;
 
+/** Pattern mode `Dir`/`Page` nudge the stamp, `Home` recentres it. */
+const PATTERN_NUDGES: [string, Vec3 | null][] = [
+  ['ArrowLeft', [-1, 0, 0]],
+  ['ArrowRight', [1, 0, 0]],
+  ['ArrowUp', [0, 1, 0]],
+  ['ArrowDown', [0, -1, 0]],
+  ['PageUp', [0, 0, 1]],
+  ['PageDown', [0, 0, -1]],
+  ['Home', null],
+];
+
 /** Matched by physical key: Shift turns ',' into '<' and '=' into '+', and digits into symbols. */
 const CODE_KEYS = /^(Comma|Period|Equal|Minus|Digit\d|Numpad\d)$/;
 
@@ -105,6 +116,7 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
       ['f', brushMode('face')],
       ['b', brushMode('box')],
       ['l', brushMode('geo')],
+      ['c', brushMode('code')],
       ['p', brushMode('pattern')],
       ['t', brushType('attach')],
       ['r', brushType('erase')],
@@ -119,6 +131,7 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
       ['Equal', orPattern(2, -1, resizeBrush(1))],
       ['Digit9', orPattern(0, -1)],
       ['Digit0', orPattern(0, 1)],
+      ...PATTERN_NUDGES.map(([key, delta]): [string, () => void] => [key, () => state.brushMode === 'pattern' && patterns.movePattern(delta)]),
       ['m', brushType('msel')],
       ['n', brushType('asel')],
       ['u', models.full],
