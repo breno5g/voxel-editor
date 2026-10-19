@@ -78,7 +78,7 @@ Pendências da v0.7:
 - [x] Ordenar, marcar, mascarar cores não usadas, cores aleatórias
 - [x] Nota da paleta (`NOTE`), uma por linha de 8 cores
 - [x] Importar/exportar paleta `.png`/`.act` (também soltando o arquivo); paleta padrão do MagicaVoxel
-- [ ] Materiais `MATL`: difuso, emissivo, mistura, metal, vidro, nuvem; copiar/colar/resetar
+- [x] Materiais `MATL`: difuso, emissivo, mistura, metal, vidro, nuvem, meio; copiar/colar/resetar (na cor atual ou na seleção da paleta). O efeito visual chega com o path tracer da v0.14
 
 ## v0.11: animação
 

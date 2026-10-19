@@ -35,7 +35,34 @@
         <div class="control-row color-row">
           <input id="palette-color" type="color" aria-label="Cor atual" />
           <input id="palette-hex" type="text" aria-label="Código hexadecimal da cor" title="Hex da cor; Enter aplica à cor atual ou à seleção" />
-          <button id="palette-tools-toggle" type="button" aria-expanded="false" aria-controls="palette-tools" title="Editar a paleta">Editar</button>
+          <button id="palette-tools-toggle" type="button" aria-expanded="false" aria-controls="palette-tools" title="Editar a paleta" aria-label="Editar a paleta">✎</button>
+          <button id="material-tools-toggle" type="button" aria-expanded="false" aria-controls="material-tools" title="Material da cor (MATL)" aria-label="Material da cor">◈</button>
+        </div>
+        <div id="material-tools" class="stack palette-tools" hidden>
+          <div id="material-title" class="hint"></div>
+          <div id="material-type" class="segmented columns-3" role="group" aria-label="Tipo de material">
+            <button type="button" data-value="_diffuse" title="Difuso">Difuso</button>
+            <button type="button" data-value="_emit" title="Emissivo">Emissivo</button>
+            <button type="button" data-value="_blend" title="Mistura de materiais">Mistura</button>
+            <button type="button" data-value="_metal" title="Metal/plástico">Metal</button>
+            <button type="button" data-value="_glass" title="Vidro">Vidro</button>
+            <button type="button" data-value="_media" title="Nuvem (meio participante)">Nuvem</button>
+          </div>
+          <div id="material-params" class="stack"></div>
+          <div class="control-row" id="material-media-row">
+            <span class="label" id="material-media-label">Meio</span>
+            <div id="material-media" class="segmented" role="group" aria-labelledby="material-media-label">
+              <button type="button" data-value="_absorb" title="Absorver">A</button>
+              <button type="button" data-value="_scatter" title="Espalhar">E</button>
+              <button type="button" data-value="_emit" title="Emitir">M</button>
+              <button type="button" data-value="_sss" title="Espalhamento subsuperficial">S</button>
+            </div>
+          </div>
+          <div class="segmented" role="group" aria-label="Material">
+            <button id="material-reset" type="button" title="Voltar a difuso (mtl_reset)">Resetar</button>
+            <button id="material-copy" type="button" title="Copiar o material (mtl_copy)">Copiar</button>
+            <button id="material-paste" type="button" title="Colar o material (mtl_paste)">Colar</button>
+          </div>
         </div>
         <div id="palette-tools" class="stack palette-tools" hidden>
             <div id="color-space" class="segmented" role="group" aria-label="Espaço de cor">

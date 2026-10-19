@@ -312,7 +312,16 @@ body {
 }
 
 .color-row {
-  grid-template-columns: 56px 1fr auto;
+  grid-template-columns: 56px minmax(0, 1fr) auto auto;
+}
+
+.segmented.columns-3 {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.hint {
+  color: var(--muted);
 }
 
 .palette-tools {
