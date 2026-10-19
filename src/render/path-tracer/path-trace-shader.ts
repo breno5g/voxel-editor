@@ -1,3 +1,4 @@
+import { EMITTER_GROUPS, EMITTER_ROW } from './emitter-faces.ts';
 import { BRICK } from './scene-volume.ts';
 
 /**
@@ -52,17 +53,12 @@ uniform float u_bladeRotation;
 
 uniform vec3 u_sunDirection;
 uniform vec3 u_sunRadiance;
-/* The emitter face picked for this sample (MagicaVoxel's \`area_*\`): corner and edges in world space, the cell it
-   belongs to, its radiance, and the density of picking a point there, per unit of area. */
-uniform bool u_hasArea;
-uniform vec3 u_areaCorner;
-uniform vec3 u_areaEdgeU;
-uniform vec3 u_areaEdgeV;
-uniform vec3 u_areaNormal;
-uniform ivec3 u_areaCell;
-uniform vec3 u_areaRadiance;
-uniform float u_areaDensity;
-/** Total power of every area-light face: a face's density is its brightest channel over this. */
+/* Area lights, as MagicaVoxel lists them (***REMOVED***): every emitter face (\`cell·8 + face\`) grouped by palette
+   index and direction, where each group starts, and each group's running share of the total power. */
+uniform highp usampler2D u_emitterFaces;
+uniform highp usampler2D u_emitterOffsets;
+uniform sampler2D u_emitterShares;
+/** Total power of every area-light face: a face's density per unit of area is its brightest channel over this. */
 uniform float u_emitterPower;
 uniform float u_sunCos;
 uniform bool u_sunDisk;
@@ -460,6 +456,9 @@ Surface traceScene(vec3 origin, vec3 direction) {
 const int MAX_SHADOW_LAYERS = 8;
 const int MAX_MEDIUM_STEPS = 256;
 const int EMIT_KIND = 3;
+const int EMITTER_GROUPS = ${EMITTER_GROUPS};
+/** Emitter faces per row of their texture. */
+const uint EMITTER_ROW = ${EMITTER_ROW}u;
 const int MEDIA_KIND = 5;
 const int MEDIA_ABSORB = 0;
 const int MEDIA_EMIT = 2;
@@ -632,18 +631,54 @@ float scatteredSunWeight(vec3 direction, vec3 next, float g) {
   return u_misScatter ? powerHeuristic(phaseHG(dot(direction, next), g), sunDensity()) : 0.0;
 }
 
-/** Light a diffuse surface at \`origin\` gets from a point on this sample's emitter face, MIS-weighted against its cosine bounce. */
+/** An emitter's radiance: its linear colour times its strength. */
+vec3 emitterRadiance(uint color) {
+  vec3 albedo = pow(texelFetch(u_palette, ivec2(int(color), 0), 0).rgb, vec3(u_gamma));
+  return albedo * texelFetch(u_materials, ivec2(int(color), 1), 0).y;
+}
+
+/**
+ * Light a diffuse surface at \`origin\` gets from one area-light face, MIS-weighted against its cosine bounce.
+ * Each pixel picks its own face as MagicaVoxel picks one per pass (***REMOVED***): a group by its share of
+ * the power, a face of the group uniformly, a point on the face uniformly.
+ */
 vec3 areaLight(vec3 origin, vec3 normal) {
-  vec3 toLight = u_areaCorner + u_areaEdgeU * random() + u_areaEdgeV * random() - origin;
+  float draw = random();
+  int low = 0;
+  int high = EMITTER_GROUPS - 1;
+  while (low < high) {
+    int middle = (low + high) / 2;
+    if (texelFetch(u_emitterShares, ivec2(middle, 0), 0).r <= draw) low = middle + 1;
+    else high = middle;
+  }
+  uint first = texelFetch(u_emitterOffsets, ivec2(low, 0), 0).r;
+  uint count = texelFetch(u_emitterOffsets, ivec2(low + 1, 0), 0).r - first;
+  if (count == 0u) return vec3(0.0);
+  uint at = first + min(uint(random() * float(count)), count - 1u);
+  uint packed = texelFetch(u_emitterFaces, ivec2(int(at % EMITTER_ROW), int(at / EMITTER_ROW)), 0).r;
+  int face = int(packed & 7u);
+  uint cellIndex = packed >> 3u;
+  uvec3 size = uvec3(u_size);
+  ivec3 cell = ivec3(uvec3(cellIndex % size.x, (cellIndex / size.x) % size.y, cellIndex / (size.x * size.y)));
+  int axis = face / 2;
+  vec3 normalOfFace = vec3(0.0);
+  normalOfFace[axis] = (face & 1) == 1 ? 1.0 : -1.0;
+  vec3 corner = vec3(cell);
+  corner[axis] += float(face & 1);
+  vec3 point = corner;
+  point[(axis + 1) % 3] += random();
+  point[(axis + 2) % 3] += random();
+  vec3 toLight = point * u_scale + u_origin - origin;
   float distanceSquared = dot(toLight, toLight);
   float distance = sqrt(distanceSquared);
   vec3 direction = toLight / distance;
   float cosSurface = dot(normal, direction);
-  float cosLight = -dot(u_areaNormal, direction);
+  float cosLight = -dot(normalOfFace, direction);
   if (cosSurface <= 0.0 || cosLight <= 0.0) return vec3(0.0);
-  float lightDensity = u_areaDensity * distanceSquared / cosLight;
+  vec3 radiance = emitterRadiance(voxelAt(cell));
+  float lightDensity = max(radiance.r, max(radiance.g, radiance.b)) / u_emitterPower * distanceSquared / cosLight;
   float weight = powerHeuristic(lightDensity, cosSurface / PI);
-  return weight * u_areaRadiance * cosSurface / (PI * lightDensity) * lightThrough(origin, direction, distance + 1e-3, u_areaCell);
+  return weight * radiance * cosSurface / (PI * lightDensity) * lightThrough(origin, direction, distance + 1e-3, cell);
 }
 
 /**
@@ -654,7 +689,7 @@ vec3 areaLight(vec3 origin, vec3 normal) {
 float emitterBrightness(vec4 shape, vec4 extra, Surface surface, vec3 direction, bool seen, float bounceDensity) {
   if (seen) return shape.y;
   if (bounceDensity <= 0.0 || shape.z < 0.5 || u_emitterPower <= 0.0) return extra.y;
-  vec3 radiance = pow(texelFetch(u_palette, ivec2(int(surface.color), 0), 0).rgb, vec3(u_gamma)) * extra.y;
+  vec3 radiance = emitterRadiance(surface.color);
   float cosLight = max(abs(dot(direction, surface.normal)), 1e-4);
   float lightDensity = max(radiance.r, max(radiance.g, radiance.b)) / u_emitterPower * surface.t * surface.t / cosLight;
   return extra.y * powerHeuristic(bounceDensity, lightDensity);
@@ -870,7 +905,7 @@ void main() {
     vec3 toSun = cone(u_sunDirection, u_sunCos);
     float cosSun = dot(toSun, facing);
     if (cosSun > 0.0) radiance += throughput * albedo * sunlightThrough(origin, toSun) * sunlight() * cosSun;
-    if (u_hasArea) radiance += throughput * albedo * areaLight(origin, facing);
+    if (u_emitterPower > 0.0) radiance += throughput * albedo * areaLight(origin, facing);
     if (diffuse >= u_diffuseBounces) break;
     diffuse++;
     throughput *= albedo;

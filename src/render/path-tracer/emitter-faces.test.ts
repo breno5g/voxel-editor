@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectEmitterFaces, emitterPower, sampleEmitter } from './emitter-faces.ts';
+import { collectEmitterFaces, emitterPower } from './emitter-faces.ts';
 import type { SceneVolume } from './scene-volume.ts';
 
 const EMITTER = 5;
@@ -22,31 +22,31 @@ describe('collectEmitterFaces', () => {
     const faces = collectEmitterFaces(volume(), flags(EMITTER), flags(GLASS));
     const count = (face: number) => faces.offsets[EMITTER * 6 + face + 1] - faces.offsets[EMITTER * 6 + face];
     expect([0, 1, 2, 3, 4, 5].map(count)).toEqual([1, 0, 1, 1, 1, 1]);
-    expect(Array.from(faces.cells)).toEqual(Array(5).fill(13));
+    expect(Array.from(faces.faces)).toEqual([0, 2, 3, 4, 5].map((face) => 13 * 8 + face));
   });
 
   it('finds nothing without area lights in the palette', () => {
-    expect(collectEmitterFaces(volume(), flags(), flags(GLASS)).cells).toHaveLength(0);
+    expect(collectEmitterFaces(volume(), flags(), flags(GLASS)).faces).toHaveLength(0);
   });
 });
 
-describe('sampleEmitter', () => {
+describe('emitterPower', () => {
   const radiance = new Float32Array(256 * 3);
   radiance.set([2, 1, 0.5], EMITTER * 3);
   const faces = collectEmitterFaces(volume(), flags(EMITTER), flags(GLASS));
 
   it('weighs faces by brightest channel times area', () => {
-    expect(emitterPower(faces, radiance, [1, 1, 1]).at(-1)).toBe(10);
-    expect(emitterPower(faces, radiance, [2, 1, 1]).at(-1)).toBe(2 * (1 + 4 * 2));
+    expect(emitterPower(faces, radiance, [1, 1, 1]).total).toBe(10);
+    expect(emitterPower(faces, radiance, [2, 1, 1]).total).toBe(2 * (1 + 4 * 2));
   });
 
-  it('picks the face whose power span holds the draw', () => {
-    const cumulative = emitterPower(faces, radiance, [1, 1, 1]);
-    expect(sampleEmitter(faces, cumulative, 0, 0)).toEqual({ cell: 13, index: EMITTER, face: 0 });
-    expect(sampleEmitter(faces, cumulative, 0.99, 0.5)).toEqual({ cell: 13, index: EMITTER, face: 5 });
+  it('runs each group up to its share of the total', () => {
+    const { cumulative } = emitterPower(faces, radiance, [1, 1, 1]);
+    const group = (face: number) => EMITTER * 6 + face;
+    expect([cumulative[group(0) - 1], cumulative[group(0)], cumulative[group(1)], cumulative[group(5)], cumulative.at(-1)]).toEqual([0, expect.closeTo(0.2), expect.closeTo(0.2), 1, 1]);
   });
 
-  it('returns nothing when no face shines', () => {
-    expect(sampleEmitter(faces, emitterPower(faces, new Float32Array(256 * 3), [1, 1, 1]), 0.5, 0.5)).toBeNull();
+  it('is all zero when no face shines', () => {
+    expect(emitterPower(faces, new Float32Array(256 * 3), [1, 1, 1])).toMatchObject({ total: 0 });
   });
 });

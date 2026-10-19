@@ -4,7 +4,7 @@ import type { RenderSettings } from '../../format/render-settings.ts';
 import { PALETTE_BYTES, PALETTE_SIZE } from '../../format/vox.ts';
 import type { Vec3 } from '../../format/vox.ts';
 import { linkFullScreenProgram } from '../gl-program.ts';
-import { collectEmitterFaces, emitterPower, FACE_NORMALS, sampleEmitter } from './emitter-faces.ts';
+import { collectEmitterFaces, EMITTER_GROUPS, EMITTER_ROW, emitterPower } from './emitter-faces.ts';
 import type { EmitterFaces } from './emitter-faces.ts';
 import { sphereLuminance } from './hdr-image.ts';
 import type { HdrImage } from './hdr-image.ts';
@@ -61,7 +61,7 @@ const AIR_SCALE = { rayleigh: 0.05, mie: 1 / 300, ozone: 0.05 };
 const AIR_DEPTH = 5;
 
 /** Units for the trace pass, then for the bloom and display passes (which bind only 2D textures). */
-const TEXTURE_UNITS = { volume: 0, bricks: 1, palette: 2, materials: 3, ibl: 4, previous: 5, density: 6, previousNormal: 7, accumulation: 0, bloom: 1, albedo: 1, normal: 2 } as const;
+const TEXTURE_UNITS = { volume: 0, bricks: 1, palette: 2, materials: 3, ibl: 4, previous: 5, density: 6, previousNormal: 7, emitterFaces: 8, emitterOffsets: 9, emitterShares: 10, accumulation: 0, bloom: 1, albedo: 1, normal: 2 } as const;
 /** Samples of first-hit albedo and normal the denoiser averages (anti-aliased edges). */
 const GUIDE_SAMPLES = 8;
 /** À-trous passes: taps 1, 2, 4, 8 and 16 pixels apart. */
@@ -132,6 +132,9 @@ export function createPathTracer(container: HTMLElement) {
   const materialsTexture = createTexture(gl.TEXTURE_2D);
   const iblTexture = createTexture(gl.TEXTURE_2D, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+  const emitterFacesTexture = createTexture(gl.TEXTURE_2D);
+  const emitterOffsetsTexture = createTexture(gl.TEXTURE_2D);
+  const emitterSharesTexture = createTexture(gl.TEXTURE_2D);
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
 
   const upload3d = (texture: WebGLTexture, size: Vec3, cells: Uint8Array) => {
@@ -151,6 +154,23 @@ export function createPathTracer(container: HTMLElement) {
   upload3d(volumeTexture, [1, 1, 1], new Uint8Array(1));
   upload3d(bricksTexture, [1, 1, 1], new Uint8Array(1));
   uploadIbl(null);
+  /** The area-light faces and where each group starts, in the textures the shader picks from. */
+  const uploadEmitterFaces = ({ faces, offsets }: EmitterFaces) => {
+    const rows = Math.max(1, Math.ceil(faces.length / EMITTER_ROW));
+    if (rows > gl.getParameter(gl.MAX_TEXTURE_SIZE)) throw new Error(`Faces emissivas demais para a GPU (${faces.length})`);
+    const texels = new Uint32Array(rows * EMITTER_ROW);
+    texels.set(faces);
+    gl.bindTexture(gl.TEXTURE_2D, emitterFacesTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32UI, EMITTER_ROW, rows, 0, gl.RED_INTEGER, gl.UNSIGNED_INT, texels);
+    gl.bindTexture(gl.TEXTURE_2D, emitterOffsetsTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32UI, offsets.length, 1, 0, gl.RED_INTEGER, gl.UNSIGNED_INT, offsets);
+  };
+  const uploadEmitterShares = (shares: Float32Array) => {
+    gl.bindTexture(gl.TEXTURE_2D, emitterSharesTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, EMITTER_GROUPS, 1, 0, gl.RED, gl.FLOAT, shares);
+  };
+  uploadEmitterFaces({ faces: new Uint32Array(0), offsets: new Uint32Array(EMITTER_GROUPS + 1) });
+  uploadEmitterShares(new Float32Array(EMITTER_GROUPS));
 
   /** Two float buffers: each sample reads the running mean from one and writes the new mean into the other. */
   const accumulation = [0, 1].map(() => ({ texture: createTexture(gl.TEXTURE_2D), framebuffer: gl.createFramebuffer() }));
@@ -212,10 +232,10 @@ export function createPathTracer(container: HTMLElement) {
   let materials: Float32Array = new Float32Array(PALETTE_SIZE * MATERIAL_ROWS * 4);
   /** Area-light faces of the current volume and materials, rebuilt when either changes. */
   let emitters: EmitterFaces | null = null;
-  /** Each emitter group's running power, the radiance per palette index behind it, and its world scale. */
-  let emitterCumulative: Float64Array = new Float64Array(0);
+  /** What the uploaded group shares were weighed with (gamma and voxel scale); empty when stale. */
+  let emitterKey = '';
+  let emitterTotal = 0;
   const emitterRadiance = new Float32Array(PALETTE_SIZE * 3);
-  let emitterScale: Vec3 = [1, 1, 1];
   let settings: RenderSettings | null = null;
   let options: TraceOptions = { shadows: true, translucentShadows: true, antialias: true, pixelated: false, misReflect: true, misScatter: true, stochastic: true, shape: 'cube', bloom: false, denoise: false };
   let hasIbl = false;
@@ -345,7 +365,21 @@ export function createPathTracer(container: HTMLElement) {
     bind(TEXTURE_UNITS.materials, gl.TEXTURE_2D, materialsTexture);
     bind(TEXTURE_UNITS.ibl, gl.TEXTURE_2D, iblTexture);
     bind(TEXTURE_UNITS.density, gl.TEXTURE_3D, densityTexture);
-    const units: [string, number][] = [['u_volume', TEXTURE_UNITS.volume], ['u_bricks', TEXTURE_UNITS.bricks], ['u_palette', TEXTURE_UNITS.palette], ['u_materials', TEXTURE_UNITS.materials], ['u_ibl', TEXTURE_UNITS.ibl], ['u_density', TEXTURE_UNITS.density], ['u_previous', TEXTURE_UNITS.previous]];
+    bind(TEXTURE_UNITS.emitterFaces, gl.TEXTURE_2D, emitterFacesTexture);
+    bind(TEXTURE_UNITS.emitterOffsets, gl.TEXTURE_2D, emitterOffsetsTexture);
+    bind(TEXTURE_UNITS.emitterShares, gl.TEXTURE_2D, emitterSharesTexture);
+    const units: [string, number][] = [
+      ['u_volume', TEXTURE_UNITS.volume],
+      ['u_bricks', TEXTURE_UNITS.bricks],
+      ['u_palette', TEXTURE_UNITS.palette],
+      ['u_materials', TEXTURE_UNITS.materials],
+      ['u_ibl', TEXTURE_UNITS.ibl],
+      ['u_density', TEXTURE_UNITS.density],
+      ['u_previous', TEXTURE_UNITS.previous],
+      ['u_emitterFaces', TEXTURE_UNITS.emitterFaces],
+      ['u_emitterOffsets', TEXTURE_UNITS.emitterOffsets],
+      ['u_emitterShares', TEXTURE_UNITS.emitterShares],
+    ];
     units.forEach(([name, unit]) => gl.uniform1i(at(program, name), unit));
     gl.uniform2f(at(program, 'u_resolution'), width, height);
     return viewKey;
@@ -356,52 +390,32 @@ export function createPathTracer(container: HTMLElement) {
    * group (palette index, direction) weighed by its faces' power under the current colours and scale.
    */
   const weighEmitters = (active: RenderSettings) => {
-    if (!volume) {
-      emitterCumulative = new Float64Array(0);
-      gl.uniform1f(at(traceProgram, 'u_emitterPower'), 0);
-      return;
-    }
     const kind = (index: number) => materials[index * 4];
     const areaLight = (index: number) => kind(index) === MATERIAL_KIND._emit && materials[index * 4 + 2] > 0.5;
     const flags = (test: (index: number) => boolean) => Uint8Array.from({ length: PALETTE_SIZE }, (_, index) => Number(index > 0 && test(index)));
-    emitters ??= collectEmitterFaces(volume, flags(areaLight), flags((index) => CLEAR_KINDS.has(kind(index))));
-    const gamma = Math.max(active.film.gamma, 0.1);
-    for (let index = 0; index < PALETTE_SIZE; index++) {
-      const emission = areaLight(index) ? materials[(PALETTE_SIZE + index) * 4 + 1] : 0;
-      for (let channel = 0; channel < 3; channel++) emitterRadiance[index * 3 + channel] = Math.pow(paletteTexels[index * 4 + channel] / 255, gamma) * emission;
+    if (volume && !emitters) {
+      emitters = collectEmitterFaces(volume, flags(areaLight), flags((index) => CLEAR_KINDS.has(kind(index))));
+      uploadEmitterFaces(emitters);
+      emitterKey = '';
     }
-    emitterScale = voxelScale(active.show);
-    emitterCumulative = emitterPower(emitters, emitterRadiance, emitterScale);
-    gl.uniform1f(at(traceProgram, 'u_emitterPower'), emitterCumulative.at(-1) ?? 0);
-  };
-
-  /** Picks the emitter face this sample lights by, as MagicaVoxel's ***REMOVED*** does once per pass. */
-  const pickEmitter = () => {
-    const sample = emitters && volume ? sampleEmitter(emitters, emitterCumulative, Math.random(), Math.random()) : null;
-    gl.uniform1i(at(traceProgram, 'u_hasArea'), Number(sample !== null));
-    if (!sample || !volume) return;
-    const { cell, index, face } = sample;
-    const { size, origin } = volume;
-    const coordinate: Vec3 = [cell % size[0], Math.floor(cell / size[0]) % size[1], Math.floor(cell / (size[0] * size[1]))];
-    const axis = face >> 1;
-    const [sx, sy, sz] = emitterScale;
-    /* A face on the cell's far side sits one voxel further along its axis. */
-    const far = (along: number) => Number(along === axis && (face & 1) === 1);
-    const corner: Vec3 = [(coordinate[0] + origin[0] + far(0)) * sx, (coordinate[1] + origin[1] + far(1)) * sy, (coordinate[2] + origin[2] + far(2)) * sz];
-    const edge = (along: number): Vec3 => [along === 0 ? sx : 0, along === 1 ? sy : 0, along === 2 ? sz : 0];
-    const radiance: Vec3 = [emitterRadiance[index * 3], emitterRadiance[index * 3 + 1], emitterRadiance[index * 3 + 2]];
-    gl.uniform3fv(at(traceProgram, 'u_areaCorner'), corner);
-    gl.uniform3fv(at(traceProgram, 'u_areaEdgeU'), edge((axis + 1) % 3));
-    gl.uniform3fv(at(traceProgram, 'u_areaEdgeV'), edge((axis + 2) % 3));
-    gl.uniform3fv(at(traceProgram, 'u_areaNormal'), FACE_NORMALS[face]);
-    gl.uniform3iv(at(traceProgram, 'u_areaCell'), coordinate);
-    gl.uniform3fv(at(traceProgram, 'u_areaRadiance'), radiance);
-    gl.uniform1f(at(traceProgram, 'u_areaDensity'), Math.max(...radiance) / (emitterCumulative.at(-1) ?? 1));
+    const gamma = Math.max(active.film.gamma, 0.1);
+    const scale = voxelScale(active.show);
+    const key = `${gamma} ${scale.join(' ')}`;
+    if (emitters && key !== emitterKey) {
+      for (let index = 0; index < PALETTE_SIZE; index++) {
+        const emission = areaLight(index) ? materials[(PALETTE_SIZE + index) * 4 + 1] : 0;
+        for (let channel = 0; channel < 3; channel++) emitterRadiance[index * 3 + channel] = Math.pow(paletteTexels[index * 4 + channel] / 255, gamma) * emission;
+      }
+      const { cumulative, total } = emitterPower(emitters, emitterRadiance, scale);
+      uploadEmitterShares(cumulative);
+      emitterTotal = total;
+      emitterKey = key;
+    }
+    gl.uniform1f(at(traceProgram, 'u_emitterPower'), volume ? emitterTotal : 0);
   };
 
   /** Traces sample number `index` of the current program into `framebuffer`. */
   const drawSample = (index: number, framebuffer: WebGLFramebuffer | null) => {
-    pickEmitter();
     gl.uniform1f(at(traceProgram, 'u_sample'), index);
     gl.uniform1f(at(traceProgram, 'u_seed'), Math.floor(Math.random() * 65536));
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
@@ -520,6 +534,7 @@ export function createPathTracer(container: HTMLElement) {
       const texels = new Uint8Array(PALETTE_BYTES);
       texels.set(palette.subarray(0, PALETTE_BYTES - 4), 4);
       paletteTexels = texels;
+      emitterKey = '';
       gl.bindTexture(gl.TEXTURE_2D, paletteTexture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, PALETTE_SIZE, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, texels);
       reset();
