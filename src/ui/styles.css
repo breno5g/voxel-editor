@@ -332,6 +332,14 @@ body {
   width: 100%;
 }
 
+/* Context menu */
+
+.context-menu {
+  position: fixed;
+  z-index: 10;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 50%);
+}
+
 /* Layers */
 
 .layer-list button {

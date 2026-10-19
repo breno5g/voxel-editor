@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ShapeKey, TransformKey, Vec3 } from '../format/vox.ts';
-import { adjacentKeyFrame, evaluateShape, evaluateTransform, parseRange, previousShapeModel, removeKeyAt, setTransformAt, upsertKey } from './keyframes.ts';
+import { adjacentKeyFrame, evaluateShape, evaluateTransform, moveKeys, parseRange, previousShapeModel, removeKeyAt, removeKeys, reverseKeys, setTransformAt, upsertKey } from './keyframes.ts';
 
 const key = (frame: number, translation: Vec3, rotation = 4): TransformKey => ({ frame, translation, rotation });
 
@@ -96,5 +96,16 @@ describe('parseRange', () => {
     expect(parseRange('10 400')).toEqual([10, 360]);
     expect(parseRange('9 2')).toEqual([0, 30]);
     expect(parseRange(undefined)).toEqual([0, 30]);
+  });
+});
+
+describe('key editing', () => {
+  const keys = [0, 4, 8].map((frame) => ({ frame, model: frame }));
+  it('moves, copies, reverses and removes keys', () => {
+    expect(moveKeys(keys, [4], 2, false).map((key) => key.frame)).toEqual([0, 6, 8]);
+    expect(moveKeys(keys, [4], 4, false)).toEqual([{ frame: 0, model: 0 }, { frame: 8, model: 4 }]);
+    expect(moveKeys(keys, [0], 1, true).map((key) => key.frame)).toEqual([0, 1, 4, 8]);
+    expect(reverseKeys(keys, [0, 4, 8]).map((key) => key.model)).toEqual([8, 4, 0]);
+    expect(removeKeys(keys, [0, 4, 8])).toEqual([{ frame: 0, model: 0 }]);
   });
 });

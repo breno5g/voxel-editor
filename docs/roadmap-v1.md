@@ -82,8 +82,8 @@ Pendências da v0.7:
 
 ## v0.11: animação
 
-- [ ] Multisseleção de keys na timeline, duplicar arrastando, `arev`, `asel all|inv|none`
-- [ ] Tempo global (`aset global`), velocidade `a_speed`
+- [x] Multisseleção de keys na timeline (clique, `Shift`), mover e duplicar arrastando (`Ctrl`), apagar (`F6`/`Delete`), `arev`, `asel all|inv|none` no menu do botão direito
+- [x] Tempo global (`aset global`); a velocidade (`a_speed`) é o FPS da timeline
 - [ ] Frames não gravados: editar fora de uma key fica pendente até `F5` ("Add/Replace Key Frame", `_frm_*`), com o aviso ao trocar de frame
 - [ ] Empacotar modelos em animação e desempacotar (`opack`, `ounpack`), importar sprites
 

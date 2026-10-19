@@ -1,6 +1,7 @@
 import type { BrushMode, BrushType, DisplayOption, Editor, Mode } from '../editor/editor.ts';
 import type { ModelCommands } from '../editor/model-commands.ts';
 import type { ObjectCommands } from '../editor/object-commands.ts';
+import type { KeyCommands } from '../editor/key-commands.ts';
 import type { Axis } from '../format/rotation.ts';
 import type { Vec3 } from '../format/vox.ts';
 import { isEditingText } from './dom.ts';
@@ -36,7 +37,7 @@ export type ShortcutActions = {
  * the editor's map wins. Tab (switch editor) is handled by the viewport, which owns its focus.
  * Browsers reserve Ctrl+N/T/W, so those MagicaVoxel keys only reach the page in a standalone window.
  */
-export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: ModelCommands, files: FileActions, actions: ShortcutActions): void {
+export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: ModelCommands, files: FileActions, actions: ShortcutActions, keys: KeyCommands): void {
   const { state } = editor;
   const undo = () => {
     if (!editor.history.undo()) editor.status('Nada para desfazer');
@@ -65,7 +66,7 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
     ['ctrl+s', files.save],
     ['ctrl+shift+s', files.saveAs],
     ['F5', commands.addKey],
-    ['F6', commands.removeKey],
+    ['F6', () => (keys.hasKeySelection() ? keys.deleteSelectedKeys() : commands.removeKey())],
     ['Comma', () => editor.stepFrame(-1)],
     ['Period', () => editor.stepFrame(1)],
     ['ctrl+Comma', () => commands.stepKey(-1)],

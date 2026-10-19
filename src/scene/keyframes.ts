@@ -79,6 +79,32 @@ export function setTransformAt(keys: readonly TransformKey[], frame: number, val
   return upsertKey(keys, { frame, ...value });
 }
 
+/**
+ * Keys at `frames` shifted by `delta` (clamped to the frame range); with `copy` the originals stay.
+ * A moved key replaces whatever key sat at its new frame.
+ */
+export function moveKeys<K extends Keyed>(keys: readonly K[], frames: readonly number[], delta: number, copy: boolean): K[] {
+  const chosen = new Set(frames);
+  const moved = keys.filter((key) => chosen.has(key.frame)).map((key) => ({ ...key, frame: clampFrame(key.frame + delta) }));
+  const landing = new Set(moved.map((key) => key.frame));
+  const kept = keys.filter((key) => (copy || !chosen.has(key.frame)) && !landing.has(key.frame));
+  return [...kept, ...moved].sort((a, b) => a.frame - b.frame);
+}
+
+/** MagicaVoxel `arev`: the keys at `frames` swap places in time (first becomes last). */
+export function reverseKeys<K extends Keyed>(keys: readonly K[], frames: readonly number[]): K[] {
+  const chosen = keys.filter((key) => frames.includes(key.frame));
+  if (chosen.length < 2) return [...keys];
+  const [first, last] = [chosen[0].frame, chosen[chosen.length - 1].frame];
+  return keys.map((key) => (frames.includes(key.frame) ? { ...key, frame: first + last - key.frame } : key)).sort((a, b) => a.frame - b.frame);
+}
+
+/** Keys without those at `frames`, keeping at least one. */
+export function removeKeys<K extends Keyed>(keys: readonly K[], frames: readonly number[]): K[] {
+  const kept = keys.filter((key) => !frames.includes(key.frame));
+  return kept.length > 0 ? kept : keys.slice(0, 1);
+}
+
 export function adjacentKeyFrame(frames: readonly number[], frame: number, direction: 1 | -1): number | null {
   const candidates = frames.filter((keyFrame) => (direction > 0 ? keyFrame > frame : keyFrame < frame));
   if (candidates.length === 0) return null;

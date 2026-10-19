@@ -22,28 +22,33 @@ export function compose(parent: Pose, local: TransformValue): Pose {
   return { rows: multiplyRows(parent.rows, rotationRows(local.rotation)), translation: [x + px, y + py, z + pz] };
 }
 
+/** Local time: only `transformId` and what is under it follow the frame; everything else shows `restFrame`. */
+export type LocalTime = { transformId: number; restFrame: number };
+
 /** Flattens the scene graph at `frame` into drawable model instances with world poses. */
-export function evaluateScene(scene: VoxDocument, frame: number): Instance[] {
+export function evaluateScene(scene: VoxDocument, frame: number, local: LocalTime | null = null): Instance[] {
   const hiddenLayers = hiddenLayerIds(scene);
   const instances: Instance[] = [];
   const path = new Set<number>();
 
-  const visit = (nodeId: number, pose: Pose, transformId: number): void => {
+  const visit = (nodeId: number, pose: Pose, transformId: number, timed: boolean): void => {
     const node = scene.nodes[nodeId];
     if (!node || path.has(nodeId)) return;
     path.add(nodeId);
+    const inside = timed || local?.transformId === nodeId;
+    const at = local === null || inside ? frame : local.restFrame;
     if (node.kind === 'transform' && !isHidden(node.attrs) && !hiddenLayers.has(node.layer)) {
-      visit(node.child, compose(pose, evaluateTransform(node.keys, frame, isLooping(node.attrs))), nodeId);
+      visit(node.child, compose(pose, evaluateTransform(node.keys, at, isLooping(node.attrs))), nodeId, inside);
     }
-    if (node.kind === 'group') node.children.forEach((child) => visit(child, pose, transformId));
+    if (node.kind === 'group') node.children.forEach((child) => visit(child, pose, transformId, inside));
     if (node.kind === 'shape') {
-      const model = evaluateShape(node.keys, frame, isLooping(node.attrs));
+      const model = evaluateShape(node.keys, at, isLooping(node.attrs));
       if (scene.models[model]) instances.push({ transformId, shapeId: nodeId, model, pose });
     }
     path.delete(nodeId);
   };
 
-  visit(ROOT_ID, IDENTITY_POSE, ROOT_ID);
+  visit(ROOT_ID, IDENTITY_POSE, ROOT_ID, false);
   return instances;
 }
 

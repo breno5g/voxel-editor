@@ -48,6 +48,9 @@ export type FaceBrush = FaceConnectivity & { usePalette: boolean };
 export type GeoBrush = CenterOptions & { shape: GeoShape; project: boolean };
 export const MAX_BRUSH_SIZE = 64;
 export type StatusTone = 'info' | 'error';
+/** Timeline rows: position keys (`nTRN`) and model frames (`nSHP`). */
+export type KeyTrack = 'transform' | 'shape';
+export type KeySelection = Record<KeyTrack, number[]>;
 
 export type EditorEvent =
   | { type: 'document' }
@@ -106,6 +109,10 @@ export type EditorState = {
   color: number;
   /** MagicaVoxel's palette multi-selection (Shift+click), for edits on several colours at once. */
   paletteSelection: number[];
+  /** Selected key frames of the primary selection, per timeline row. */
+  keySelection: KeySelection;
+  /** MagicaVoxel `aset global`: every object follows the frame; off, only the selected one does and the rest stay at the range start. */
+  globalTime: boolean;
   /** Shows the previous model frame translucent while editing frame-by-frame animation. */
   onionSkin: boolean;
   display: Display;
@@ -175,13 +182,15 @@ export function createEditor() {
     voxelSelection: null,
     color: DEFAULT_COLOR,
     paletteSelection: [],
+    keySelection: { transform: [], shape: [] },
+    globalTime: true,
     onionSkin: false,
     display: { grid: true, frame: true, edges: false, backgroundObjects: true },
   };
 
   const emit = (event: EditorEvent) => listeners.forEach((listener) => listener(event));
   const evaluate = () => {
-    state.instances = evaluateScene(state.vox, state.frame);
+    state.instances = evaluateScene(state.vox, state.frame, state.globalTime ? null : { transformId: state.selected ?? -1, restFrame: state.range[0] });
   };
 
   const setFrame = (frame: number) => {
@@ -199,8 +208,11 @@ export function createEditor() {
   const setSelection = (transformIds: number[], force = false) => {
     const next = [...new Set(transformIds)];
     if (!force && next.length === state.selection.length && next.every((id, index) => id === state.selection[index])) return;
+    const primaryChanged = state.selected !== (next.at(-1) ?? null);
     state.selection = next;
     state.selected = next.at(-1) ?? null;
+    if (primaryChanged) state.keySelection = { transform: [], shape: [] };
+    if (!state.globalTime) evaluate();
     emit({ type: 'selection' });
     if (state.mode === 'model' && (state.selected === null || !isObject(state.vox, state.selected))) {
       state.mode = 'world';
@@ -218,7 +230,7 @@ export function createEditor() {
     },
 
     load(vox: VoxDocument, name: string) {
-      Object.assign(state, { vox, fileName: name, dirty: false, playing: false, voxelSelection: null, range: parseRange(vox.meta.get(RANGE_META_KEY)) });
+      Object.assign(state, { vox, fileName: name, dirty: false, playing: false, voxelSelection: null, keySelection: { transform: [], shape: [] }, range: parseRange(vox.meta.get(RANGE_META_KEY)) });
       state.frame = state.range[0];
       evaluate();
       const first = state.instances[0]?.transformId;
@@ -388,6 +400,17 @@ export function createEditor() {
     setOnionSkin(enabled: boolean) {
       state.onionSkin = enabled;
       emit({ type: 'tool' });
+    },
+
+    setKeySelection(selection: KeySelection) {
+      state.keySelection = { transform: [...new Set(selection.transform)].sort((a, b) => a - b), shape: [...new Set(selection.shape)].sort((a, b) => a - b) };
+      emit({ type: 'tool' });
+    },
+
+    setGlobalTime(enabled: boolean) {
+      state.globalTime = enabled;
+      evaluate();
+      emit({ type: 'scene' });
     },
 
     setPaletteSelection(indices: number[]) {

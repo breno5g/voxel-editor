@@ -20,6 +20,7 @@ import { bindLayersPanel } from './ui/layers-panel.ts';
 import { bindPalettePanel } from './ui/palette-panel.ts';
 import { createPaletteCommands } from './editor/palette-commands.ts';
 import { createMaterialCommands } from './editor/material-commands.ts';
+import { createKeyCommands } from './editor/key-commands.ts';
 import { bindMaterialPanel } from './ui/material-panel.ts';
 import { bindShortcuts } from './ui/shortcuts.ts';
 import { bindStatusBar } from './ui/status-bar.ts';
@@ -31,6 +32,7 @@ const editor = createEditor();
 const viewport = createViewport(element('viewport', HTMLElement));
 const commands = createObjectCommands(editor);
 const models = createModelCommands(editor);
+const keys = createKeyCommands(editor);
 const files = createFileActions(editor, viewport);
 const { focusCamera } = bindViewportPanel(editor, viewport, commands);
 const cameras = bindCameraPanel(editor, viewport);
@@ -46,7 +48,7 @@ bindWorldPanel(editor, commands);
 bindLayersPanel(editor, commands);
 bindObjectInspector(editor, commands);
 bindModelPanel(models);
-bindTimeline(editor, commands);
+bindTimeline(editor, commands, keys);
 bindShortcuts(editor, commands, models, files, {
   focusCamera,
   faceView: viewport.camera.faceView,
@@ -56,7 +58,7 @@ bindShortcuts(editor, commands, models, files, {
   selectCameraSlot: cameras.selectSlot,
   fly: viewport.camera.fly,
   openHelp: bindHelp().open,
-});
+}, keys);
 bindPlayback(editor);
 const autosave = bindAutosave(editor);
 

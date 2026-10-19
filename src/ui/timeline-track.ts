@@ -1,6 +1,14 @@
 import type { FrameRange } from '../scene/keyframes.ts';
 
-export type TrackView = { range: FrameRange; frame: number; transformKeys: number[]; shapeKeys: number[] };
+export type TrackView = {
+  range: FrameRange;
+  frame: number;
+  transformKeys: number[];
+  shapeKeys: number[];
+  /** Selected key frames per row, and how far a drag is moving them. */
+  selected: { transform: number[]; shape: number[] };
+  dragDelta: number;
+};
 
 const COLORS = {
   background: '#1b1d22',
@@ -11,6 +19,7 @@ const COLORS = {
   cursorEdge: '#ffaa33',
   transformKey: '#5cc8ff',
   shapeKey: '#9be36d',
+  selectedKey: '#ffffff',
 };
 const LABEL_STEPS = [1, 2, 5, 10, 20, 50, 100];
 const MIN_LABEL_SPACING = 28;
@@ -51,10 +60,13 @@ export function drawTrack(canvas: HTMLCanvasElement, view: TrackView): void {
   context.fillRect(xOf(view.frame), 0, 1, height);
 
   const visible = (frame: number) => frame >= start && frame <= end;
-  context.fillStyle = COLORS.transformKey;
-  view.transformKeys.filter(visible).forEach((frame) => {
+  /** Selected keys are drawn white, at their dragged place while a drag is moving them. */
+  const placed = (frames: number[], selected: number[]) =>
+    frames.map((frame) => (selected.includes(frame) ? { frame: frame + view.dragDelta, selected: true } : { frame, selected: false })).filter(({ frame }) => visible(frame));
+  placed(view.transformKeys, view.selected.transform).forEach(({ frame, selected }) => {
     const x = xOf(frame) + slot / 2;
     const y = height * ROWS.transform;
+    context.fillStyle = selected ? COLORS.selectedKey : COLORS.transformKey;
     context.beginPath();
     context.moveTo(x, y - KEY_SIZE);
     context.lineTo(x + KEY_SIZE, y);
@@ -62,10 +74,16 @@ export function drawTrack(canvas: HTMLCanvasElement, view: TrackView): void {
     context.lineTo(x - KEY_SIZE, y);
     context.fill();
   });
-  context.fillStyle = COLORS.shapeKey;
-  view.shapeKeys.filter(visible).forEach((frame) => {
+  placed(view.shapeKeys, view.selected.shape).forEach(({ frame, selected }) => {
+    context.fillStyle = selected ? COLORS.selectedKey : COLORS.shapeKey;
     context.fillRect(xOf(frame) + slot / 2 - KEY_SIZE / 1.4, height * ROWS.shape - KEY_SIZE / 1.4, KEY_SIZE * 1.4, KEY_SIZE * 1.4);
   });
+}
+
+/** The timeline row under a pointer: position keys in the upper half, model frames below. */
+export function rowAtPoint(canvas: HTMLCanvasElement, clientY: number): 'transform' | 'shape' {
+  const bounds = canvas.getBoundingClientRect();
+  return (clientY - bounds.top) / bounds.height < (ROWS.transform + ROWS.shape) / 2 ? 'transform' : 'shape';
 }
 
 export function frameAtPoint(canvas: HTMLCanvasElement, [start, end]: FrameRange, clientX: number): number {

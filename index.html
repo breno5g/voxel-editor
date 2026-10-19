@@ -598,9 +598,17 @@
           </div>
           <label class="check"><input id="loop-shape" type="checkbox" /> Loop</label>
           <label class="check" title="Mostra o frame de modelo anterior translúcido (O)"><input id="onion-skin" type="checkbox" /> Onion skin</label>
+          <label class="check" title="Tempo global (aset global): desligado, só o objeto selecionado anima"><input id="global-time" type="checkbox" /> Global</label>
         </div>
       </div>
-      <canvas id="timeline-track" class="timeline-track" role="slider" aria-label="Frame atual" tabindex="0"></canvas>
+      <canvas id="timeline-track" class="timeline-track" role="slider" aria-label="Frame atual. Clique numa key seleciona (Shift soma), arrastar move (Ctrl duplica), botão direito abre o menu de keys" tabindex="0"></canvas>
+      <div id="key-menu" class="context-menu segmented" role="menu" aria-label="Keys" hidden>
+        <button type="button" role="menuitem" data-keys="all" title="Selecionar todas as keys (asel all)">Todas</button>
+        <button type="button" role="menuitem" data-keys="inv" title="Inverter a seleção de keys (asel inv)">Inverter</button>
+        <button type="button" role="menuitem" data-keys="none" title="Nenhuma key (asel none)">Nenhuma</button>
+        <button type="button" role="menuitem" data-keys="reverse" title="Inverter a ordem das keys selecionadas no tempo (arev)">Inverter tempo</button>
+        <button type="button" role="menuitem" data-keys="delete" title="Apagar as keys selecionadas (F6)">Apagar</button>
+      </div>
     </footer>
 
     <div id="status" class="status" role="status" aria-live="polite"></div>
