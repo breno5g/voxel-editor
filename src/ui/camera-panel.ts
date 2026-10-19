@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import type { Editor } from '../editor/editor.ts';
 import { isCameraMode, isWheelZoom } from '../render/camera-rig.ts';
 import { cameraFromDict, cameraToDict } from '../render/camera-chunk.ts';
@@ -23,6 +24,62 @@ function storeWheelZoom(value: string) {
   } catch {
     // Not persisted; the choice still holds for this session.
   }
+}
+
+const round = (value: number, digits = 1) => String(Number(value.toFixed(digits)));
+
+/**
+ * MagicaVoxel's camera panel (`cam.ui`): centre, distance, pitch and yaw, field of view, free camera
+ * speed and mouse sensitivity. Fields follow the camera unless they are being edited.
+ */
+function bindCameraDetails(camera: Viewport['camera']) {
+  const panel = element('camera-settings', HTMLElement);
+  const toggle = element('camera-more', HTMLButtonElement);
+  const fields = new Map([...panel.querySelectorAll<HTMLInputElement>('[data-camera-field]')].map((input) => [input.dataset.cameraField ?? '', input]));
+  const field = (name: string) => fields.get(name)?.valueAsNumber ?? Number.NaN;
+  const finite = (...values: number[]) => values.every(Number.isFinite);
+
+  const apply: Record<string, () => void> = {
+    x: () => applyCenter(),
+    y: () => applyCenter(),
+    z: () => applyCenter(),
+    distance: () => finite(field('distance')) && camera.setDistance(field('distance')),
+    pitch: () => applyOrientation(),
+    yaw: () => applyOrientation(),
+    fov: () => finite(field('fov')) && camera.setFov(field('fov')),
+    move: () => applySpeeds(),
+    mouse: () => applySpeeds(),
+  };
+  const applyCenter = () => {
+    const [x, y, z] = [field('x'), field('y'), field('z')];
+    if (finite(x, y, z)) camera.centerOn(new THREE.Vector3(x, y, z));
+  };
+  const applyOrientation = () => {
+    const [pitch, yaw] = [field('pitch'), field('yaw')];
+    if (finite(pitch, yaw)) camera.setOrientation(Math.max(-90, Math.min(90, pitch)), yaw);
+  };
+  const applySpeeds = () => {
+    const [move, mouse] = [field('move'), field('mouse')];
+    if (finite(move, mouse)) camera.setSpeeds({ move, mouse });
+  };
+  fields.forEach((input, name) => input.addEventListener('change', () => apply[name]?.()));
+
+  const sync = () => {
+    if (panel.hidden) return;
+    const { target } = camera.state();
+    const [pitch, yaw] = camera.orientation();
+    const { move, mouse } = camera.speeds();
+    const values: Record<string, string> = { x: round(target[0]), y: round(target[1]), z: round(target[2]), distance: round(camera.distance()), pitch: round(pitch), yaw: round(yaw), fov: round(camera.fov(), 0), move: round(move, 2), mouse: round(mouse, 2) };
+    fields.forEach((input, name) => {
+      if (input !== document.activeElement && values[name] !== undefined) input.value = values[name];
+    });
+  };
+  toggle.addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    toggle.setAttribute('aria-expanded', String(!panel.hidden));
+    sync();
+  });
+  camera.onChange(sync);
 }
 
 export type CameraPanel = ReturnType<typeof bindCameraPanel>;
@@ -61,6 +118,7 @@ export function bindCameraPanel(editor: Editor, viewport: Viewport) {
     syncModes();
     editor.status(`Câmera do slot ${slot()} carregada`);
   };
+  bindCameraDetails(camera);
   element('camera-save', HTMLButtonElement).addEventListener('click', save);
   element('camera-load', HTMLButtonElement).addEventListener('click', load);
   syncModes();

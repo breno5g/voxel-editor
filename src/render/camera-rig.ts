@@ -12,14 +12,17 @@ export const WHEEL_ZOOMS = ['cursor', 'focus'] as const;
 export type WheelZoom = (typeof WHEEL_ZOOMS)[number];
 export const isWheelZoom = (value: unknown): value is WheelZoom => WHEEL_ZOOMS.some((zoom) => zoom === value);
 
-export type CameraState = { mode: CameraMode; target: Vec3; position: Vec3; zoom: number; height: number };
+export type CameraState = { mode: CameraMode; target: Vec3; position: Vec3; zoom: number; height: number; fov: number };
 export type CameraDrag = 'pan' | 'zoom' | 'rotate';
 
 const DRAG_ACTIONS: Record<CameraDrag, THREE.MOUSE> = { pan: THREE.MOUSE.PAN, zoom: THREE.MOUSE.DOLLY, rotate: THREE.MOUSE.ROTATE };
 export type CameraRig = ReturnType<typeof createCameraRig>;
 
-const FIELD_OF_VIEW = 45;
-const HALF_TAN = Math.tan(THREE.MathUtils.degToRad(FIELD_OF_VIEW / 2));
+/** MagicaVoxel `cam_fov`: 45° by default, 30–90° in its camera panel. */
+export const DEFAULT_FOV = 45;
+export const clampFov = (fov: number) => THREE.MathUtils.clamp(fov, 30, 90);
+export const halfTan = (fov: number) => Math.tan(THREE.MathUtils.degToRad(fov / 2));
+const DEGREES = 180 / Math.PI;
 const FRAMING_DISTANCE = 3;
 /** Polar angle from +Z of a true isometric view: MagicaVoxel snaps the pitch to ±35.264° (atan(1/√2)). */
 const ISO_POLAR = Math.PI / 2 - Math.atan(1 / Math.SQRT2);
@@ -55,6 +58,22 @@ export const focusZoomRadius = (radius: number, amount: number) => Math.max((rad
 export const focusZoomExtent = (extent: number, amount: number) => Math.max(extent * (1 - amount), MIN_ZOOM_EXTENT);
 
 /**
+ * Unit vector from the focus to the eye for rCAM `_angle` `(ax, ay)` in degrees. MagicaVoxel builds
+ * `R = M0 · Ry(ay) · Rx(ax) · Rz(az)` with `M0 = [1 0 0; 0 0 -1; 0 1 0]` (`UI_3DView` constructor) and puts
+ * the eye at `focus + radius · R·ẑ`; roll (`az`) does not move the eye.
+ */
+export function eyeDirection(ax: number, ay: number): Vec3 {
+  const [pitch, yaw] = [ax / DEGREES, ay / DEGREES];
+  return [Math.cos(pitch) * Math.sin(yaw), -Math.cos(pitch) * Math.cos(yaw), -Math.sin(pitch)];
+}
+
+/** rCAM `_angle` `(ax, ay)` in degrees for a focus-to-eye direction (the inverse of {@link eyeDirection}). */
+export function cameraAngles([x, y, z]: Vec3): [number, number] {
+  const length = Math.hypot(x, y, z) || 1;
+  return [-Math.asin(Math.max(-1, Math.min(1, z / length))) * DEGREES, Math.atan2(x, -y) * DEGREES];
+}
+
+/**
  * Free camera look: the target turned about the eye, `yaw` around the vertical (positive turns right)
  * and `pitch` down (positive) or up, never past straight up or down; its distance is kept.
  */
@@ -71,7 +90,7 @@ export function turnedTarget(eye: THREE.Vector3, target: THREE.Vector3, yaw: num
  * the perspective view when switching, like MagicaVoxel's `tan(fov/2) * radius` frustum.
  */
 export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void) {
-  const perspective = new THREE.PerspectiveCamera(FIELD_OF_VIEW, 1, 0.1, 5000);
+  const perspective = new THREE.PerspectiveCamera(DEFAULT_FOV, 1, 0.1, 5000);
   const orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, -10000, 10000);
   perspective.up.copy(UP);
   orthographic.up.copy(UP);
@@ -103,7 +122,7 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
   canvas.addEventListener('pointermove', (event) => {
     if (!look) return;
     event.stopImmediatePropagation();
-    lookAround((event.clientX - look.x) * LOOK_SPEED, (event.clientY - look.y) * LOOK_SPEED);
+    lookAround((event.clientX - look.x) * LOOK_SPEED * controls.rotateSpeed, (event.clientY - look.y) * LOOK_SPEED * controls.rotateSpeed);
     look = { x: event.clientX, y: event.clientY };
   });
   canvas.addEventListener('pointerup', (event) => {
@@ -114,7 +133,12 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
   const controls = new OrbitControls<THREE.PerspectiveCamera | THREE.OrthographicCamera>(perspective, canvas);
   controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
   controls.zoomToCursor = true;
-  controls.addEventListener('change', onChange);
+  const listeners = new Set<() => void>();
+  let moveSpeed = 1;
+  controls.addEventListener('change', () => {
+    onChange();
+    listeners.forEach((listener) => listener());
+  });
   let mode: CameraMode = 'pers';
   let aspect = 1;
   /** Half the orthographic view height at zoom 1. */
@@ -135,6 +159,7 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
     updateProjection();
     controls.update();
     onChange();
+    listeners.forEach((listener) => listener());
   };
 
   const lookAround = (yaw: number, pitch: number) => {
@@ -162,7 +187,7 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
     if (next === mode) return;
     const from = camera();
     const direction = offset().normalize();
-    const visibleHeight = isOrthographic(mode) ? orthoHeight / orthographic.zoom : from.position.distanceTo(controls.target) * HALF_TAN;
+    const visibleHeight = isOrthographic(mode) ? orthoHeight / orthographic.zoom : from.position.distanceTo(controls.target) * halfTan(perspective.fov);
     mode = next;
     const to = camera();
     if (isOrthographic(mode)) {
@@ -170,7 +195,7 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
       orthographic.zoom = 1;
       orthographic.updateProjectionMatrix();
     }
-    to.position.copy(controls.target).addScaledVector(direction, visibleHeight / HALF_TAN);
+    to.position.copy(controls.target).addScaledVector(direction, visibleHeight / halfTan(perspective.fov));
     controls.object = to;
     controls.minPolarAngle = mode === 'iso' ? ISO_POLAR : 0;
     controls.maxPolarAngle = mode === 'iso' ? ISO_POLAR : Math.PI;
@@ -208,7 +233,7 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
       const distance = sphere.radius * FRAMING_DISTANCE;
       controls.target.copy(sphere.center);
       camera().position.copy(sphere.center).addScaledVector(direction, distance);
-      orthoHeight = distance * HALF_TAN;
+      orthoHeight = distance * halfTan(perspective.fov);
       orthographic.zoom = 1;
       settle();
     },
@@ -246,7 +271,7 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
     fly(forward: number, right: number, up: number) {
       if (mode !== 'free') return;
       const view = offset().negate();
-      const step = Math.max(1, view.length() * 0.05);
+      const step = Math.max(1, view.length() * 0.05) * moveSpeed;
       const ahead = view.normalize();
       const side = ahead.clone().cross(UP).normalize();
       const move = ahead.multiplyScalar(forward * step).addScaledVector(side, right * step).addScaledVector(UP, up * step);
@@ -256,16 +281,52 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
     },
 
     state(): CameraState {
-      return { mode, target: toVec3(controls.target), position: toVec3(camera().position), zoom: orthographic.zoom, height: orthoHeight };
+      return { mode, target: toVec3(controls.target), position: toVec3(camera().position), zoom: orthographic.zoom, height: orthoHeight, fov: perspective.fov };
     },
 
     restore(state: CameraState) {
       setMode(state.mode);
+      perspective.fov = clampFov(state.fov);
       controls.target.set(...state.target);
       camera().position.set(...state.position);
       orthographic.zoom = state.zoom;
       orthoHeight = state.height;
       settle();
+    },
+
+    /** MagicaVoxel's camera panel: pitch and yaw (rCAM `_angle` degrees) about the centre, keeping the distance. */
+    setOrientation(pitch: number, yaw: number) {
+      const distance = offset().length();
+      camera().position.copy(controls.target).add(new THREE.Vector3(...eyeDirection(pitch, yaw)).multiplyScalar(distance));
+      settle();
+    },
+    orientation: () => cameraAngles(toVec3(offset())),
+
+    /** The eye's distance to the centre, or the visible half height for `orth` and `iso` (MagicaVoxel `cam_zoom`). */
+    distance: () => (isOrthographic(mode) ? orthoHeight / orthographic.zoom : offset().length()),
+    setDistance(value: number) {
+      const next = Math.max(value, MIN_ZOOM_EXTENT);
+      if (isOrthographic(mode)) orthographic.zoom = orthoHeight / next;
+      else camera().position.copy(controls.target).addScaledVector(offset().normalize(), next);
+      settle();
+    },
+
+    fov: () => perspective.fov,
+    setFov(degrees: number) {
+      perspective.fov = clampFov(degrees);
+      settle();
+    },
+
+    /** MagicaVoxel `cam_key` and `cam_mouse`: free camera key steps and mouse rotation, as multipliers. */
+    speeds: () => ({ move: moveSpeed, mouse: controls.rotateSpeed }),
+    setSpeeds({ move, mouse }: { move: number; mouse: number }) {
+      moveSpeed = Math.max(move, 0.01);
+      controls.rotateSpeed = Math.max(mouse, 0.1);
+    },
+
+    /** Called after every camera change (drags, wheel, panel edits). */
+    onChange(listener: () => void) {
+      listeners.add(listener);
     },
   };
 }

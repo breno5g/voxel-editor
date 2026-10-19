@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { cameraAngles, cameraFromDict, cameraToDict, eyeDirection } from './camera-chunk.ts';
+import { cameraFromDict, cameraToDict } from './camera-chunk.ts';
+import { cameraAngles, eyeDirection } from './camera-rig.ts';
 
 /** An `iso` slot from a file saved by MagicaVoxel 0.99.7. */
 const ISO_SLOT = new Map([

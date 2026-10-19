@@ -476,6 +476,16 @@ body {
   background: var(--overlay);
 }
 
+.camera-settings {
+  bottom: 44px;
+  left: 8px;
+  width: 260px;
+  padding: 8px;
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
 .display-settings {
   top: 40px;
   right: 8px;

@@ -631,6 +631,16 @@
             <button type="button" data-value="focus" title="Como no MagicaVoxel: a roda aproxima do centro de rotação (5 recentraliza)">Foco</button>
           </div>
         </div>
+        <button id="camera-more" type="button" aria-expanded="false" aria-controls="camera-settings" title="Centro, distância, ângulos e campo de visão da câmera" aria-label="Mais opções da câmera">⋯</button>
+      </div>
+      <div id="camera-settings" class="overlay camera-settings stack" role="group" aria-label="Detalhes da câmera" hidden>
+        <div class="control-row"><span class="label">Centro</span><div class="size-fields"><input data-camera-field="x" type="number" step="any" aria-label="Centro X" /><input data-camera-field="y" type="number" step="any" aria-label="Centro Y" /><input data-camera-field="z" type="number" step="any" aria-label="Centro Z" /></div></div>
+        <label class="control-row" title="Distância do olho ao centro (meia altura da vista em Orto e Iso)"><span class="label">Distância</span><input data-camera-field="distance" type="number" min="0.001" step="any" /></label>
+        <label class="control-row" title="Inclinação: negativo olha de cima (-90 a 90)"><span class="label">Pitch</span><input data-camera-field="pitch" type="number" min="-90" max="90" step="any" /></label>
+        <label class="control-row" title="Giro em torno do eixo vertical (-180 a 180)"><span class="label">Yaw</span><input data-camera-field="yaw" type="number" min="-180" max="180" step="any" /></label>
+        <label class="control-row" title="Campo de visão em graus (30 a 90)"><span class="label">FOV</span><input data-camera-field="fov" type="number" min="30" max="90" step="1" /></label>
+        <label class="control-row" title="Passo da câmera livre (W/A/S/D/Q/E), como multiplicador"><span class="label">Velocidade</span><input data-camera-field="move" type="number" min="0.01" max="100" step="0.01" /></label>
+        <label class="control-row" title="Sensibilidade do mouse ao girar"><span class="label">Mouse</span><input data-camera-field="mouse" type="number" min="0.1" max="3" step="0.01" /></label>
       </div>
     </main>
 

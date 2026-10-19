@@ -29,7 +29,8 @@ Pendências da v0.6:
 - [x] Slots de câmera lidos e gravados em `rCAM` (matriz base `M0` confirmada, ver [RE §4.4](magicavoxel-re.md))
 - [x] Câmera livre girando em torno do olho; `X` + clique centraliza a órbita num voxel
 - [x] Sombra (`Ctrl+W`), contornos dos objetos (`Ctrl+M`), AO, sombreamento constante, esmaecer o fundo, cores de fundo/grade/aresta/seleção e grade do chão do modelo (`rm_space`), com os padrões do MagicaVoxel
-- [ ] Cubo de vista e régua da câmera
+- [x] Painel da câmera (`cam.ui`): centro, distância, pitch, yaw, FOV, velocidade da câmera livre e sensibilidade do mouse
+- [ ] Rolagem da câmera (`cam rz`): o controle de órbita mantém `+z` para cima
 - [ ] `Ctrl+N`, `Ctrl+T` e `Ctrl+W` são reservados pelo navegador: só chegam ao editor numa janela própria (PWA ou app desktop)
 
 ## v0.7: pincéis (feito)
