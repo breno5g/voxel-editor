@@ -8,6 +8,9 @@ export type CameraMode = (typeof CAMERA_MODES)[number];
 export const isCameraMode = (value: unknown): value is CameraMode => CAMERA_MODES.some((mode) => mode === value);
 
 export type CameraState = { mode: CameraMode; target: Vec3; position: Vec3; zoom: number; height: number };
+export type CameraDrag = 'pan' | 'zoom' | 'rotate';
+
+const DRAG_ACTIONS: Record<CameraDrag, THREE.MOUSE> = { pan: THREE.MOUSE.PAN, zoom: THREE.MOUSE.DOLLY, rotate: THREE.MOUSE.ROTATE };
 export type CameraRig = ReturnType<typeof createCameraRig>;
 
 const FIELD_OF_VIEW = 45;
@@ -86,6 +89,12 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
     camera,
     mode: () => mode,
     setMode,
+
+    /** MagicaVoxel `camera-control`: while a key is held, the left button drives the camera. */
+    setLeftDrag(drag: CameraDrag | null) {
+      controls.mouseButtons = { ...controls.mouseButtons, LEFT: drag ? DRAG_ACTIONS[drag] : null };
+    },
+    leftDrag: () => controls.mouseButtons.LEFT !== null,
     aspect: () => aspect,
 
     setAspect(next: number) {

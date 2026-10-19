@@ -2,11 +2,15 @@ import type { Editor } from '../editor/editor.ts';
 import type { ObjectCommands } from '../editor/object-commands.ts';
 import { createVoxelTools } from '../editor/voxel-tools.ts';
 import { createWorldTools } from '../editor/world-tools.ts';
+import type { CameraDrag } from '../render/camera-rig.ts';
 import type { Viewport } from '../render/viewport.ts';
 import { isLooping, previousShapeModel } from '../scene/keyframes.ts';
 import { evaluateScene } from '../scene/scene-graph.ts';
+import { isEditingText } from './dom.ts';
 
 const MAIN_BUTTON = 0;
+/** MagicaVoxel `camera-control`: hold the key and drag with the left button. */
+const CAMERA_DRAG_KEYS: Record<string, CameraDrag> = { Space: 'pan', KeyZ: 'zoom', KeyK: 'rotate' };
 
 /**
  * Keeps the viewport in step with editor events and routes left-button input by editor:
@@ -30,8 +34,19 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
     editor.setMode(event.shiftKey || state.mode === 'model' ? 'world' : 'model');
   });
 
+  window.addEventListener('keydown', (event) => {
+    const drag = CAMERA_DRAG_KEYS[event.code];
+    if (!drag || event.ctrlKey || event.metaKey || isEditingText(event) || event.target instanceof HTMLButtonElement) return;
+    event.preventDefault();
+    viewport.camera.setLeftDrag(drag);
+  });
+  window.addEventListener('keyup', (event) => {
+    if (CAMERA_DRAG_KEYS[event.code]) viewport.camera.setLeftDrag(null);
+  });
+  window.addEventListener('blur', () => viewport.camera.setLeftDrag(null));
+
   canvas.addEventListener('pointerdown', (event) => {
-    if (event.button !== MAIN_BUTTON) return;
+    if (event.button !== MAIN_BUTTON || viewport.camera.leftDrag()) return;
     canvas.setPointerCapture(event.pointerId);
     tools().begin(event.clientX, event.clientY, event.altKey);
   });
