@@ -14,7 +14,7 @@ export type PathTracer = ReturnType<typeof createPathTracer>;
 /** The camera to trace from and the distance along its view where the lens focuses. */
 export type TraceView = { camera: THREE.Camera; focusDistance: number };
 /** Options that only live while rendering (MagicaVoxel keeps them out of the file). */
-export type TraceOptions = { shadows: boolean; translucentShadows: boolean; antialias: boolean; shape: VoxelShape; bloom: boolean };
+export type TraceOptions = { shadows: boolean; translucentShadows: boolean; antialias: boolean; pixelated: boolean; shape: VoxelShape; bloom: boolean };
 /** MagicaVoxel's `pt_prim`: how each voxel is drawn. */
 export const VOXEL_SHAPES = ['cube', 'lego', 'mc', 'clay', 'sphr', 'cyli'] as const;
 export type VoxelShape = (typeof VOXEL_SHAPES)[number];
@@ -143,7 +143,7 @@ export function createPathTracer(container: HTMLElement) {
 
   let volume: SceneVolume | null = null;
   let settings: RenderSettings | null = null;
-  let options: TraceOptions = { shadows: true, translucentShadows: true, antialias: true, shape: 'cube', bloom: false };
+  let options: TraceOptions = { shadows: true, translucentShadows: true, antialias: true, pixelated: false, shape: 'cube', bloom: false };
   let hasIbl = false;
   let samples = 0;
   let current = 0;
@@ -359,6 +359,7 @@ export function createPathTracer(container: HTMLElement) {
       gl.uniform1i(at(traceProgram, 'u_shadows'), Number(options.shadows));
       gl.uniform1i(at(traceProgram, 'u_translucentShadows'), Number(options.translucentShadows));
       gl.uniform1i(at(traceProgram, 'u_antialias'), Number(options.antialias));
+      gl.uniform1i(at(traceProgram, 'u_pixelated'), Number(options.pixelated));
       gl.uniform1f(at(traceProgram, 'u_cell'), Math.min(Math.max(settings.show.cell, 0.01), 1));
       const previous = current;
       current = 1 - current;

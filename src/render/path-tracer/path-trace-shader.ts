@@ -86,6 +86,8 @@ uniform bool u_shadows;
 uniform bool u_translucentShadows;
 /** \`pt_b_aa\`: jitter each sample inside its pixel. */
 uniform bool u_antialias;
+/** \`pt_px\`: light each voxel face as a whole, from its centre, for a pixel-art look. */
+uniform bool u_pixelated;
 /* MagicaVoxel \`pt_prim\` (numbered as VOXEL_SHAPES; one program per shape keeps other shapes' work out of the
    DDA loop) and \`pt_cell\`, the share of its cell a voxel fills. */
 const int SHAPE = ${shape};
@@ -395,13 +397,15 @@ Surface traceScene(vec3 origin, vec3 direction) {
   if (voxel.t >= 0.0) {
     surface.hit = true;
     surface.t = voxel.t;
-    surface.normal = normalize(voxel.normal / u_scale);
+    /* A ray starting inside a voxel (in a cloud, after scattering) has no entry face. */
+    surface.normal = dot(voxel.normal, voxel.normal) > 0.0 ? normalize(voxel.normal / u_scale) : vec3(0.0);
     surface.color = voxel.color;
     surface.cell = voxel.cell;
   }
-  if (u_ground && direction.z < 0.0) {
-    float tGround = -origin.z / direction.z;
-    if (tGround > 1e-4 && tGround < surface.t) {
+  /* A ray nudged just under the ground (leaving a voxel through its bottom face) is on it. */
+  if (u_ground && (direction.z < 0.0 || origin.z < 0.0)) {
+    float tGround = origin.z < 0.0 ? 0.0 : -origin.z / direction.z;
+    if ((tGround > 1e-4 || origin.z < 0.0) && tGround < surface.t) {
       surface.hit = true;
       surface.t = tGround;
       surface.normal = vec3(0.0, 0.0, 1.0);
@@ -409,10 +413,44 @@ Surface traceScene(vec3 origin, vec3 direction) {
     }
   }
   surface.position = origin + direction * surface.t;
+  if (surface.ground) surface.position.z = 0.0;
   return surface;
 }
 
 const int MAX_SHADOW_LAYERS = 8;
+const int MAX_MEDIUM_STEPS = 256;
+const int MEDIA_KIND = 5;
+const int MEDIA_ABSORB = 0;
+const int MEDIA_EMIT = 2;
+
+int kindOf(uint color) {
+  return int(texelFetch(u_materials, ivec2(int(color), 0), 0).x + 0.5);
+}
+
+/** World distance from \`position\`, in media voxel \`cell\`, to where the ray leaves the run of media voxels. */
+float mediumLength(vec3 position, vec3 direction, ivec3 cell) {
+  vec3 origin = (position - u_origin) / u_scale;
+  vec3 local = mix(direction / u_scale, vec3(1e-9), equal(direction, vec3(0.0)));
+  vec3 inverse = 1.0 / local;
+  ivec3 stepDirection = ivec3(sign(local));
+  vec3 tDelta = abs(inverse);
+  vec3 next = (vec3(cell) + max(vec3(stepDirection), vec3(0.0)) - origin) * inverse;
+  float t = 0.0;
+  for (int steps = 0; steps < MAX_MEDIUM_STEPS; steps++) {
+    if (!solid(cell) || kindOf(voxelAt(cell)) != MEDIA_KIND) return t;
+    t = min(next.x, min(next.y, next.z));
+    if (next.x <= next.y && next.x <= next.z) { next.x += tDelta.x; cell.x += stepDirection.x; }
+    else if (next.y <= next.z) { next.y += tDelta.y; cell.y += stepDirection.y; }
+    else { next.z += tDelta.z; cell.z += stepDirection.z; }
+  }
+  return t;
+}
+
+// ponytail: \`_d\` read as extinction per voxel; MagicaVoxel's media density scale is unconfirmed.
+/** A medium's extinction per world unit. */
+float mediumDensity(vec4 extra) {
+  return max(extra.z, 0.0) * 3.0 / (u_scale.x + u_scale.y + u_scale.z);
+}
 
 /** How much sunlight gets from \`origin\` along \`direction\`: none past opaque voxels, tinted through glass. */
 vec3 sunlightThrough(vec3 origin, vec3 direction) {
@@ -421,9 +459,18 @@ vec3 sunlightThrough(vec3 origin, vec3 direction) {
   for (int layer = 0; layer < MAX_SHADOW_LAYERS; layer++) {
     Surface surface = traceScene(origin, direction);
     if (!surface.hit) return transmittance;
-    if (!u_translucentShadows || surface.ground) return vec3(0.0);
+    if (surface.ground) return vec3(0.0);
     vec4 shape = texelFetch(u_materials, ivec2(int(surface.color), 0), 0);
     int kind = int(shape.x + 0.5);
+    if (kind == MEDIA_KIND) {
+      vec4 extra = texelFetch(u_materials, ivec2(int(surface.color), 1), 0);
+      vec3 albedo = pow(texelFetch(u_palette, ivec2(int(surface.color), 0), 0).rgb, vec3(2.2));
+      float span = mediumLength(surface.position, direction, surface.cell);
+      transmittance *= exp(-mediumDensity(extra) * span * (int(shape.y + 0.5) == MEDIA_ABSORB ? 1.0 - albedo : vec3(1.0)));
+      origin = surface.position + direction * (span + 2e-3);
+      continue;
+    }
+    if (!u_translucentShadows) return vec3(0.0);
     float transparency = kind == 2 || kind == 4 ? texelFetch(u_materials, ivec2(int(surface.color), 1), 0).x : 0.0;
     if (transparency <= 0.0) return vec3(0.0);
     transmittance *= transparency * pow(texelFetch(u_palette, ivec2(int(surface.color), 0), 0).rgb, vec3(2.2));
@@ -568,16 +615,38 @@ void main() {
     float metalness = clamp(shape.z, 0.0, 1.0);
     float ior = max(shape.w, 1.0);
     float transparency = clamp(extra.x, 0.0, 1.0);
-    radiance += throughput * albedo * extra.y;
+    if (kind != MEDIA_KIND) radiance += throughput * albedo * extra.y;
 
     /* Smooth surfaces sit on 8-bit density, so rays leave them with a wider gap. */
     float bias = (SHAPE == 2 || SHAPE == 3 ? 0.05 : 1e-3) * max(max(u_scale.x, u_scale.y), max(u_scale.z, 1.0));
     bool entering = dot(direction, normal) < 0.0;
     vec3 facing = entering ? normal : -normal;
-    // ponytail: media voxels (clouds) pass light through with probability 1 - density instead of a real volume walk.
-    if (kind == 5 && random() > clamp(extra.z, 0.0, 1.0)) {
+    /* Media (clouds, smoke): absorbing ones tint by Beer–Lambert, emitting ones glow, scattering ones sample a
+       free-flight distance and scatter with their own phase. */
+    if (kind == MEDIA_KIND) {
+      int mediaType = int(shape.y + 0.5);
+      float density = mediumDensity(extra);
+      float span = mediumLength(surface.position, direction, surface.cell);
+      vec3 beyond = surface.position + direction * (span + bias * 2.0);
+      if (mediaType == MEDIA_ABSORB || mediaType == MEDIA_EMIT) {
+        float absorbed = 1.0 - exp(-density * span);
+        if (mediaType == MEDIA_EMIT) radiance += throughput * albedo * max(extra.y, 1.0) * absorbed;
+        throughput *= mediaType == MEDIA_EMIT ? vec3(1.0 - absorbed) : exp(-density * span * (1.0 - albedo));
+        origin = beyond;
+        continue;
+      }
+      float flight = -log(max(random(), 1e-7)) / max(density, 1e-6);
+      if (flight >= span || scatter >= u_scatterBounces) {
+        if (flight < span) throughput *= exp(-density * span);
+        origin = beyond;
+        continue;
+      }
+      scatter++;
+      origin = surface.position + direction * flight;
       throughput *= albedo;
-      origin = surface.position + direction * bias * 2.0;
+      radiance += throughput * sunlightThrough(origin, u_sunDirection) * sunlight() * PI * phaseHG(dot(direction, u_sunDirection), shape.z);
+      direction = henyeyGreenstein(direction, shape.z);
+      showSun = false;
       continue;
     }
     if ((kind == 2 || kind == 4) && random() < transparency) {
@@ -607,7 +676,8 @@ void main() {
       showSun = true;
       continue;
     }
-    origin = surface.position + facing * bias;
+    vec3 shadingPoint = u_pixelated && fullCubes && !surface.ground ? (vec3(surface.cell) + 0.5 + normal * 0.5) * u_scale + u_origin : surface.position;
+    origin = shadingPoint + facing * bias;
     vec3 toSun = cone(u_sunDirection, u_sunCos);
     float cosSun = dot(toSun, facing);
     if (cosSun > 0.0) radiance += throughput * albedo * sunlightThrough(origin, toSun) * sunlight() * cosSun;

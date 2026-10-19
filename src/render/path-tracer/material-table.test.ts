@@ -20,4 +20,10 @@ describe('materialTable', () => {
     const table = materialTable(new Map([[1, new Map([['_metal', '1'], ['_trans', '1']])]]));
     expect([row(table, 1, 0)[2], row(table, 1, 1)[0]]).toEqual([0, 0]);
   });
+
+  it('stores the media type and phase of clouds', () => {
+    const table = materialTable(new Map([[9, new Map([['_type', '_media'], ['_media_type', '_scatter'], ['_g', '0.4'], ['_d', '0.3']])]]));
+    expect(row(table, 9, 0).slice(0, 3)).toEqual([MATERIAL_KIND._media, 1, expect.closeTo(0.4)]);
+    expect(row(table, 9, 1)[2]).toBeCloseTo(0.3);
+  });
 });
