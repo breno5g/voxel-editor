@@ -50,6 +50,11 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
   const rotate = (axis: Axis, direction: 1 | -1) => () => commands.rotateSelected(axis, direction);
   const toggle = (option: DisplayOption) => () => editor.toggleDisplay(option);
   const mirror = (axis: Axis) => () => editor.toggleMirror(axis);
+  const lockAxis = (axis: Axis) => () => editor.toggleAxis(axis);
+  const resizeBrush = (delta: number) => () => {
+    editor.setVoxBrush({ size: state.voxBrush.size + delta });
+    editor.status(`Pincel de ${state.voxBrush.size} voxel(s)`);
+  };
 
   const global: Keymap = new Map([
     ['ctrl+z', undo],
@@ -99,6 +104,11 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
       ['Digit1', mirror(0)],
       ['Digit2', mirror(1)],
       ['Digit3', mirror(2)],
+      ['ctrl+Digit1', lockAxis(0)],
+      ['ctrl+Digit2', lockAxis(1)],
+      ['ctrl+Digit3', lockAxis(2)],
+      ['Minus', resizeBrush(-1)],
+      ['Equal', resizeBrush(1)],
       ['u', models.full],
       ['i', models.fill],
       ['Delete', models.zero],

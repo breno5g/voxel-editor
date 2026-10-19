@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createModel, voxelIndex } from '../format/vox.ts';
-import { raycastFloor, raycastVoxels } from './raycast.ts';
+import { raycastPlane, raycastVoxels } from './raycast.ts';
 
 const model = createModel([8, 8, 8]);
 model.voxels[voxelIndex(model.size, 3, 4, 5)] = 1;
@@ -25,13 +25,17 @@ describe('raycastVoxels', () => {
   });
 });
 
-describe('raycastFloor', () => {
-  it('returns the bottom-layer cell under the ray', () => {
-    expect(raycastFloor(model, [2.5, 6.5, 10], [0, 0, -1])).toEqual([2, 6, 0]);
+describe('raycastPlane', () => {
+  it('returns the floor cell under the ray', () => {
+    expect(raycastPlane(model, [2.5, 6.5, 10], [0, 0, -1], 2, 0, 0)).toEqual([2, 6, 0]);
+  });
+
+  it('keeps the requested layer on any axis', () => {
+    expect(raycastPlane(model, [10, 3.5, 2.5], [-1, 0, 0], 0, 4, 4)).toEqual([4, 3, 2]);
   });
 
   it('ignores rays pointing away or landing outside the model', () => {
-    expect(raycastFloor(model, [2.5, 6.5, 10], [0, 0, 1])).toBeNull();
-    expect(raycastFloor(model, [20.5, 6.5, 10], [0, 0, -1])).toBeNull();
+    expect(raycastPlane(model, [2.5, 6.5, 10], [0, 0, 1], 2, 0, 0)).toBeNull();
+    expect(raycastPlane(model, [20.5, 6.5, 10], [0, 0, -1], 2, 0, 0)).toBeNull();
   });
 });

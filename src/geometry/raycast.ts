@@ -1,3 +1,4 @@
+import type { Axis } from '../format/rotation.ts';
 import { voxelIndex } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
 
@@ -60,12 +61,16 @@ export function raycastVoxels(model: VoxModel, origin: Vec3, direction: Vec3): V
 }
 
 /** Cell on the model's bottom layer (z = 0) under the ray; lets the first voxel go into an empty model. */
-export function raycastFloor(model: VoxModel, origin: Vec3, direction: Vec3): Vec3 | null {
-  if (Math.abs(direction[2]) < EPSILON) return null;
-  const distance = -origin[2] / direction[2];
+/**
+ * The cell of layer `layer` (along `axis`) where the ray crosses the plane `axis = plane`;
+ * null when the ray runs parallel, points away or lands outside the model. The floor is
+ * `(2, 0, 0)`; a stroke dragged over a face keeps that face's plane.
+ */
+export function raycastPlane(model: VoxModel, origin: Vec3, direction: Vec3, axis: Axis, plane: number, layer: number): Vec3 | null {
+  if (Math.abs(direction[axis]) < EPSILON) return null;
+  const distance = (plane - origin[axis]) / direction[axis];
   if (distance < 0) return null;
-  const x = Math.floor(origin[0] + direction[0] * distance);
-  const y = Math.floor(origin[1] + direction[1] * distance);
-  const [sx, sy] = model.size;
-  return x >= 0 && y >= 0 && x < sx && y < sy ? [x, y, 0] : null;
+  const cell: Vec3 = [0, 0, 0];
+  for (let i = 0; i < 3; i++) cell[i] = i === axis ? layer : Math.floor(origin[i] + direction[i] * distance);
+  return cell.every((value, i) => value >= 0 && value < model.size[i]) ? cell : null;
 }

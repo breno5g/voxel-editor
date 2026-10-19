@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { modelPivot } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
-import { raycastFloor, raycastVoxels } from '../geometry/raycast.ts';
+import type { Axis } from '../format/rotation.ts';
+import { raycastPlane, raycastVoxels } from '../geometry/raycast.ts';
 import type { VoxelHit } from '../geometry/raycast.ts';
 import type { Instance, Pose } from '../scene/scene-graph.ts';
 import { createCameraRig } from './camera-rig.ts';
@@ -142,6 +143,13 @@ export function createViewport(container: HTMLElement) {
     };
   };
 
+  /** The model cell of `layer` under the pointer, on the model-space plane `axis = plane`. */
+  const planeCell = (clientX: number, clientY: number, transformId: number, axis: Axis, plane: number, layer: number): Vec3 | null => {
+    const view = views.get(transformId);
+    const ray = view && modelRay(view, clientX, clientY);
+    return view?.model && ray ? raycastPlane(view.model, ray.origin, ray.direction, axis, plane, layer) : null;
+  };
+
   return {
     canvas: renderer.domElement,
     requestRender,
@@ -268,11 +276,9 @@ export function createViewport(container: HTMLElement) {
       return point && toVec3(point);
     },
 
-    floorCell(clientX: number, clientY: number, transformId: number): Vec3 | null {
-      const view = views.get(transformId);
-      const ray = view && modelRay(view, clientX, clientY);
-      return view?.model && ray ? raycastFloor(view.model, ray.origin, ray.direction) : null;
-    },
+    planeCell,
+
+    floorCell: (clientX: number, clientY: number, transformId: number) => planeCell(clientX, clientY, transformId, 2, 0, 0),
 
     imageTarget: {
       renderer,

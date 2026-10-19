@@ -5,6 +5,7 @@ import { clampFrame, DEFAULT_RANGE, formatRange, parseRange, RANGE_META_KEY } fr
 import type { FrameRange } from '../scene/keyframes.ts';
 import { evaluateScene } from '../scene/scene-graph.ts';
 import type { Instance } from '../scene/scene-graph.ts';
+import type { StampShape } from './brush-shapes.ts';
 import { createHistory } from './history.ts';
 
 /** MagicaVoxel's editors: `model` edits the selected object's voxels, `world` arranges objects. */
@@ -20,6 +21,9 @@ export type BrushMode = (typeof BRUSH_MODES)[number];
 export const DISPLAY_OPTIONS = ['grid', 'frame', 'edges', 'backgroundObjects'] as const;
 export type DisplayOption = (typeof DISPLAY_OPTIONS)[number];
 export type Display = Record<DisplayOption, boolean>;
+/** Voxel brush options: MagicaVoxel `b_vox_size` (1..64), `b_vox_cube`, `b_vox_vol` (false is 2D). */
+export type VoxBrush = { size: number; shape: StampShape; volume: boolean };
+export const MAX_BRUSH_SIZE = 64;
 export type StatusTone = 'info' | 'error';
 
 export type EditorEvent =
@@ -54,6 +58,9 @@ export type EditorState = {
   brushMode: BrushMode;
   /** MagicaVoxel `b_mirror_x/y/z`: strokes are repeated across the model's centre on each enabled axis. */
   mirror: [boolean, boolean, boolean];
+  /** MagicaVoxel `b_axis_x/y/z`: strokes run through the whole model along each enabled axis. */
+  axes: [boolean, boolean, boolean];
+  voxBrush: VoxBrush;
   color: number;
   /** Shows the previous model frame translucent while editing frame-by-frame animation. */
   onionSkin: boolean;
@@ -67,6 +74,12 @@ export const UNTITLED = 'untitled.vox';
 const DEFAULT_FPS = 12;
 /** A mid-lightness orange in the default palette, readable against the dark viewport. */
 const DEFAULT_COLOR = 100;
+
+const toggled = ([x, y, z]: [boolean, boolean, boolean], axis: Axis): [boolean, boolean, boolean] => [
+  axis === 0 ? !x : x,
+  axis === 1 ? !y : y,
+  axis === 2 ? !z : z,
+];
 
 const isOneOf =
   <T extends string>(values: readonly T[]) =>
@@ -99,6 +112,8 @@ export function createEditor() {
     brushType: 'attach',
     brushMode: 'vox',
     mirror: [false, false, false],
+    axes: [false, false, false],
+    voxBrush: { size: 1, shape: 'cube', volume: true },
     color: DEFAULT_COLOR,
     onionSkin: false,
     display: { grid: true, frame: true, edges: false, backgroundObjects: true },
@@ -207,8 +222,18 @@ export function createEditor() {
     },
 
     toggleMirror(axis: Axis) {
-      const [x, y, z] = state.mirror;
-      state.mirror = [axis === 0 ? !x : x, axis === 1 ? !y : y, axis === 2 ? !z : z];
+      state.mirror = toggled(state.mirror, axis);
+      emit({ type: 'tool' });
+    },
+
+    toggleAxis(axis: Axis) {
+      state.axes = toggled(state.axes, axis);
+      emit({ type: 'tool' });
+    },
+
+    setVoxBrush(changes: Partial<VoxBrush>) {
+      const next = { ...state.voxBrush, ...changes };
+      state.voxBrush = { ...next, size: Math.min(Math.max(Math.round(next.size), 1), MAX_BRUSH_SIZE) };
       emit({ type: 'tool' });
     },
 
