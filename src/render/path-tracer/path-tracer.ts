@@ -15,7 +15,19 @@ export type PathTracer = ReturnType<typeof createPathTracer>;
 /** The camera to trace from and the distance along its view where the lens focuses. */
 export type TraceView = { camera: THREE.Camera; focusDistance: number };
 /** Options that only live while rendering (MagicaVoxel keeps them out of the file). */
-export type TraceOptions = { shadows: boolean; translucentShadows: boolean; antialias: boolean; pixelated: boolean; shape: VoxelShape; bloom: boolean; denoise: boolean };
+export type TraceOptions = {
+  shadows: boolean;
+  translucentShadows: boolean;
+  antialias: boolean;
+  pixelated: boolean;
+  /** `pt_mis_ggx`: the sun in reflections, sampled both ways and weighed. */
+  misReflect: boolean;
+  /** `pt_mis_cloud`: the same for fog and media. */
+  misScatter: boolean;
+  shape: VoxelShape;
+  bloom: boolean;
+  denoise: boolean;
+};
 /** MagicaVoxel's `pt_prim`: how each voxel is drawn. */
 export const VOXEL_SHAPES = ['cube', 'lego', 'mc', 'clay', 'sphr', 'cyli'] as const;
 export type VoxelShape = (typeof VOXEL_SHAPES)[number];
@@ -188,7 +200,7 @@ export function createPathTracer(container: HTMLElement) {
 
   let volume: SceneVolume | null = null;
   let settings: RenderSettings | null = null;
-  let options: TraceOptions = { shadows: true, translucentShadows: true, antialias: true, pixelated: false, shape: 'cube', bloom: false, denoise: false };
+  let options: TraceOptions = { shadows: true, translucentShadows: true, antialias: true, pixelated: false, misReflect: true, misScatter: true, shape: 'cube', bloom: false, denoise: false };
   let hasIbl = false;
   /** ∫ luminance dω of the loaded map, which its intensity is normalized by. */
   let iblLuminance = 0;
@@ -303,6 +315,8 @@ export function createPathTracer(container: HTMLElement) {
     applySettings(active);
     gl.uniform1i(at(program, 'u_shadows'), Number(options.shadows));
     gl.uniform1i(at(program, 'u_translucentShadows'), Number(options.translucentShadows));
+    gl.uniform1i(at(program, 'u_misReflect'), Number(options.misReflect));
+    gl.uniform1i(at(program, 'u_misScatter'), Number(options.misScatter));
     gl.uniform1i(at(program, 'u_antialias'), Number(options.antialias));
     gl.uniform1i(at(program, 'u_pixelated'), Number(options.pixelated));
     gl.uniform1f(at(program, 'u_cell'), Math.min(Math.max(active.show.cell, 0.01), 1));

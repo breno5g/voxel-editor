@@ -59,6 +59,9 @@ uniform vec3 u_sky;
 uniform float u_iblIntensity;
 /** The film gamma, which also linearizes the palette. */
 uniform float u_gamma;
+/** MagicaVoxel's \`pt_mis_ggx\` and \`pt_mis_cloud\`: weigh sun samples against reflection and phase samples. */
+uniform bool u_misReflect;
+uniform bool u_misScatter;
 uniform mat3 u_iblRotation;
 uniform bool u_hasIbl;
 uniform vec3 u_rayleigh;
@@ -403,7 +406,9 @@ vec3 escape(vec3 direction, float sunWeight) {
 
 /** The power heuristic's weight for a sample from the strategy with density \`chosen\` against \`other\`. */
 float powerHeuristic(float chosen, float other) {
-  return chosen * chosen / max(chosen * chosen + other * other, 1e-30);
+  /* As a ratio, so a point sun's huge density neither overflows nor turns the weight into NaN. */
+  float ratio = min(other / max(chosen, 1e-30), 1e15);
+  return 1.0 / (1.0 + ratio * ratio);
 }
 
 struct Surface { bool hit; float t; vec3 position; vec3 normal; uint color; ivec3 cell; bool ground; };
@@ -566,6 +571,11 @@ vec3 ggxWeight(vec3 normal, vec3 view, vec3 light, vec3 halfway, float alpha, ve
   return schlick(reflectance, vh) * smithG1(nv, alpha) * smithG1(nl, alpha) * vh / (nv * nh);
 }
 
+/** Without MIS, lobes this narrow see the sun only by reflecting it, wider ones only by sampling it. */
+bool mirrorLike(float alpha) {
+  return alpha < 0.05;
+}
+
 /** Sunlight reflected toward \`view\` by a GGX lobe, sampled over the sun's disk and MIS-weighted. */
 vec3 ggxSunlight(vec3 normal, vec3 view, float alpha, vec3 reflectance, vec3 origin) {
   vec3 light = cone(u_sunDirection, u_sunCos);
@@ -574,8 +584,26 @@ vec3 ggxSunlight(vec3 normal, vec3 view, float alpha, vec3 reflectance, vec3 ori
   if (nl <= 0.0 || nv <= 0.0) return vec3(0.0);
   vec3 halfway = normalize(view + light);
   vec3 brdf = schlick(reflectance, max(dot(view, halfway), 0.0)) * ggxDistribution(max(dot(normal, halfway), 0.0), alpha) * smithG1(nv, alpha) * smithG1(nl, alpha) / (4.0 * nv * nl);
-  float weight = powerHeuristic(sunDensity(), ggxDensity(normal, view, halfway, alpha));
+  float weight = u_misReflect ? powerHeuristic(sunDensity(), ggxDensity(normal, view, halfway, alpha)) : float(!mirrorLike(alpha));
   return weight * brdf * nl * PI * sunlight() * sunlightThrough(origin, light);
+}
+
+/** How much of the sun a reflected ray may add when it escapes; the counterpart of \`ggxSunlight\`'s weight. */
+float reflectedSunWeight(vec3 normal, vec3 view, vec3 halfway, float alpha) {
+  return u_misReflect ? powerHeuristic(ggxDensity(normal, view, halfway, alpha), sunDensity()) : float(mirrorLike(alpha));
+}
+
+/** Sunlight a phase lobe at \`origin\` scatters back along \`direction\`, sampled over the sun's disk. */
+vec3 phaseSunlight(vec3 origin, vec3 direction, float g) {
+  vec3 light = cone(u_sunDirection, u_sunCos);
+  float phase = phaseHG(dot(direction, light), g);
+  float weight = u_misScatter ? powerHeuristic(sunDensity(), phase) : 1.0;
+  return weight * phase * PI * sunlight() * sunlightThrough(origin, light);
+}
+
+/** Without \`u_misScatter\` the sun is only sampled directly; with it, a phase sample may hit it too. */
+float scatteredSunWeight(vec3 direction, vec3 next, float g) {
+  return u_misScatter ? powerHeuristic(phaseHG(dot(direction, next), g), sunDensity()) : 0.0;
 }
 
 /** The ray through pixel coordinates for the chosen projection, with depth of field. */
@@ -654,9 +682,10 @@ void main() {
         scatter++;
         origin += direction * fogDistance;
         throughput *= u_fogColor;
-        radiance += throughput * sunlightThrough(origin, u_sunDirection) * sunlight() * PI * phaseHG(dot(direction, u_sunDirection), u_fogPhase);
-        direction = henyeyGreenstein(direction, u_fogPhase);
-        sunWeight = 0.0;
+        radiance += throughput * phaseSunlight(origin, direction, u_fogPhase);
+        vec3 next = henyeyGreenstein(direction, u_fogPhase);
+        sunWeight = scatteredSunWeight(direction, next, u_fogPhase);
+        direction = next;
         continue;
       }
     }
@@ -735,9 +764,10 @@ void main() {
       scatter++;
       origin = surface.position + direction * flight;
       throughput *= albedo;
-      radiance += throughput * sunlightThrough(origin, u_sunDirection) * sunlight() * PI * phaseHG(dot(direction, u_sunDirection), shape.z);
-      direction = henyeyGreenstein(direction, shape.z);
-      sunWeight = 0.0;
+      radiance += throughput * phaseSunlight(origin, direction, shape.z);
+      vec3 next = henyeyGreenstein(direction, shape.z);
+      sunWeight = scatteredSunWeight(direction, next, shape.z);
+      direction = next;
       continue;
     }
     if ((kind == 2 || kind == 4) && random() < transparency) {
@@ -769,7 +799,7 @@ void main() {
       vec3 next = reflect(direction, halfway);
       if (dot(next, facing) <= 0.0 || dot(view, facing) <= 0.0) break;
       throughput *= ggxWeight(facing, view, next, halfway, alpha, reflectance);
-      sunWeight = powerHeuristic(ggxDensity(facing, view, halfway, alpha), sunDensity());
+      sunWeight = reflectedSunWeight(facing, view, halfway, alpha);
       direction = next;
       continue;
     }
