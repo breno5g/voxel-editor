@@ -43,6 +43,20 @@ export function createDefaultPalette(): Uint8Array {
   return palette;
 }
 
+/** MagicaVoxel `pal fill <color>`: every colour the same (its "New Palette" button fills with gray 75). */
+export function createFilledPalette([red, green, blue]: Vec3 = [75, 75, 75]): Uint8Array {
+  const palette = new Uint8Array(PALETTE_BYTES);
+  for (let slot = 0; slot < 255; slot++) palette.set([red, green, blue, 255], slot * 4);
+  return palette;
+}
+
+/** MagicaVoxel `pal bw`: a gray ramp from white at index 1 down to 1 at index 255. */
+export function createGrayPalette(): Uint8Array {
+  const palette = new Uint8Array(PALETTE_BYTES);
+  for (let slot = 0; slot < 255; slot++) palette.set([255 - slot, 255 - slot, 255 - slot, 255], slot * 4);
+  return palette;
+}
+
 /** This editor's earlier palette: 7 shades of 32 hues followed by a gray ramp. */
 export function createHuePalette(): Uint8Array {
   const palette = new Uint8Array(PALETTE_BYTES);

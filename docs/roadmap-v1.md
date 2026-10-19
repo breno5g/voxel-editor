@@ -79,7 +79,7 @@ Pendências da v0.7:
 ## v0.10: paleta e materiais
 
 - [x] Seletor HSV/RGB, hex, somar a canais da seleção (`pal_add`), copiar/colar cor e região da paleta, gradiente (`Ctrl+Alt`), trocar (`Ctrl`, os voxels acompanham), cor da tela (`Alt`)
-- [x] Ordenar, marcar, mascarar cores não usadas, cores aleatórias
+- [x] Ordenar, marcar, mascarar cores não usadas, cores aleatórias; paleta nova (`pal fill 75`) e rampa de cinza (`pal bw`)
 - [x] Nota da paleta (`NOTE`), uma por linha de 8 cores
 - [x] Importar/exportar paleta `.png`/`.act` (também soltando o arquivo); paleta padrão do MagicaVoxel
 - [x] Materiais `MATL`: difuso, emissivo, mistura, metal, vidro, nuvem, meio; copiar/colar/resetar (na cor atual ou na seleção da paleta). O efeito visual chega com o path tracer da v0.14

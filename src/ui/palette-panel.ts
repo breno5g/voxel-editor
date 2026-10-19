@@ -4,7 +4,7 @@ import type { PaletteCommands } from '../editor/palette-commands.ts';
 import { PALETTE_SIZE, paletteColor } from '../format/vox.ts';
 import type { Vec3 } from '../format/vox.ts';
 import { bindButtonGroup, downloadBlob, element } from './dom.ts';
-import { createDefaultPalette, createHuePalette } from '../format/defaults.ts';
+import { createDefaultPalette, createFilledPalette, createGrayPalette, createHuePalette } from '../format/defaults.ts';
 import { encodeAct, paletteFromPixels, parseAct } from '../format/palette-file.ts';
 
 /** Palette files open from the palette tools or by dropping them on the window. */
@@ -167,6 +167,8 @@ export function bindPalettePanel(editor: Editor, palette: PaletteCommands): void
     saveAct: () => downloadBlob(new Blob([encodeAct(state.vox.palette)], { type: 'application/octet-stream' }), `${baseName()}-paleta.act`),
     presetMv: () => palette.loadPalette(createDefaultPalette(), 'Paleta padrão do MagicaVoxel'),
     presetHue: () => palette.loadPalette(createHuePalette(), 'Paleta de tons'),
+    presetGray: () => palette.loadPalette(createGrayPalette(), 'Paleta em tons de cinza'),
+    presetNew: () => palette.loadPalette(createFilledPalette(), 'Paleta nova'),
     all: () => palette.selectPalette('all'),
     inv: () => palette.selectPalette('inv'),
     none: () => palette.selectPalette('none'),
