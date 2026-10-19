@@ -15,6 +15,7 @@ export function bindObjectInspector(editor: Editor, commands: ObjectCommands): v
   element('apply-size', HTMLButtonElement).addEventListener('click', applySize);
   size.forEach((input) => input.addEventListener('keydown', (event) => event.key === 'Enter' && applySize()));
   name.addEventListener('change', () => commands.renameSelected(name.value));
+  element('shrink-object', HTMLButtonElement).addEventListener('click', commands.shrinkSelected);
   element('duplicate-object', HTMLButtonElement).addEventListener('click', commands.duplicateSelected);
   element('delete-object', HTMLButtonElement).addEventListener('click', commands.deleteSelected);
 

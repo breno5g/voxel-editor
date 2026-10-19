@@ -70,6 +70,25 @@ const GHOST_FRAGMENT = /* glsl */ `
   }
 `;
 
+/** Selected voxels: tinted toward the selection colour, outlined, drawn over their own faces. */
+const SELECTION_FRAGMENT = /* glsl */ `
+  varying vec3 vColor;
+  varying vec3 vLocal;
+  varying float vFace;
+
+  float edgeLine() {
+    int axis = int(vFace + 0.5) / 2;
+    vec2 uv = axis == 0 ? vLocal.yz : axis == 1 ? vLocal.xz : vLocal.xy;
+    vec2 pixels = min(fract(uv), 1.0 - fract(uv)) / fwidth(uv);
+    return 1.0 - clamp(min(pixels.x, pixels.y), 0.0, 1.0);
+  }
+
+  void main() {
+    vec3 tinted = mix(vColor, vec3(1.0, 0.86, 0.6), 0.4);
+    gl_FragColor = vec4(mix(tinted, vec3(1.0, 0.67, 0.2), edgeLine()), 1.0);
+  }
+`;
+
 const BACKGROUND_FADE = 0.6;
 
 export function createVoxelMaterial(background: THREE.Color) {
@@ -90,6 +109,16 @@ export function createVoxelMaterial(background: THREE.Color) {
     depthWrite: false,
   });
 
+  const selectionMaterial = new THREE.ShaderMaterial({
+    uniforms: shared,
+    vertexShader: VERTEX_SHADER,
+    fragmentShader: SELECTION_FRAGMENT,
+    depthFunc: THREE.LessEqualDepth,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  });
+
   /** Texel i holds palette index i; the RGBA chunk stores index i at slot i - 1. */
   const setPalette = (palette: Uint8Array) => {
     texels.set(palette.subarray(0, (PALETTE_SIZE - 1) * 4), 4);
@@ -100,6 +129,7 @@ export function createVoxelMaterial(background: THREE.Color) {
     material: solid(0),
     backgroundMaterial: solid(BACKGROUND_FADE),
     ghostMaterial,
+    selectionMaterial,
     setPalette,
     setEdges: (visible: boolean) => (shared.edges.value = visible ? 1 : 0),
   };

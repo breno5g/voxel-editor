@@ -1,6 +1,7 @@
 import type { Editor } from '../editor/editor.ts';
 import type { ObjectCommands } from '../editor/object-commands.ts';
 import { createVoxelTools } from '../editor/voxel-tools.ts';
+import { selectedVoxels } from '../editor/voxel-selection.ts';
 import { createWorldTools } from '../editor/world-tools.ts';
 import type { CameraDrag } from '../render/camera-rig.ts';
 import type { Viewport } from '../render/viewport.ts';
@@ -48,7 +49,7 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
   canvas.addEventListener('pointerdown', (event) => {
     if (event.button !== MAIN_BUTTON || viewport.camera.leftDrag()) return;
     canvas.setPointerCapture(event.pointerId);
-    tools().begin(event.clientX, event.clientY, event.altKey);
+    tools().begin(event.clientX, event.clientY, event);
   });
   canvas.addEventListener('pointermove', (event) => tools().move(event.clientX, event.clientY));
   canvas.addEventListener('pointerup', (event) => {
@@ -101,6 +102,14 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
 
   const syncFocus = () => viewport.setFocus(state.mode === 'model' ? state.selected : null);
 
+  /** Highlights the voxel selection while its model is the one being edited. */
+  const syncVoxelSelection = () => {
+    const instance = state.mode === 'model' ? editor.selectedInstance() : undefined;
+    const model = instance && state.vox.models[instance.model];
+    const mask = model && editor.selectionOf(model);
+    viewport.setVoxelSelection(instance && mask ? instance.transformId : null, model && mask ? selectedVoxels(model, mask) : null);
+  };
+
   viewport.setDisplay(state.display);
   editor.subscribe((event) => {
     if (event.type === 'document') {
@@ -109,22 +118,33 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
       syncInstances();
       viewport.setSelection(state.selected);
       syncFocus();
+      syncVoxelSelection();
       frameScene();
       return;
     }
     if (event.type === 'display') return viewport.setDisplay(state.display);
-    if (event.type === 'scene' || event.type === 'frame') return syncInstances();
-    if (event.type === 'voxels') return viewport.refreshModel(event.model, event.chunks);
+    if (event.type === 'scene' || event.type === 'frame') {
+      syncInstances();
+      return syncVoxelSelection();
+    }
+    if (event.type === 'voxelSelection') return syncVoxelSelection();
+    if (event.type === 'voxels') {
+      viewport.refreshModel(event.model, event.chunks);
+      if (state.voxelSelection?.model === event.model) syncVoxelSelection();
+      return;
+    }
     if (event.type === 'palette') return viewport.setPalette(state.vox.palette);
     if (event.type === 'tool') return syncGhost();
     if (event.type === 'mode') {
       viewport.showHover(null);
+      syncVoxelSelection();
       return syncFocus();
     }
     if (event.type === 'selection') {
       viewport.setSelection(state.selected);
       syncFocus();
       syncGhost();
+      syncVoxelSelection();
     }
   });
 

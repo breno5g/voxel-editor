@@ -1,7 +1,7 @@
 import { DEFAULT_MODEL_SIZE, objectTransform } from '../format/defaults.ts';
 import { applyRows, mirrorRotation, rotationRows, turnRotation } from '../format/rotation.ts';
 import type { Axis } from '../format/rotation.ts';
-import { cloneModel, createModel, MAX_MODEL_SIZE, modelPivot, resizeModel } from '../format/vox.ts';
+import { cellOf, cloneModel, createModel, EMPTY_VOXEL, MAX_MODEL_SIZE, modelPivot, resizeModel } from '../format/vox.ts';
 import type { ShapeNode, TransformNode, Vec3 } from '../format/vox.ts';
 import { adjacentKeyFrame, evaluateShape, evaluateTransform, isLooping, removeKeyAt, setTransformAt, upsertKey } from '../scene/keyframes.ts';
 import type { TransformValue } from '../scene/keyframes.ts';
@@ -61,6 +61,29 @@ export function createObjectCommands(editor: Editor) {
     const { transform } = selected;
     const current = evaluateTransform(transform.keys, state.frame, isLooping(transform.attrs));
     commitKeys(transform, setTransformAt(transform.keys, state.frame, edit(current)), message);
+  };
+
+  /**
+   * Gives every model of the selected object (all its frames) `size`, with old cell `origin` as new cell 0;
+   * translations are compensated so voxels keep their world position.
+   */
+  const reshape = (size: Vec3, origin: Vec3, message: string) => {
+    const selected = selection();
+    if (!selected) return;
+    const { transform, shape } = selected;
+    const ids = uniqueModels(shape);
+    const before = ids.map((id) => state.vox.models[id]);
+    const after = before.map((model) => resizeModel(model, size, origin));
+    const oldPivot = modelPivot(state.vox.models[selected.model].size);
+    const newPivot = modelPivot(size);
+    const shift: Vec3 = [newPivot[0] + origin[0] - oldPivot[0], newPivot[1] + origin[1] - oldPivot[1], newPivot[2] + origin[2] - oldPivot[2]];
+    const keysBefore = transform.keys;
+    const keysAfter = transform.keys.map((key) => ({ ...key, translation: add(key.translation, applyRows(rotationRows(key.rotation), shift)) }));
+    const assign = (models: typeof before, keys: TransformNode['keys']) => () => {
+      ids.forEach((id, i) => (state.vox.models[id] = models[i]));
+      transform.keys = keys;
+    };
+    change(assign(after, keysAfter), assign(before, keysBefore), message);
   };
 
   const hasKeyAt = (keys: { frame: number }[]) => keys.some((key) => key.frame === state.frame);
@@ -194,27 +217,31 @@ export function createObjectCommands(editor: Editor) {
      * translations are compensated so voxels keep their world position.
      */
     resizeSelected(size: Vec3) {
-      const selected = selection();
-      if (!selected) return;
       if (size.some((axis) => !Number.isInteger(axis) || axis < 1 || axis > MAX_MODEL_SIZE)) {
         return editor.status(`Tamanho inválido: cada eixo vai de 1 a ${MAX_MODEL_SIZE}`, 'error');
       }
-      const { transform, shape } = selected;
-      const ids = uniqueModels(shape);
-      const before = ids.map((id) => state.vox.models[id]);
-      const after = before.map((model) => resizeModel(model, size));
-      const oldPivot = modelPivot(state.vox.models[selected.model].size);
-      const shift = modelPivot(size).map((axis, i) => axis - oldPivot[i]);
-      const keysBefore = transform.keys;
-      const keysAfter = transform.keys.map((key) => ({
-        ...key,
-        translation: add(key.translation, applyRows(rotationRows(key.rotation), [shift[0], shift[1], shift[2]])),
-      }));
-      const assign = (models: typeof before, keys: TransformNode['keys']) => () => {
-        ids.forEach((id, i) => (state.vox.models[id] = models[i]));
-        transform.keys = keys;
-      };
-      change(assign(after, keysAfter), assign(before, keysBefore), `Modelo redimensionado para ${size.join('×')}`);
+      reshape(size, [0, 0, 0], `Modelo redimensionado para ${size.join('×')}`);
+    },
+
+    /** MagicaVoxel `shrink`: crops every frame's volume to the box holding all of their voxels. */
+    shrinkSelected() {
+      const selected = selection();
+      if (!selected) return;
+      const low: Vec3 = [Infinity, Infinity, Infinity];
+      const high: Vec3 = [-Infinity, -Infinity, -Infinity];
+      for (const id of uniqueModels(selected.shape)) {
+        const model = state.vox.models[id];
+        model.voxels.forEach((color, index) => {
+          if (color === EMPTY_VOXEL) return;
+          cellOf(model.size, index).forEach((value, axis) => {
+            low[axis] = Math.min(low[axis], value);
+            high[axis] = Math.max(high[axis], value);
+          });
+        });
+      }
+      if (low[0] === Infinity) return editor.status('O modelo está vazio', 'error');
+      const size: Vec3 = [high[0] - low[0] + 1, high[1] - low[1] + 1, high[2] - low[2] + 1];
+      reshape(size, low, `Modelo ajustado ao conteúdo: ${size.join('×')}`);
     },
 
     renameSelected(name: string) {

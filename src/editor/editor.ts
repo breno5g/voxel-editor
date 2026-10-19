@@ -7,13 +7,20 @@ import { evaluateScene } from '../scene/scene-graph.ts';
 import type { Instance } from '../scene/scene-graph.ts';
 import type { CenterOptions, FaceConnectivity, GeoShape, RegionOptions, StampShape } from './brush-shapes.ts';
 import { createHistory } from './history.ts';
+import type { VoxelSelection } from './voxel-selection.ts';
 
 /** MagicaVoxel's editors: `model` edits the selected object's voxels, `world` arranges objects. */
 export const MODES = ['model', 'world'] as const;
 export type Mode = (typeof MODES)[number];
-/** MagicaVoxel `b_type`: brush actions, then one-click actions on a colour region (`pick` takes its colour). */
-export const BRUSH_TYPES = ['attach', 'erase', 'paint', 'pick', 'remove', 'replace'] as const;
+/**
+ * MagicaVoxel `b_type`: brush actions, one-click actions on a colour region (`pick` takes its colour),
+ * then selection: `msel` marquee (M), `asel` region (N) and `xform`, which moves the selected voxels.
+ */
+export const BRUSH_TYPES = ['attach', 'erase', 'paint', 'pick', 'remove', 'replace', 'msel', 'asel', 'xform'] as const;
 export type BrushType = (typeof BRUSH_TYPES)[number];
+/** MagicaVoxel `b_msel`: the marquee selects by screen rectangle, by brush stroke, or by box. */
+export const MARQUEE_MODES = ['rect', 'brush', 'box'] as const;
+export type MarqueeMode = (typeof MARQUEE_MODES)[number];
 /**
  * MagicaVoxel `b_mode`: `vox` stamps under the pointer, `face` works on the flat face region
  * under it, `box` fills the cells between press and release, `geo` draws lines and shapes.
@@ -38,6 +45,7 @@ export type EditorEvent =
   | { type: 'scene' }
   | { type: 'frame' }
   | { type: 'selection' }
+  | { type: 'voxelSelection' }
   | { type: 'palette' }
   | { type: 'saved' }
   | { type: 'color' }
@@ -71,6 +79,9 @@ export type EditorState = {
   faceBrush: FaceBrush;
   geoBrush: GeoBrush;
   regionBrush: RegionOptions;
+  marquee: MarqueeMode;
+  /** Selected voxels of the edited model; ignored once that model is no longer the one being edited. */
+  voxelSelection: VoxelSelection | null;
   color: number;
   /** Shows the previous model frame translucent while editing frame-by-frame animation. */
   onionSkin: boolean;
@@ -124,6 +135,8 @@ export function createEditor() {
     faceBrush: { usePalette: true, byColor: false, neighbors: 4 },
     geoBrush: { shape: 'line', project: false, fill: true, even: false },
     regionBrush: { connected: true, byColor: true, neighbors: 6 },
+    marquee: 'rect',
+    voxelSelection: null,
     color: DEFAULT_COLOR,
     onionSkin: false,
     display: { grid: true, frame: true, edges: false, backgroundObjects: true },
@@ -155,7 +168,7 @@ export function createEditor() {
     },
 
     load(vox: VoxDocument, name: string) {
-      Object.assign(state, { vox, fileName: name, dirty: false, playing: false, range: parseRange(vox.meta.get(RANGE_META_KEY)) });
+      Object.assign(state, { vox, fileName: name, dirty: false, playing: false, voxelSelection: null, range: parseRange(vox.meta.get(RANGE_META_KEY)) });
       state.frame = state.range[0];
       evaluate();
       state.selected = state.instances[0]?.transformId ?? null;
@@ -239,6 +252,21 @@ export function createEditor() {
     toggleAxis(axis: Axis) {
       state.axes = toggled(state.axes, axis);
       emit({ type: 'tool' });
+    },
+
+    setMarquee(marquee: MarqueeMode) {
+      state.marquee = marquee;
+      emit({ type: 'tool' });
+    },
+
+    setVoxelSelection(selection: VoxelSelection | null) {
+      state.voxelSelection = selection;
+      emit({ type: 'voxelSelection' });
+    },
+
+    /** The selection mask of `model`, when the current selection belongs to it. */
+    selectionOf(model: VoxModel): Uint8Array | null {
+      return state.voxelSelection?.model === model ? state.voxelSelection.mask : null;
     },
 
     setRegionBrush(changes: Partial<RegionOptions>) {

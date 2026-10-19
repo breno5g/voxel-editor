@@ -75,3 +75,63 @@ describe('argument parsing', () => {
     expect(parseReach(['q'])).toBeNull();
   });
 });
+
+describe('selection-aware commands', () => {
+  const twoVoxels = () => {
+    const context = setup();
+    const model = context.editor.state.vox.models[0];
+    model.voxels[voxelIndex([3, 2, 2], 2, 1, 1)] = 7;
+    return { ...context, model };
+  };
+
+  it('selects all, inverts and clears the selection', () => {
+    const { editor, models, model } = twoVoxels();
+    models.run('sel_all');
+    expect(editor.selectionOf(model)?.reduce((total, value) => total + value, 0)).toBe(2);
+    models.run('sel_col');
+    expect([...(editor.selectionOf(model) ?? [])].filter(Boolean)).toHaveLength(0);
+    editor.setColor(9);
+    models.run('sel_col');
+    models.run('sel_inv');
+    const mask = editor.selectionOf(model);
+    expect(mask?.[voxelIndex([3, 2, 2], 2, 1, 1)]).toBe(1);
+    expect(mask?.[voxelIndex([3, 2, 2], 0, 0, 0)]).toBe(0);
+    models.run('sel_none');
+    expect(editor.state.voxelSelection).toBeNull();
+  });
+
+  it('limits fill and zero to the selection', () => {
+    const { editor, models, voxels } = twoVoxels();
+    editor.setColor(9);
+    models.run('sel_col');
+    editor.setColor(5);
+    models.fill();
+    expect(voxels().filter((color) => color !== 0).sort()).toEqual([5, 7]);
+    models.zero();
+    expect(voxels().filter((color) => color !== 0)).toEqual([7]);
+  });
+
+  it('copies the selection and pastes it back as the new selection', () => {
+    const { editor, models, voxels } = twoVoxels();
+    editor.setColor(7);
+    models.run('sel_col');
+    models.run('cut');
+    expect(voxels().filter((color) => color !== 0)).toEqual([9]);
+    models.run('paste');
+    expect(voxels().filter((color) => color !== 0).sort()).toEqual([7, 9]);
+    const model = editor.state.vox.models[0];
+    expect(editor.selectionOf(model)?.[voxelIndex([3, 2, 2], 2, 1, 1)]).toBe(1);
+  });
+
+  it('transforms only the selected voxels and keeps them selected', () => {
+    const { editor, models, voxels } = twoVoxels();
+    editor.setColor(7);
+    models.run('sel_col');
+    models.run('x2');
+    expect(editor.state.vox.models[0].size).toEqual([3, 2, 2]);
+    expect(voxels().filter((color) => color === 7)).toHaveLength(8);
+    expect(voxels().filter((color) => color === 9)).toHaveLength(1);
+    editor.history.undo();
+    expect(voxels().filter((color) => color === 7)).toHaveLength(1);
+  });
+});

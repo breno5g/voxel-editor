@@ -1,4 +1,4 @@
-import { BRUSH_MODES, BRUSH_TYPES } from '../editor/editor.ts';
+import { BRUSH_MODES, BRUSH_TYPES, MARQUEE_MODES } from '../editor/editor.ts';
 import type { Editor } from '../editor/editor.ts';
 import { GEO_SHAPES, STAMP_SHAPES } from '../editor/brush-shapes.ts';
 import { isAxis } from '../format/rotation.ts';
@@ -45,9 +45,14 @@ export function bindBrushPanel(editor: Editor): void {
   const showRegionScope = bindButtonGroup('region-scope', flag('connected', 'color'), (connected) => editor.setRegionBrush({ connected }));
   const showRegionConnect = bindButtonGroup('region-connect', flag('color', 'geometry'), (byColor) => editor.setRegionBrush({ byColor }));
   const showRegionNeighbors = bindButtonGroup('region-neighbors', (raw) => (raw === '6' ? 6 : raw === '26' ? 26 : undefined), (neighbors) => editor.setRegionBrush({ neighbors }));
+  const showMarquee = bindButtonGroup('marquee-mode', oneOf(MARQUEE_MODES), editor.setMarquee);
   const optionSections = [...document.querySelectorAll<HTMLElement>('[data-brush-options]')];
   const regionOptions = [...document.querySelectorAll<HTMLElement>('[data-region-options]')];
-  const isStroke = () => state.brushType === 'attach' || state.brushType === 'erase' || state.brushType === 'paint';
+  const marqueeOptions = element('marquee-options', HTMLElement);
+  const transformHint = element('transform-hint', HTMLElement);
+  /** Brush-shaped actions: edits, and the marquee when it selects with the brush. */
+  const isStroke = () =>
+    state.brushType === 'attach' || state.brushType === 'erase' || state.brushType === 'paint' || (state.brushType === 'msel' && state.marquee === 'brush');
 
   const sync = () => {
     showMode(state.brushMode);
@@ -70,8 +75,11 @@ export function bindBrushPanel(editor: Editor): void {
     showRegionScope(state.regionBrush.connected);
     showRegionConnect(state.regionBrush.byColor);
     showRegionNeighbors(state.regionBrush.neighbors);
+    showMarquee(state.marquee);
     optionSections.forEach((section) => (section.hidden = !isStroke() || section.dataset.brushOptions !== state.brushMode));
-    regionOptions.forEach((section) => (section.hidden = state.brushType !== 'remove' && state.brushType !== 'replace'));
+    regionOptions.forEach((section) => (section.hidden = state.brushType !== 'remove' && state.brushType !== 'replace' && state.brushType !== 'asel'));
+    marqueeOptions.hidden = state.brushType !== 'msel';
+    transformHint.hidden = state.brushType !== 'xform';
   };
   sync();
   editor.subscribe((event) => {

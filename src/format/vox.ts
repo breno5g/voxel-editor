@@ -44,14 +44,18 @@ export function cloneModel(model: VoxModel): VoxModel {
   return { size: [...model.size], voxels: model.voxels.slice() };
 }
 
-/** Copy of `model` at a new size, anchored at the minimum corner (cells outside the new size are dropped). */
-export function resizeModel(model: VoxModel, size: Vec3): VoxModel {
+/**
+ * Copy of `model` at a new size whose cell 0 is the old cell `origin` (the minimum corner by default);
+ * cells outside the old volume are empty and cells outside the new one are dropped.
+ */
+export function resizeModel(model: VoxModel, size: Vec3, origin: Vec3 = [0, 0, 0]): VoxModel {
   const resized = createModel(size);
-  const rowLength = Math.min(size[0], model.size[0]);
-  for (let z = 0; z < Math.min(size[2], model.size[2]); z++) {
-    for (let y = 0; y < Math.min(size[1], model.size[1]); y++) {
-      const source = voxelIndex(model.size, 0, y, z);
-      resized.voxels.set(model.voxels.subarray(source, source + rowLength), voxelIndex(size, 0, y, z));
+  const [x0, x1] = [Math.max(origin[0], 0), Math.min(origin[0] + size[0], model.size[0])];
+  if (x1 <= x0) return resized;
+  for (let z = Math.max(origin[2], 0); z < Math.min(origin[2] + size[2], model.size[2]); z++) {
+    for (let y = Math.max(origin[1], 0); y < Math.min(origin[1] + size[1], model.size[1]); y++) {
+      const source = voxelIndex(model.size, x0, y, z);
+      resized.voxels.set(model.voxels.subarray(source, source + x1 - x0), voxelIndex(size, x0 - origin[0], y - origin[1], z - origin[2]));
     }
   }
   return resized;

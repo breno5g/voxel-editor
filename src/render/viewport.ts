@@ -18,6 +18,8 @@ type ObjectView = { group: THREE.Group; model: VoxModel | null };
 export type ViewportDisplay = { grid: boolean; frame: boolean; edges: boolean; backgroundObjects: boolean };
 type Ghost = { transformId: number; model: VoxModel };
 type ModelRay = { origin: Vec3; direction: Vec3 };
+/** A screen rectangle from a press (`x0`, `y0`) to the pointer (`x1`, `y1`), in client coordinates. */
+export type ClientRect = { x0: number; y0: number; x1: number; y1: number };
 
 const BACKGROUND = 0x2b2d33;
 
@@ -46,7 +48,7 @@ export function createViewport(container: HTMLElement) {
   const rig = createCameraRig(renderer.domElement, () => requestRender());
 
   // Raw sRGB components: the shader writes its output without colour management, like the clear colour appears.
-  const { material, backgroundMaterial, ghostMaterial, setPalette, setEdges } = createVoxelMaterial(
+  const { material, backgroundMaterial, ghostMaterial, selectionMaterial, setPalette, setEdges } = createVoxelMaterial(
     new THREE.Color().setHex(BACKGROUND, THREE.LinearSRGBColorSpace),
   );
   const modelCache = createModelCache();
@@ -58,6 +60,14 @@ export function createViewport(container: HTMLElement) {
   ghostGroup.renderOrder = 2;
   scene.add(ghostGroup);
   let ghost: Ghost | null = null;
+  /** Selected voxels drawn highlighted over their object; built from a throwaway model, so it has its own cache. */
+  const selectionCache = createModelCache();
+  const selectionGroup = new THREE.Group();
+  selectionGroup.matrixAutoUpdate = false;
+  scene.add(selectionGroup);
+  let selectionOwner: number | null = null;
+  const marquee = Object.assign(document.createElement('div'), { className: 'marquee', hidden: true });
+  container.append(marquee);
   let selectedId: number | null = null;
   /** The object being edited in model mode; every other object is background. */
   let focusId: number | null = null;
@@ -80,9 +90,9 @@ export function createViewport(container: HTMLElement) {
     render();
   }).observe(container);
 
-  const fillGroup = (group: THREE.Group, model: VoxModel, meshMaterial: THREE.Material) => {
+  const fillGroup = (group: THREE.Group, model: VoxModel, meshMaterial: THREE.Material, cache = modelCache) => {
     group.clear();
-    for (const { geometry, offset } of modelCache.chunks(model)) {
+    for (const { geometry, offset } of cache.chunks(model)) {
       const mesh = new THREE.Mesh(geometry, meshMaterial);
       mesh.position.set(...offset);
       group.add(mesh);
@@ -111,6 +121,14 @@ export function createViewport(container: HTMLElement) {
     if (!view) return;
     ghostGroup.matrix.copy(view.group.matrix);
     ghostGroup.matrixWorldNeedsUpdate = true;
+  };
+
+  const placeVoxelSelection = () => {
+    const view = selectionOwner === null ? undefined : views.get(selectionOwner);
+    selectionGroup.visible = Boolean(view) && !exporting;
+    if (!view) return;
+    selectionGroup.matrix.copy(view.group.matrix);
+    selectionGroup.matrixWorldNeedsUpdate = true;
   };
 
   /** The selection box doubles as the model frame in model mode, where `frame` toggles it. */
@@ -221,6 +239,7 @@ export function createViewport(container: HTMLElement) {
       }
       updateSelection();
       placeGhost();
+      placeVoxelSelection();
       requestRender();
     },
 
@@ -245,6 +264,61 @@ export function createViewport(container: HTMLElement) {
       requestRender();
     },
 
+    /** Highlights `selected` (the selected voxels alone) on object `transformId`; null clears it. */
+    setVoxelSelection(transformId: number | null, selected: VoxModel | null) {
+      selectionCache.clear();
+      selectionGroup.clear();
+      selectionOwner = selected ? transformId : null;
+      if (selected) fillGroup(selectionGroup, selected, selectionMaterial, selectionCache);
+      placeVoxelSelection();
+      requestRender();
+    },
+
+    /** Dashed rectangle of a marquee selection, in client coordinates; null hides it. */
+    showMarquee(rect: ClientRect | null) {
+      marquee.hidden = !rect;
+      if (!rect) return;
+      const bounds = container.getBoundingClientRect();
+      Object.assign(marquee.style, {
+        left: `${Math.min(rect.x0, rect.x1) - bounds.left}px`,
+        top: `${Math.min(rect.y0, rect.y1) - bounds.top}px`,
+        width: `${Math.abs(rect.x1 - rect.x0)}px`,
+        height: `${Math.abs(rect.y1 - rect.y0)}px`,
+      });
+    },
+
+    /** Filled voxels of object `transformId` whose centres project inside a client rectangle, through every depth. */
+    rectCells(transformId: number, rect: ClientRect): Uint8Array | null {
+      const view = views.get(transformId);
+      if (!view?.model) return null;
+      const { size, voxels } = view.model;
+      const pivot = modelPivot(size);
+      const camera = rig.camera();
+      camera.updateMatrixWorld();
+      const toClip = new THREE.Matrix4()
+        .multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+        .multiply(view.group.matrix)
+        .multiply(new THREE.Matrix4().makeTranslation(0.5 - pivot[0], 0.5 - pivot[1], 0.5 - pivot[2]));
+      const e = toClip.elements;
+      const bounds = renderer.domElement.getBoundingClientRect();
+      const toNdc = (client: number, start: number, length: number) => ((client - start) / length) * 2 - 1;
+      const [left, right] = [rect.x0, rect.x1].map((x) => toNdc(x, bounds.left, bounds.width)).sort((a, b) => a - b);
+      const [bottom, top] = [rect.y0, rect.y1].map((y) => -toNdc(y, bounds.top, bounds.height)).sort((a, b) => a - b);
+      const mask = new Uint8Array(voxels.length);
+      for (let index = 0; index < voxels.length; index++) {
+        if (voxels[index] === 0) continue;
+        const x = index % size[0];
+        const y = Math.floor(index / size[0]) % size[1];
+        const z = Math.floor(index / (size[0] * size[1]));
+        const w = e[3] * x + e[7] * y + e[11] * z + e[15];
+        if (w <= 0) continue;
+        const ndcX = (e[0] * x + e[4] * y + e[8] * z + e[12]) / w;
+        const ndcY = (e[1] * x + e[5] * y + e[9] * z + e[13]) / w;
+        if (ndcX >= left && ndcX <= right && ndcY >= bottom && ndcY <= top) mask[index] = 1;
+      }
+      return mask;
+    },
+
     /** Model mode edits `transformId` and treats the rest as background; null is world mode. */
     setFocus(transformId: number | null) {
       focusId = transformId;
@@ -263,6 +337,9 @@ export function createViewport(container: HTMLElement) {
       views.clear();
       ghostGroup.clear();
       ghost = null;
+      selectionCache.clear();
+      selectionGroup.clear();
+      selectionOwner = null;
       modelCache.clear();
       overlays.showHover(null);
       requestRender();
@@ -320,6 +397,7 @@ export function createViewport(container: HTMLElement) {
         views.forEach((view, transformId) => styleView(transformId, view));
         if (visible) placeGhost();
         else ghostGroup.visible = false;
+        placeVoxelSelection();
       },
     } satisfies ImageTarget,
   };

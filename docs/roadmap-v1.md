@@ -48,14 +48,17 @@ Pendências da v0.7:
 
 ## v0.8: seleção e operações de modelo
 
-- [ ] Seleção retangular, por pincel e por caixa; somar (`Shift`) e subtrair (`Shift+Alt`); `sel_all`/`sel_none`/`sel_inv`, `sel_col`
-- [ ] Seleção por região (`b_type asel`, `N`), reaproveitando a busca de região da v0.7
-- [ ] Copiar/recortar/colar voxels; gizmo mover/loop, escalar, wrap, girar (`Enter`/`Esc`)
+- [x] Seleção retangular (atravessa o modelo), por pincel e por caixa; somar (`Shift`) e subtrair (`Shift+Alt`); `sel_all`/`sel_none`/`sel_inv`, `sel_col`
+- [x] Seleção por região (`b_type asel`, `N`), reaproveitando a busca de região da v0.7
+- [x] Operações de modelo agem só na caixa da seleção, e a seleção acompanha o resultado
+- [x] Copiar/recortar/colar voxels (`Ctrl+C`/`X`/`V`); mover/loop arrastando (`Ctrl` trava um eixo)
+- [ ] Gizmo de escalar, wrap e girar com `Enter`/`Esc`
 - [x] `full`, `fill`, `zero`, `rev`, `x2`, `xh`, `rot90`, `flip`, `loop`, `mir`, `dia`
 - [x] Mover/escalar/cisalhar/girar/repetir com argumentos
 - [x] `prim elli|cyli|pyra|cone`, `maze`, `noise` (`fractal`, `mask` e `tex` usam padrões: v0.13)
 - [x] `flood 0` (remover invisíveis), `flood` (preencher vazios internos), dilatação, erosão
-- [ ] Redimensionar por gizmo e `shrink` (ajustar ao conteúdo)
+- [x] `shrink` (ajustar ao conteúdo de todos os frames)
+- [ ] Redimensionar arrastando a moldura
 
 ## v0.9: editor de mundo
 

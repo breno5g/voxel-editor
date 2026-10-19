@@ -52,7 +52,21 @@
             <button type="button" data-value="remove" title="Remover região: apaga a região de cor clicada">Remover</button>
             <button type="button" data-value="replace" title="Substituir região: pinta a região clicada com a cor atual">Substituir</button>
           </div>
+  <div class="segmented">
+            <button type="button" data-value="msel" title="Selecionar (M): Shift soma, Shift+Alt subtrai">Selecionar</button>
+            <button type="button" data-value="asel" title="Selecionar região (N): Shift soma, Shift+Alt subtrai">Região</button>
+            <button type="button" data-value="xform" title="Mover a seleção arrastando, dando a volta no volume; Ctrl move em um eixo">Mover</button>
+          </div>
         </div>
+        <div class="control-row" id="marquee-options">
+          <span class="label" id="marquee-label">Seleção</span>
+          <div id="marquee-mode" class="segmented" role="group" aria-labelledby="marquee-label">
+            <button type="button" data-value="rect" title="Retângulo na tela: seleciona tudo dentro dele, atravessando o modelo">Retângulo</button>
+            <button type="button" data-value="brush" title="Seleciona com o pincel atual (voxel, face, caixa ou geometria)">Pincel</button>
+            <button type="button" data-value="box" title="Seleciona uma caixa arrastada no modelo">Caixa</button>
+          </div>
+        </div>
+        <p class="hint" id="transform-hint">Arraste a seleção para movê-la; ela dá a volta no volume. Ctrl limita a um eixo.</p>
         <div class="stack" data-region-options>
           <div class="control-row">
             <span class="label" id="region-scope-label">Região</span>
@@ -180,6 +194,7 @@
             </div>
           </div>
           <div class="segmented">
+            <button id="shrink-object" type="button" title="Encolher o volume até os voxels de todos os frames (shrink)">Ajustar</button>
             <button id="duplicate-object" type="button" title="Duplicar o objeto com cópia própria dos voxels">Duplicar</button>
             <button id="delete-object" type="button" title="Apagar o objeto (Delete no modo Mundo)">Apagar</button>
           </div>
@@ -196,6 +211,20 @@
           <button type="button" data-command="rev" title="O espaço vazio vira voxel na cor atual e os voxels somem">Inverter</button>
           <button type="button" data-command="x2" title="Dobrar o tamanho do modelo">2×</button>
           <button type="button" data-command="xh" title="Reduzir o modelo à metade">½</button>
+        </div>
+      </section>
+      <section aria-labelledby="selection-title" data-only-mode="model">
+        <h2 id="selection-title">Seleção</h2>
+        <div class="segmented" role="group" aria-label="Selecionar voxels">
+          <button type="button" data-command="sel_all" title="Selecionar todos os voxels (Ctrl+A)">Tudo</button>
+          <button type="button" data-command="sel_inv" title="Inverter a seleção (Ctrl+I)">Inverter</button>
+          <button type="button" data-command="sel_none" title="Limpar a seleção (Ctrl+D)">Nada</button>
+          <button type="button" data-command="sel_col" title="Selecionar os voxels da cor atual">Cor</button>
+        </div>
+        <div class="segmented" role="group" aria-label="Área de transferência">
+          <button type="button" data-command="copy" title="Copiar os voxels selecionados, ou todos (Ctrl+C)">Copiar</button>
+          <button type="button" data-command="cut" title="Recortar os voxels selecionados, ou todos (Ctrl+X)">Recortar</button>
+          <button type="button" data-command="paste" title="Colar na mesma posição e selecionar (Ctrl+V)">Colar</button>
         </div>
       </section>
       <section aria-labelledby="transform-title" data-only-mode="model">
@@ -380,6 +409,9 @@
           <tr><th scope="row">Modo eixo X / Y / Z (atravessa o modelo)</th><td><kbd>Ctrl+1</kbd> / <kbd>Ctrl+2</kbd> / <kbd>Ctrl+3</kbd></td></tr>
           <tr><th scope="row">Adicionar / apagar / pintar</th><td><kbd>T</kbd> / <kbd>R</kbd> / <kbd>G</kbd></td></tr>
           <tr><th scope="row">Pegar cor do voxel</th><td><kbd>Alt</kbd> + clique</td></tr>
+          <tr><th scope="row">Selecionar / selecionar região</th><td><kbd>M</kbd> / <kbd>N</kbd> (<kbd>Shift</kbd> soma, <kbd>Shift+Alt</kbd> subtrai)</td></tr>
+          <tr><th scope="row">Selecionar tudo / inverter / nada</th><td><kbd>Ctrl+A</kbd> / <kbd>Ctrl+I</kbd> / <kbd>Ctrl+D</kbd></td></tr>
+          <tr><th scope="row">Copiar / recortar / colar voxels</th><td><kbd>Ctrl+C</kbd> / <kbd>Ctrl+X</kbd> / <kbd>Ctrl+V</kbd></td></tr>
           <tr><th scope="row">Espelhar o pincel em X / Y / Z</th><td><kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd></td></tr>
           <tr><th scope="row">Encher / pintar tudo / limpar</th><td><kbd>U</kbd> / <kbd>I</kbd> / <kbd>Delete</kbd></td></tr>
           <tr><th scope="row">Exibir moldura do modelo</th><td><kbd>Ctrl+F</kbd></td></tr>

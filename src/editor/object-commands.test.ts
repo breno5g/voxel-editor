@@ -62,6 +62,17 @@ describe('object commands', () => {
     expect(editor.state.vox.models[0].size).toEqual([4, 4, 3]);
   });
 
+  it('shrinks every frame to its voxels without moving them in the world', () => {
+    const { editor, commands } = setup();
+    commands.rotateSelected(2, 1);
+    const before = worldCenter(editor, [3, 0, 2]);
+    commands.shrinkSelected();
+    expect(editor.state.vox.models[0].size).toEqual([1, 1, 1]);
+    expect(worldCenter(editor, [0, 0, 0])).toEqual(before);
+    editor.history.undo();
+    expect(editor.state.vox.models[0].size).toEqual([4, 4, 3]);
+  });
+
   it('grounds an object on z = 0 using the height of its rotated model box', () => {
     const { editor, commands } = setup();
     commands.moveSelected([0, 0, 5]);

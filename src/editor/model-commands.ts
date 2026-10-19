@@ -6,6 +6,7 @@ import { chunkCounts } from '../geometry/mesher.ts';
 import type { Editor } from './editor.ts';
 import * as ops from './model-ops.ts';
 import type { AxisReach } from './model-ops.ts';
+import { countSelected, invertSelection, selectAll, selectColor, selectedVoxels, transformSelection } from './voxel-selection.ts';
 
 export type ModelCommands = ReturnType<typeof createModelCommands>;
 
@@ -62,22 +63,28 @@ const USAGE: Record<string, string> = {
 export function createModelCommands(editor: Editor) {
   const { state } = editor;
 
+  /** Voxels copied with `copy`/`cut`, at their position in a model of their source's size. */
+  let clipboard: VoxModel | null = null;
+
   const editedModel = () => {
     const instance = editor.selectedInstance();
     if (!instance) editor.status('Selecione um objeto primeiro', 'error');
-    return instance && { index: instance.model, model: state.vox.models[instance.model] };
+    if (!instance) return undefined;
+    const model = state.vox.models[instance.model];
+    return { index: instance.model, model, mask: editor.selectionOf(model) };
   };
 
   /**
-   * Rewrites every voxel of the edited model in place. Undo keeps a full copy of the voxels.
+   * Rewrites voxels of the edited model in place; `edit` gets the selection mask, if any, to stay inside it.
+   * Undo keeps a full copy of the voxels.
    * ponytail: one snapshot per edit; switch to run-length or sparse diffs if huge models make history heavy.
    */
-  const rewrite = (edit: (voxels: Uint8Array) => void, message: string) => {
+  const rewrite = (edit: (voxels: Uint8Array, mask: Uint8Array | null) => void, message: string) => {
     const edited = editedModel();
     if (!edited) return;
-    const { model } = edited;
+    const { model, mask } = edited;
     const before = model.voxels.slice();
-    edit(model.voxels);
+    edit(model.voxels, mask);
     const after = model.voxels.slice();
     const restore = (voxels: Uint8Array) => () => {
       model.voxels.set(voxels);
@@ -88,19 +95,40 @@ export function createModelCommands(editor: Editor) {
     editor.status(message);
   };
 
-  /** Swaps the edited model for `operation(model)`, which may change its size; the object keeps its position. */
+  /**
+   * Swaps the edited model for `operation(model)`, which may change its size; the object keeps its position.
+   * With a selection the operation runs on the selected voxels' bounding box only, and the selection follows.
+   */
   const replace = (operation: (model: VoxModel) => VoxModel, message: string) => {
     const edited = editedModel();
     if (!edited) return;
-    const { index, model: before } = edited;
-    const after = operation(before);
-    const assign = (model: VoxModel) => () => {
+    const { index, model: before, mask } = edited;
+    const after = mask ? transformSelection(before, mask, operation) : { model: operation(before), mask: null };
+    const assign = (model: VoxModel, selection: Uint8Array | null) => () => {
       state.vox.models[index] = model;
       editor.sceneChanged();
+      editor.setVoxelSelection(selection && { model, mask: selection });
     };
-    assign(after)();
-    editor.history.push({ undo: assign(before), redo: assign(after) });
+    assign(after.model, after.mask)();
+    editor.history.push({ undo: assign(before, mask), redo: assign(after.model, after.mask) });
     editor.status(message);
+  };
+
+  const select = (mask: (model: VoxModel, current: Uint8Array | null) => Uint8Array, message: string) => {
+    const edited = editedModel();
+    if (!edited) return;
+    const next = mask(edited.model, edited.mask);
+    const count = countSelected(next);
+    editor.setVoxelSelection(count > 0 ? { model: edited.model, mask: next } : null);
+    editor.status(count > 0 ? `${message}: ${count} voxels` : 'Nada selecionado');
+  };
+
+  const copy = () => {
+    const edited = editedModel();
+    if (!edited) return false;
+    clipboard = selectedVoxels(edited.model, edited.mask);
+    editor.status(`${countSelected(clipboard.voxels.map((color) => (color === EMPTY_VOXEL ? 0 : 1)))} voxels copiados`);
+    return true;
   };
 
   const withAxis = (args: string[], run: (axis: Axis) => void) => {
@@ -114,23 +142,59 @@ export function createModelCommands(editor: Editor) {
     return parsed ? run(parsed) : `use ${USAGE[name]}`;
   };
 
+  /** `full`: the whole volume, or the selection's box, in the current colour. */
   const full = () => {
     const { color } = state;
+    if (editedModel()?.mask) return replace((part) => ({ size: part.size, voxels: part.voxels.map(() => color) }), 'Seleção preenchida');
     rewrite((voxels) => voxels.fill(color), 'Volume preenchido');
   };
+  /** `fill`: repaints every voxel, or every selected one. */
   const fill = () => {
     const { color } = state;
-    rewrite((voxels) => {
-      for (let index = 0; index < voxels.length; index++) if (voxels[index] !== EMPTY_VOXEL) voxels[index] = color;
+    rewrite((voxels, mask) => {
+      for (let index = 0; index < voxels.length; index++) if (voxels[index] !== EMPTY_VOXEL && (!mask || mask[index])) voxels[index] = color;
     }, 'Voxels pintados com a cor atual');
   };
-  const zero = () => rewrite((voxels) => voxels.fill(EMPTY_VOXEL), 'Voxels apagados');
+  /** `zero`: clears every voxel, or the selected ones. */
+  const zero = () =>
+    rewrite((voxels, mask) => {
+      for (let index = 0; index < voxels.length; index++) if (!mask || mask[index]) voxels[index] = EMPTY_VOXEL;
+    }, 'Voxels apagados');
+
+  /** `paste`: the copied voxels go back at their position (clipped to this model's size) and become the selection. */
+  const paste = () => {
+    const source = clipboard;
+    const edited = editedModel();
+    if (!source) return editor.status('Nada copiado ainda', 'error');
+    if (!edited) return;
+    const pasted = new Uint8Array(edited.model.voxels.length);
+    rewrite((voxels) => {
+      source.voxels.forEach((color, index) => {
+        if (color === EMPTY_VOXEL) return;
+        const [x, y, z] = [index % source.size[0], Math.floor(index / source.size[0]) % source.size[1], Math.floor(index / (source.size[0] * source.size[1]))];
+        if (x >= edited.model.size[0] || y >= edited.model.size[1] || z >= edited.model.size[2]) return;
+        const target = x + edited.model.size[0] * (y + edited.model.size[1] * z);
+        voxels[target] = color;
+        pasted[target] = 1;
+      });
+    }, 'Voxels colados');
+    editor.setVoxelSelection(countSelected(pasted) > 0 ? { model: edited.model, mask: pasted } : null);
+  };
 
   /** MagicaVoxel command words; a handler returns an error message for bad arguments. */
   const COMMANDS: Record<string, (args: string[]) => string | void> = {
     full,
     fill,
     zero,
+    sel_all: () => select(selectAll, 'Tudo selecionado'),
+    sel_none: () => select(() => new Uint8Array(0), ''),
+    sel_inv: () => select(invertSelection, 'Seleção invertida'),
+    sel_col: () => select((model) => selectColor(model, state.color), `Voxels da cor ${state.color} selecionados`),
+    copy: () => void copy(),
+    cut: () => {
+      if (copy()) zero();
+    },
+    paste,
     rev: () => replace((model) => ops.reverse(model, state.color), 'Espaço vazio invertido'),
     x2: () => replace(ops.double, 'Modelo com o dobro do tamanho'),
     xh: () => replace(ops.half, 'Modelo com metade do tamanho'),
