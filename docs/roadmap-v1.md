@@ -114,7 +114,8 @@ Pendências da v0.7:
 
 Pendências da v1.0:
 
-- [ ] Denoise da imagem final (o MagicaVoxel carrega o OIDN da Intel)
-- [ ] Opções de amostragem sem efeito visível isolado: estocástico, MIS (reflexo e espalhamento), iluminação pixelada, volume esparso
-- [ ] Meios (`_media`: absorver, espalhar, emitir, SSS) com caminhada volumétrica de verdade; hoje deixam a luz passar com probabilidade `1 − densidade`
+- [x] Denoise na vista e nas imagens finais: filtro à-trous guiado por albedo e normal (o MagicaVoxel usa o OIDN da Intel, que não roda no navegador)
+- [x] Iluminação pixelada (`pt_px`)
+- [x] Meios (`_media`): absorver (Beer–Lambert colorido), espalhar e SSS (distância livre e fase `_g`), emitir; sombras atravessam os meios
+- [ ] MIS (reflexo e espalhamento): o path tracer amostra só a BRDF e o sol; as opções estocástico e volume esparso não têm equivalente separado (sempre ligados)
 - [ ] Escalas inferidas do path tracer (área do sol, névoa, abertura, emissão, atmosfera; ver [RE §8](magicavoxel-re.md)) conferidas contra renders do MagicaVoxel

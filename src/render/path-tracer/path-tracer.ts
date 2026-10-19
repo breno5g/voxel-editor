@@ -6,7 +6,7 @@ import type { Vec3 } from '../../format/vox.ts';
 import { linkFullScreenProgram } from '../gl-program.ts';
 import type { HdrImage } from './hdr-image.ts';
 import { MATERIAL_ROWS } from './material-table.ts';
-import { BLOOM_BLUR_FRAGMENT, BLOOM_DOWNSAMPLE, BLOOM_EXTRACT_FRAGMENT, DISPLAY_FRAGMENT, pathTraceFragment } from './path-trace-shader.ts';
+import { BLOOM_BLUR_FRAGMENT, BLOOM_DOWNSAMPLE, BLOOM_EXTRACT_FRAGMENT, DENOISE_FRAGMENT, DISPLAY_FRAGMENT, pathTraceFragment } from './path-trace-shader.ts';
 import { dilateBricks, shapeDensity } from './scene-volume.ts';
 import type { SceneVolume } from './scene-volume.ts';
 
@@ -14,7 +14,7 @@ export type PathTracer = ReturnType<typeof createPathTracer>;
 /** The camera to trace from and the distance along its view where the lens focuses. */
 export type TraceView = { camera: THREE.Camera; focusDistance: number };
 /** Options that only live while rendering (MagicaVoxel keeps them out of the file). */
-export type TraceOptions = { shadows: boolean; translucentShadows: boolean; antialias: boolean; pixelated: boolean; shape: VoxelShape; bloom: boolean };
+export type TraceOptions = { shadows: boolean; translucentShadows: boolean; antialias: boolean; pixelated: boolean; shape: VoxelShape; bloom: boolean; denoise: boolean };
 /** MagicaVoxel's `pt_prim`: how each voxel is drawn. */
 export const VOXEL_SHAPES = ['cube', 'lego', 'mc', 'clay', 'sphr', 'cyli'] as const;
 export type VoxelShape = (typeof VOXEL_SHAPES)[number];
@@ -34,7 +34,13 @@ const HORIZON_SCALE = 0.01;
 const APERTURE_SCALE = 0.02;
 
 /** Units for the trace pass, then for the bloom and display passes (which bind only 2D textures). */
-const TEXTURE_UNITS = { volume: 0, bricks: 1, palette: 2, materials: 3, ibl: 4, previous: 5, density: 6, accumulation: 0, bloom: 1 } as const;
+const TEXTURE_UNITS = { volume: 0, bricks: 1, palette: 2, materials: 3, ibl: 4, previous: 5, density: 6, previousNormal: 7, accumulation: 0, bloom: 1, albedo: 1, normal: 2 } as const;
+/** Samples of first-hit albedo and normal the denoiser averages (anti-aliased edges). */
+const GUIDE_SAMPLES = 8;
+/** À-trous passes: taps 1, 2, 4, 8 and 16 pixels apart. */
+const DENOISE_PASSES = 5;
+/** Colour difference (squared) the first pass tolerates; each pass halves it. */
+const DENOISE_COLOR_SIGMA = 0.8;
 /** Clay is occupancy blurred this many times; marching cubes uses it as is. */
 const CLAY_BLUR_PASSES = 2;
 
@@ -54,12 +60,14 @@ export function createPathTracer(container: HTMLElement) {
   if (!gl) throw new Error('Este navegador não tem WebGL2 para o renderizador');
   if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('A GPU não grava texturas float (EXT_color_buffer_float), que o renderizador usa');
 
-  const tracePrograms = new Map<VoxelShape, WebGLProgram>();
-  const traceProgramFor = (shape: VoxelShape) => {
-    const program = tracePrograms.get(shape) ?? linkFullScreenProgram(gl, pathTraceFragment(VOXEL_SHAPES.indexOf(shape)));
-    tracePrograms.set(shape, program);
+  const tracePrograms = new Map<string, WebGLProgram>();
+  const traceProgramFor = (shape: VoxelShape, guide = false) => {
+    const key = `${shape}:${guide}`;
+    const program = tracePrograms.get(key) ?? linkFullScreenProgram(gl, pathTraceFragment(VOXEL_SHAPES.indexOf(shape), guide));
+    tracePrograms.set(key, program);
     return program;
   };
+  const denoiseProgram = linkFullScreenProgram(gl, DENOISE_FRAGMENT);
   let traceProgram = traceProgramFor('cube');
   const displayProgram = linkFullScreenProgram(gl, DISPLAY_FRAGMENT);
   const extractProgram = linkFullScreenProgram(gl, BLOOM_EXTRACT_FRAGMENT);
@@ -113,6 +121,14 @@ export function createPathTracer(container: HTMLElement) {
   const accumulation = [0, 1].map(() => ({ texture: createTexture(gl.TEXTURE_2D), framebuffer: gl.createFramebuffer() }));
   /** Bloom's bright pass and blur, ping-ponged at a quarter of the image size. */
   const bloomTargets = [0, 1].map(() => ({ texture: createTexture(gl.TEXTURE_2D, gl.LINEAR), framebuffer: gl.createFramebuffer() }));
+  /** The denoiser's guides (first-hit albedo and normal, ping-ponged) and its filter's ping-pong. */
+  const guideTargets = [0, 1].map(() => {
+    const target = { albedo: createTexture(gl.TEXTURE_2D), normal: createTexture(gl.TEXTURE_2D), framebuffer: gl.createFramebuffer() };
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+    return target;
+  });
+  const denoiseTargets = [0, 1].map(() => ({ texture: createTexture(gl.TEXTURE_2D), framebuffer: gl.createFramebuffer() }));
   let width = 0;
   let height = 0;
   let bloomWidth = 0;
@@ -130,6 +146,20 @@ export function createPathTracer(container: HTMLElement) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
     });
+    const attach = (texture: WebGLTexture, format: GLenum, type: GLenum, attachment: GLenum = gl.COLOR_ATTACHMENT0) => {
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, gl.RGBA, type, null);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, attachment, gl.TEXTURE_2D, texture, 0);
+    };
+    guideTargets.forEach(({ albedo, normal, framebuffer }) => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+      attach(albedo, gl.RGBA16F, gl.HALF_FLOAT);
+      attach(normal, gl.RGBA16F, gl.HALF_FLOAT, gl.COLOR_ATTACHMENT1);
+    });
+    denoiseTargets.forEach(({ texture, framebuffer }) => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+      attach(texture, gl.RGBA32F, gl.FLOAT);
+    });
     bloomWidth = Math.ceil(width / BLOOM_DOWNSAMPLE);
     bloomHeight = Math.ceil(height / BLOOM_DOWNSAMPLE);
     bloomTargets.forEach(({ texture, framebuffer }) => {
@@ -143,13 +173,18 @@ export function createPathTracer(container: HTMLElement) {
 
   let volume: SceneVolume | null = null;
   let settings: RenderSettings | null = null;
-  let options: TraceOptions = { shadows: true, translucentShadows: true, antialias: true, pixelated: false, shape: 'cube', bloom: false };
+  let options: TraceOptions = { shadows: true, translucentShadows: true, antialias: true, pixelated: false, shape: 'cube', bloom: false, denoise: false };
   let hasIbl = false;
   let samples = 0;
   let current = 0;
   let lastView = '';
+  /** The image on screen: the running mean, or its denoised copy until the next sample. */
+  let shown: WebGLTexture | null = null;
+  let guidesReady = false;
   const reset = () => {
     samples = 0;
+    shown = null;
+    guidesReady = false;
   };
   /** Smooth shapes need the density field, and bricks grown by one so surfaces bulging out of them are found. */
   const uploadShape = () => {
@@ -238,12 +273,44 @@ export function createPathTracer(container: HTMLElement) {
     gl.bindTexture(target, texture);
   };
 
+  /** Makes `program` current with every input a sample reads but the previous mean; returns the view's key. */
+  const prepareTrace = (program: WebGLProgram, view: TraceView, active: RenderSettings) => {
+    traceProgram = program;
+    gl.useProgram(program);
+    const viewKey = applyCamera(view, active.lens);
+    applySettings(active);
+    gl.uniform1i(at(program, 'u_shadows'), Number(options.shadows));
+    gl.uniform1i(at(program, 'u_translucentShadows'), Number(options.translucentShadows));
+    gl.uniform1i(at(program, 'u_antialias'), Number(options.antialias));
+    gl.uniform1i(at(program, 'u_pixelated'), Number(options.pixelated));
+    gl.uniform1f(at(program, 'u_cell'), Math.min(Math.max(active.show.cell, 0.01), 1));
+    bind(TEXTURE_UNITS.volume, gl.TEXTURE_3D, volumeTexture);
+    bind(TEXTURE_UNITS.bricks, gl.TEXTURE_3D, bricksTexture);
+    bind(TEXTURE_UNITS.palette, gl.TEXTURE_2D, paletteTexture);
+    bind(TEXTURE_UNITS.materials, gl.TEXTURE_2D, materialsTexture);
+    bind(TEXTURE_UNITS.ibl, gl.TEXTURE_2D, iblTexture);
+    bind(TEXTURE_UNITS.density, gl.TEXTURE_3D, densityTexture);
+    const units: [string, number][] = [['u_volume', TEXTURE_UNITS.volume], ['u_bricks', TEXTURE_UNITS.bricks], ['u_palette', TEXTURE_UNITS.palette], ['u_materials', TEXTURE_UNITS.materials], ['u_ibl', TEXTURE_UNITS.ibl], ['u_density', TEXTURE_UNITS.density], ['u_previous', TEXTURE_UNITS.previous]];
+    units.forEach(([name, unit]) => gl.uniform1i(at(program, name), unit));
+    gl.uniform2f(at(program, 'u_resolution'), width, height);
+    return viewKey;
+  };
+
+  /** Traces sample number `index` of the current program into `framebuffer`. */
+  const drawSample = (index: number, framebuffer: WebGLFramebuffer | null) => {
+    gl.uniform1f(at(traceProgram, 'u_sample'), index);
+    gl.uniform1f(at(traceProgram, 'u_seed'), Math.floor(Math.random() * 65536));
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.viewport(0, 0, width, height);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  };
+
   /** Blurs what the exposure lifts above the threshold into the first bloom target. */
-  const blurBloom = (exposure: number, { scale, aspect, threshold }: RenderSettings['bloom']) => {
+  const blurBloom = (source: WebGLTexture, exposure: number, { scale, aspect, threshold }: RenderSettings['bloom']) => {
     const [first, second] = bloomTargets;
     gl.viewport(0, 0, bloomWidth, bloomHeight);
     gl.useProgram(extractProgram);
-    bind(TEXTURE_UNITS.accumulation, gl.TEXTURE_2D, accumulation[current].texture);
+    bind(TEXTURE_UNITS.accumulation, gl.TEXTURE_2D, source);
     gl.uniform1i(at(extractProgram, 'u_accumulation'), TEXTURE_UNITS.accumulation);
     gl.uniform1f(at(extractProgram, 'u_exposure'), exposure);
     gl.uniform1f(at(extractProgram, 'u_threshold'), threshold);
@@ -265,26 +332,67 @@ export function createPathTracer(container: HTMLElement) {
     });
   };
 
-  const display = (film: RenderSettings['film'], background: Vec3, transparent: boolean, bloom: RenderSettings['bloom'] | null) => {
-    if (bloom) blurBloom(film.exposure, bloom);
+  const display = (active: RenderSettings) => {
+    const source = shown ?? accumulation[current].texture;
+    const { film, bloom } = active;
+    if (options.bloom) blurBloom(source, film.exposure, bloom);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, width, height);
     gl.useProgram(displayProgram);
-    bind(TEXTURE_UNITS.accumulation, gl.TEXTURE_2D, accumulation[current].texture);
+    bind(TEXTURE_UNITS.accumulation, gl.TEXTURE_2D, source);
     bind(TEXTURE_UNITS.bloom, gl.TEXTURE_2D, bloomTargets[0].texture);
     gl.uniform1i(at(displayProgram, 'u_accumulation'), TEXTURE_UNITS.accumulation);
     gl.uniform1i(at(displayProgram, 'u_bloom'), TEXTURE_UNITS.bloom);
-    gl.uniform1f(at(displayProgram, 'u_bloomMix'), bloom ? bloom.mix : 0);
+    gl.uniform1f(at(displayProgram, 'u_bloomMix'), options.bloom ? bloom.mix : 0);
     gl.uniform2f(at(displayProgram, 'u_resolution'), width, height);
     gl.uniform1f(at(displayProgram, 'u_exposure'), film.exposure);
     gl.uniform1i(at(displayProgram, 'u_aces'), Number(film.aces));
     gl.uniform1f(at(displayProgram, 'u_gamma'), film.gamma);
     gl.uniform1f(at(displayProgram, 'u_vignette'), film.vignette);
-    gl.uniform1i(at(displayProgram, 'u_transparent'), Number(transparent));
-    gl.uniform3fv(at(displayProgram, 'u_background'), scaled(background, 1 / 255));
+    gl.uniform1i(at(displayProgram, 'u_transparent'), Number(active.show.transparent));
+    gl.uniform3fv(at(displayProgram, 'u_background'), scaled(active.background.color, 1 / 255));
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+  };
+
+  /** Traces the first-hit albedo and normal for the current view; kept until the next reset. */
+  const traceGuides = (view: TraceView, active: RenderSettings) => {
+    prepareTrace(traceProgramFor(options.shape, true), view, active);
+    gl.uniform1i(at(traceProgram, 'u_previousNormal'), TEXTURE_UNITS.previousNormal);
+    for (let sample = 0; sample < GUIDE_SAMPLES; sample++) {
+      bind(TEXTURE_UNITS.previous, gl.TEXTURE_2D, guideTargets[sample % 2].albedo);
+      bind(TEXTURE_UNITS.previousNormal, gl.TEXTURE_2D, guideTargets[sample % 2].normal);
+      drawSample(sample, guideTargets[1 - (sample % 2)].framebuffer);
+    }
+    guidesReady = true;
+  };
+
+  /**
+   * MagicaVoxel's Denoise: the running mean filtered by the à-trous passes, guided by the first hit's
+   * albedo and normal; returns the filtered texture.
+   */
+  const denoised = (view: TraceView, active: RenderSettings) => {
+    if (!guidesReady) traceGuides(view, active);
+    const guide = guideTargets[GUIDE_SAMPLES % 2];
+    gl.useProgram(denoiseProgram);
+    gl.viewport(0, 0, width, height);
+    bind(TEXTURE_UNITS.albedo, gl.TEXTURE_2D, guide.albedo);
+    bind(TEXTURE_UNITS.normal, gl.TEXTURE_2D, guide.normal);
+    gl.uniform1i(at(denoiseProgram, 'u_color'), TEXTURE_UNITS.accumulation);
+    gl.uniform1i(at(denoiseProgram, 'u_albedo'), TEXTURE_UNITS.albedo);
+    gl.uniform1i(at(denoiseProgram, 'u_normal'), TEXTURE_UNITS.normal);
+    let source = accumulation[current].texture;
+    for (let pass = 0; pass < DENOISE_PASSES; pass++) {
+      const target = denoiseTargets[pass % 2];
+      bind(TEXTURE_UNITS.accumulation, gl.TEXTURE_2D, source);
+      gl.uniform1i(at(denoiseProgram, 'u_step'), 1 << pass);
+      gl.uniform1f(at(denoiseProgram, 'u_colorSigma'), DENOISE_COLOR_SIGMA / (1 << pass));
+      gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      source = target.texture;
+    }
+    return source;
   };
 
   return {
@@ -349,42 +457,19 @@ export function createPathTracer(container: HTMLElement) {
         resize(nextWidth, nextHeight);
         reset();
       }
-      traceProgram = traceProgramFor(options.shape);
-      gl.useProgram(traceProgram);
-      const viewKey = applyCamera(view, settings.lens);
+      const viewKey = prepareTrace(traceProgramFor(options.shape), view, settings);
       if (viewKey !== lastView && !moving) reset();
       lastView = viewKey;
       if (samples >= MAX_SAMPLES) return;
-      applySettings(settings);
-      gl.uniform1i(at(traceProgram, 'u_shadows'), Number(options.shadows));
-      gl.uniform1i(at(traceProgram, 'u_translucentShadows'), Number(options.translucentShadows));
-      gl.uniform1i(at(traceProgram, 'u_antialias'), Number(options.antialias));
-      gl.uniform1i(at(traceProgram, 'u_pixelated'), Number(options.pixelated));
-      gl.uniform1f(at(traceProgram, 'u_cell'), Math.min(Math.max(settings.show.cell, 0.01), 1));
       const previous = current;
       current = 1 - current;
-      bind(TEXTURE_UNITS.volume, gl.TEXTURE_3D, volumeTexture);
-      bind(TEXTURE_UNITS.bricks, gl.TEXTURE_3D, bricksTexture);
-      bind(TEXTURE_UNITS.palette, gl.TEXTURE_2D, paletteTexture);
-      bind(TEXTURE_UNITS.materials, gl.TEXTURE_2D, materialsTexture);
-      bind(TEXTURE_UNITS.ibl, gl.TEXTURE_2D, iblTexture);
       bind(TEXTURE_UNITS.previous, gl.TEXTURE_2D, accumulation[previous].texture);
-      bind(TEXTURE_UNITS.density, gl.TEXTURE_3D, densityTexture);
-      gl.uniform1i(at(traceProgram, 'u_density'), TEXTURE_UNITS.density);
-      gl.uniform1i(at(traceProgram, 'u_volume'), TEXTURE_UNITS.volume);
-      gl.uniform1i(at(traceProgram, 'u_bricks'), TEXTURE_UNITS.bricks);
-      gl.uniform1i(at(traceProgram, 'u_palette'), TEXTURE_UNITS.palette);
-      gl.uniform1i(at(traceProgram, 'u_materials'), TEXTURE_UNITS.materials);
-      gl.uniform1i(at(traceProgram, 'u_ibl'), TEXTURE_UNITS.ibl);
-      gl.uniform1i(at(traceProgram, 'u_previous'), TEXTURE_UNITS.previous);
-      gl.uniform2f(at(traceProgram, 'u_resolution'), width, height);
-      gl.uniform1f(at(traceProgram, 'u_sample'), samples);
-      gl.uniform1f(at(traceProgram, 'u_seed'), Math.floor(Math.random() * 65536));
-      gl.bindFramebuffer(gl.FRAMEBUFFER, accumulation[current].framebuffer);
-      gl.viewport(0, 0, width, height);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      drawSample(samples, accumulation[current].framebuffer);
       samples++;
-      display(settings.film, settings.background.color, settings.show.transparent, options.bloom ? settings.bloom : null);
+      shown = options.denoise ? denoised(view, settings) : null;
+      display(settings);
     },
+
+
   };
 }

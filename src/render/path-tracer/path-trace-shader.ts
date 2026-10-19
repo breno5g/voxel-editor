@@ -12,7 +12,11 @@ import { BRICK } from './scene-volume.ts';
  * Alpha is the pixel's scene coverage: primary rays that escape write 0 when the background is a flat
  * colour or transparent, and the display pass composites.
  */
-export const pathTraceFragment = (shape: number) => `#version 300 es
+/**
+ * \`guide\` builds the denoiser's variant instead: each sample writes the first hit's albedo and normal
+ * (into a second target), averaged like the image, and traces nothing further.
+ */
+export const pathTraceFragment = (shape: number, guide = false) => `#version 300 es
 precision highp float;
 precision highp int;
 precision highp usampler3D;
@@ -91,9 +95,11 @@ uniform bool u_pixelated;
 /* MagicaVoxel \`pt_prim\` (numbered as VOXEL_SHAPES; one program per shape keeps other shapes' work out of the
    DDA loop) and \`pt_cell\`, the share of its cell a voxel fills. */
 const int SHAPE = ${shape};
+const bool GUIDE = ${guide};
 uniform float u_cell;
 
-out vec4 o_color;
+layout(location = 0) out vec4 o_color;
+${guide ? 'layout(location = 1) out vec4 o_normal;\nuniform sampler2D u_previousNormal;' : ''}
 
 const float PI = 3.14159265359;
 const int BRICK = ${BRICK};
@@ -548,6 +554,14 @@ void cameraRay(vec2 pixel, out vec3 origin, out vec3 direction) {
   direction = normalize(focusPoint - origin);
 }
 
+${guide ? `/** The denoiser's guides: the first hit's albedo and normal, averaged over the samples so far. */
+void accumulateGuide(vec3 albedo, vec3 normal) {
+  float weight = 1.0 / (u_sample + 1.0);
+  ivec2 pixel = ivec2(gl_FragCoord.xy);
+  o_color = u_sample < 0.5 ? vec4(albedo, 1.0) : mix(texelFetch(u_previous, pixel, 0), vec4(albedo, 1.0), weight);
+  o_normal = u_sample < 0.5 ? vec4(normal, 1.0) : mix(texelFetch(u_previousNormal, pixel, 0), vec4(normal, 1.0), weight);
+}
+` : 'void accumulateGuide(vec3 albedo, vec3 normal) {}'}
 void main() {
   g_state = (uint(gl_FragCoord.x) * 1973u + uint(gl_FragCoord.y) * 9277u + uint(u_sample) * 26699u + uint(u_seed)) | 1u;
   random();
@@ -565,7 +579,7 @@ void main() {
   int scatter = 0;
   for (int depth = 0; depth < MAX_DEPTH; depth++) {
     Surface surface = traceScene(origin, direction);
-    if (u_fogDensity > 0.0 && scatter < u_scatterBounces) {
+    if (!GUIDE && u_fogDensity > 0.0 && scatter < u_scatterBounces) {
       float fogDistance = -log(max(random(), 1e-7)) / u_fogDensity;
       if (fogDistance < surface.t) {
         scatter++;
@@ -576,6 +590,10 @@ void main() {
         showSun = false;
         continue;
       }
+    }
+    if (GUIDE && !surface.hit) {
+      accumulateGuide(vec3(0.0), vec3(0.0));
+      return;
     }
     if (!surface.hit) {
       if (depth == 0 && u_flatBackground) coverage = 0.0;
@@ -610,6 +628,10 @@ void main() {
       albedo = mix(albedo, u_gridColor, gridLine(plane, max(u_gridSpacing, 1.0), u_gridWidth));
     }
 
+    if (GUIDE) {
+      accumulateGuide(albedo, normal);
+      return;
+    }
     int kind = int(shape.x + 0.5);
     float roughness = clamp(shape.y, 0.0, 1.0);
     float metalness = clamp(shape.z, 0.0, 1.0);
@@ -785,5 +807,47 @@ void main() {
   vec2 uv = gl_FragCoord.xy / u_resolution - 0.5;
   color *= clamp(1.0 - u_vignette * dot(uv, uv) * 2.0, 0.0, 1.0);
   o_color = u_transparent ? vec4(color * coverage, coverage) : vec4(color * coverage + u_background * (1.0 - coverage), 1.0);
+}
+`;
+
+/**
+ * One pass of an edge-avoiding à-trous wavelet filter (Dammertz et al. 2010): a 5×5 B3-spline whose taps
+ * spread by \`u_step\` each pass, weighted down across changes of colour, normal and albedo. MagicaVoxel
+ * denoises with Intel's OIDN; this is the browser's stand-in.
+ */
+export const DENOISE_FRAGMENT = `#version 300 es
+precision highp float;
+uniform sampler2D u_color;
+uniform sampler2D u_albedo;
+uniform sampler2D u_normal;
+uniform int u_step;
+uniform float u_colorSigma;
+out vec4 o_color;
+
+const float KERNEL[3] = float[3](0.375, 0.25, 0.0625);
+
+void main() {
+  ivec2 pixel = ivec2(gl_FragCoord.xy);
+  ivec2 limit = textureSize(u_color, 0) - 1;
+  vec4 center = texelFetch(u_color, pixel, 0);
+  vec3 centerNormal = texelFetch(u_normal, pixel, 0).xyz;
+  vec3 centerAlbedo = texelFetch(u_albedo, pixel, 0).rgb;
+  vec4 sum = vec4(0.0);
+  float total = 0.0;
+  for (int y = -2; y <= 2; y++) {
+    for (int x = -2; x <= 2; x++) {
+      ivec2 tap = clamp(pixel + ivec2(x, y) * u_step, ivec2(0), limit);
+      vec4 color = texelFetch(u_color, tap, 0);
+      vec3 normal = texelFetch(u_normal, tap, 0).xyz;
+      vec3 albedo = texelFetch(u_albedo, tap, 0).rgb;
+      vec3 colorStep = color.rgb - center.rgb;
+      vec3 albedoStep = albedo - centerAlbedo;
+      float normalWeight = dot(normal, normal) * dot(centerNormal, centerNormal) > 0.0 ? pow(max(dot(normalize(normal), normalize(centerNormal)), 0.0), 32.0) : float(dot(normal, normal) == dot(centerNormal, centerNormal));
+      float weight = KERNEL[abs(x)] * KERNEL[abs(y)] * exp(-dot(colorStep, colorStep) / u_colorSigma) * exp(-dot(albedoStep, albedoStep) / 0.02) * normalWeight;
+      sum += color * weight;
+      total += weight;
+    }
+  }
+  o_color = total > 0.0 ? sum / total : center;
 }
 `;

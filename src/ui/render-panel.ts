@@ -40,6 +40,7 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
   const translucentCheck = element('render-translucent-shadows', HTMLInputElement);
   const antialiasCheck = element('render-antialias', HTMLInputElement);
   const pixelatedCheck = element('render-pixelated', HTMLInputElement);
+  const denoiseCheck = element('render-denoise', HTMLInputElement);
   const shapeSelect = element('render-shape', HTMLSelectElement);
   const fixFocusCheck = element('render-fix-focus', HTMLInputElement);
   const focusInput = element('render-focus', HTMLInputElement);
@@ -151,8 +152,9 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
     pixelated: pixelatedCheck.checked,
     shape: VOXEL_SHAPES.find((shape) => shape === shapeSelect.value) ?? 'cube',
     bloom: bloomCheck.checked,
+    denoise: denoiseCheck.checked,
   });
-  for (const control of [shadowsCheck, translucentCheck, antialiasCheck, pixelatedCheck, bloomCheck, shapeSelect]) {
+  for (const control of [shadowsCheck, translucentCheck, antialiasCheck, pixelatedCheck, bloomCheck, denoiseCheck, shapeSelect]) {
     control.addEventListener('change', () => {
       tracer?.setOptions(options());
       requestFrame();
