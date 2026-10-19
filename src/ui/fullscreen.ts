@@ -1,4 +1,5 @@
 import type { StatusTone } from '../editor/editor.ts';
+import { t } from '../i18n/i18n.ts';
 import { element } from './dom.ts';
 
 declare global {
@@ -21,11 +22,11 @@ export function bindFullscreen(status: (message: string, tone?: StatusTone) => v
     try {
       if (document.fullscreenElement) return await document.exitFullscreen();
       await document.documentElement.requestFullscreen();
-      if (!navigator.keyboard) return status('Tela cheia; este navegador não libera Ctrl+N/T/W para o editor');
+      if (!navigator.keyboard) return status(t('Tela cheia; este navegador não libera Ctrl+N/T/W para o editor'));
       await navigator.keyboard.lock(RESERVED_KEYS);
-      status('Tela cheia: Ctrl+N, Ctrl+T e Ctrl+W agora vão para o editor (segure Esc para sair)');
+      status(t('Tela cheia: Ctrl+N, Ctrl+T e Ctrl+W agora vão para o editor (segure Esc para sair)'));
     } catch (error) {
-      status(`Tela cheia indisponível: ${error instanceof Error ? error.message : String(error)}`, 'error');
+      status(t('Tela cheia indisponível: {error}', { error: error instanceof Error ? error.message : String(error) }), 'error');
     }
   });
   document.addEventListener('fullscreenchange', () => {

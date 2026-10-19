@@ -3,6 +3,7 @@ import { COLOR_CHANNELS, fromHex, hsvToRgb, indexRange, rgbToHsv, toHex } from '
 import type { PaletteCommands } from '../editor/palette-commands.ts';
 import { PALETTE_SIZE, paletteColor } from '../format/vox.ts';
 import type { Vec3 } from '../format/vox.ts';
+import { t } from '../i18n/i18n.ts';
 import { bindButtonGroup, downloadBlob, element } from './dom.ts';
 import { createDefaultPalette, createFilledPalette, createGrayPalette, createHuePalette } from '../format/defaults.ts';
 import { encodeAct, paletteFromPixels, parseAct } from '../format/palette-file.ts';
@@ -46,9 +47,9 @@ export function bindPalettePanel(editor: Editor, palette: PaletteCommands): void
   let masked = false;
 
   const swatches = Array.from({ length: PALETTE_SIZE - 1 }, (_unused, slot) => {
-    const swatch = Object.assign(document.createElement('button'), { type: 'button', title: `Cor ${slot + 1}` });
+    const swatch = Object.assign(document.createElement('button'), { type: 'button', title: t('Cor {index}', { index: slot + 1 }) });
     swatch.dataset.index = String(slot + 1);
-    swatch.setAttribute('aria-label', `Cor ${slot + 1}`);
+    swatch.setAttribute('aria-label', t('Cor {index}', { index: slot + 1 }));
     return swatch;
   });
   container.replaceChildren(...swatches);
@@ -74,7 +75,7 @@ export function bindPalettePanel(editor: Editor, palette: PaletteCommands): void
     editor.setPaletteSelection([]);
     if (!started.altKey) return;
     const dropper = eyeDropper();
-    if (!dropper) return editor.status('Este navegador não pega cores da tela', 'error');
+    if (!dropper) return editor.status(t('Este navegador não pega cores da tela'), 'error');
     const rgb = fromHex((await dropper.open().catch(() => ({ sRGBHex: '' }))).sRGBHex);
     if (rgb) palette.setColor(rgb);
   });
@@ -140,41 +141,41 @@ export function bindPalettePanel(editor: Editor, palette: PaletteCommands): void
 
   const importPalette = async (file: File) => {
     try {
-      if (/\.act$/i.test(file.name)) return palette.loadPalette(parseAct(new Uint8Array(await file.arrayBuffer()), state.vox.palette), `Paleta ${file.name} aberta`);
+      if (/\.act$/i.test(file.name)) return palette.loadPalette(parseAct(new Uint8Array(await file.arrayBuffer()), state.vox.palette), t('Paleta {file} aberta', { file: file.name }));
       const bitmap = await createImageBitmap(file);
       const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
       const context = canvas.getContext('2d');
-      if (!context) throw new Error('Canvas 2D indisponível');
+      if (!context) throw new Error(t('Canvas 2D indisponível'));
       context.drawImage(bitmap, 0, 0);
-      palette.loadPalette(paletteFromPixels(context.getImageData(0, 0, bitmap.width, bitmap.height).data, state.vox.palette), `Paleta ${file.name} aberta`);
+      palette.loadPalette(paletteFromPixels(context.getImageData(0, 0, bitmap.width, bitmap.height).data, state.vox.palette), t('Paleta {file} aberta', { file: file.name }));
     } catch (error) {
-      editor.fail(`Não foi possível abrir a paleta ${file.name}`, error);
+      editor.fail(t('Não foi possível abrir a paleta {file}', { file: file.name }), error);
     }
   };
 
   const savePng = async () => {
     const canvas = new OffscreenCanvas(PALETTE_SIZE, 1);
     const context = canvas.getContext('2d');
-    if (!context) return editor.status('Canvas 2D indisponível', 'error');
+    if (!context) return editor.status(t('Canvas 2D indisponível'), 'error');
     context.putImageData(new ImageData(Uint8ClampedArray.from(state.vox.palette), PALETTE_SIZE, 1), 0, 0);
-    downloadBlob(await canvas.convertToBlob({ type: 'image/png' }), `${baseName()}-paleta.png`);
+    downloadBlob(await canvas.convertToBlob({ type: 'image/png' }), `${t('{base}-paleta', { base: baseName() })}.png`);
   };
   const baseName = () => state.fileName.replace(/\.vox$/i, '');
 
   const actions: Record<string, () => void> = {
     open: () => fileInput.click(),
     savePng: () => void savePng(),
-    saveAct: () => downloadBlob(new Blob([encodeAct(state.vox.palette)], { type: 'application/octet-stream' }), `${baseName()}-paleta.act`),
-    presetMv: () => palette.loadPalette(createDefaultPalette(), 'Paleta padrão do MagicaVoxel'),
-    presetHue: () => palette.loadPalette(createHuePalette(), 'Paleta de tons'),
-    presetGray: () => palette.loadPalette(createGrayPalette(), 'Paleta em tons de cinza'),
-    presetNew: () => palette.loadPalette(createFilledPalette(), 'Paleta nova'),
+    saveAct: () => downloadBlob(new Blob([encodeAct(state.vox.palette)], { type: 'application/octet-stream' }), `${t('{base}-paleta', { base: baseName() })}.act`),
+    presetMv: () => palette.loadPalette(createDefaultPalette(), t('Paleta padrão do MagicaVoxel')),
+    presetHue: () => palette.loadPalette(createHuePalette(), t('Paleta de tons')),
+    presetGray: () => palette.loadPalette(createGrayPalette(), t('Paleta em tons de cinza')),
+    presetNew: () => palette.loadPalette(createFilledPalette(), t('Paleta nova')),
     all: () => palette.selectPalette('all'),
     inv: () => palette.selectPalette('inv'),
     none: () => palette.selectPalette('none'),
     flag: palette.flagUsedColors,
-    copyCode: () => void navigator.clipboard?.writeText(palette.colorCode()).then(() => editor.status(`Cor ${palette.colorCode()} copiada`)),
-    pasteCode: () => void navigator.clipboard?.readText().then(palette.pasteColorCode, () => editor.status('Sem acesso à área de transferência', 'error')),
+    copyCode: () => void navigator.clipboard?.writeText(palette.colorCode()).then(() => editor.status(t('Cor {code} copiada', { code: palette.colorCode() }))),
+    pasteCode: () => void navigator.clipboard?.readText().then(palette.pasteColorCode, () => editor.status(t('Sem acesso à área de transferência'), 'error')),
     copyRegion: palette.copyRegion,
     pasteRegion: palette.pasteRegion,
     sort: palette.sortColors,

@@ -1,4 +1,5 @@
 import { xsFragmentSource } from '../editor/xs-shader.ts';
+import { t } from '../i18n/i18n.ts';
 import { linkFullScreenProgram } from './gl-program.ts';
 import type { XsShader } from '../editor/xs-shader.ts';
 import { PALETTE_BYTES, voxelIndex } from '../format/vox.ts';
@@ -46,12 +47,12 @@ export function createXsRunner() {
 
   return {
     run(shader: XsShader, model: VoxModel, inputs: XsInputs): VoxModel {
-      if (!gl) throw new Error('Este navegador não tem WebGL2 para rodar shaders XS');
+      if (!gl) throw new Error(t('Este navegador não tem WebGL2 para rodar shaders XS'));
       const { size } = model;
       const columns = columnsFor(size);
       const width = size[0] * columns;
       const height = size[1] * Math.ceil(size[2] / columns);
-      if (Math.max(width, height) > gl.getParameter(gl.MAX_TEXTURE_SIZE)) throw new Error('Volume grande demais para a GPU');
+      if (Math.max(width, height) > gl.getParameter(gl.MAX_TEXTURE_SIZE)) throw new Error(t('Volume grande demais para a GPU'));
       const program = programFor(shader, gl);
       canvas.width = width;
       canvas.height = height;

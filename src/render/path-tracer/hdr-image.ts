@@ -1,3 +1,5 @@
+import { t } from '../../i18n/i18n.ts';
+
 /** A linear RGB float image, top row first. */
 export type HdrImage = { width: number; height: number; pixels: Float32Array };
 
@@ -10,42 +12,42 @@ const RLE_MAX_WIDTH = 0x7fff;
 export function parseHdr(bytes: Uint8Array): HdrImage {
   let offset = 0;
   const fail = (reason: string): never => {
-    throw new Error(`Arquivo .hdr inválido: ${reason}`);
+    throw new Error(t('Arquivo .hdr inválido: {reason}', { reason }));
   };
   const line = () => {
     const end = bytes.indexOf(0x0a, offset);
-    if (end < 0) fail('cabeçalho incompleto');
+    if (end < 0) fail(t('cabeçalho incompleto'));
     const text = new TextDecoder().decode(bytes.subarray(offset, end));
     offset = end + 1;
     return text;
   };
-  if (!line().startsWith('#?')) fail('falta a assinatura #?RADIANCE');
+  if (!line().startsWith('#?')) fail(t('falta a assinatura #?RADIANCE'));
   for (let header = line(); header.trim() !== ''; header = line()) {
-    if (header.startsWith('FORMAT=') && header.trim() !== 'FORMAT=32-bit_rle_rgbe') fail(`formato ${header.slice(7)} não suportado`);
+    if (header.startsWith('FORMAT=') && header.trim() !== 'FORMAT=32-bit_rle_rgbe') fail(t('formato {format} não suportado', { format: header.slice(7) }));
   }
-  const match = RESOLUTION.exec(line().trim()) ?? fail('só a orientação -Y +X é suportada');
+  const match = RESOLUTION.exec(line().trim()) ?? fail(t('só a orientação -Y +X é suportada'));
   const height = Number(match[1]);
   const width = Number(match[2]);
   const rgbe = new Uint8Array(width * height * 4);
-  const take = () => (offset < bytes.length ? bytes[offset++] : fail('dados truncados'));
+  const take = () => (offset < bytes.length ? bytes[offset++] : fail(t('dados truncados')));
 
   for (let y = 0; y < height; y++) {
     const row = y * width * 4;
     const encoded = width >= RLE_MIN_WIDTH && width <= RLE_MAX_WIDTH && bytes[offset] === 2 && bytes[offset + 1] === 2 && (bytes[offset + 2] & 0x80) === 0;
     if (!encoded) {
-      if (offset + width * 4 > bytes.length) fail('dados truncados');
+      if (offset + width * 4 > bytes.length) fail(t('dados truncados'));
       rgbe.set(bytes.subarray(offset, offset + width * 4), row);
       offset += width * 4;
       continue;
     }
     offset += 2;
-    if (((take() << 8) | take()) !== width) fail('largura da linha não confere');
+    if (((take() << 8) | take()) !== width) fail(t('largura da linha não confere'));
     for (let channel = 0; channel < 4; channel++) {
       for (let x = 0; x < width; ) {
         const count = take();
         const run = count > 128;
         const length = run ? count - 128 : count;
-        if (length === 0 || x + length > width) fail('sequência fora da linha');
+        if (length === 0 || x + length > width) fail(t('sequência fora da linha'));
         const value = run ? take() : 0;
         for (let end = x + length; x < end; x++) rgbe[row + x * 4 + channel] = run ? value : take();
       }

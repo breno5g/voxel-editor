@@ -1,6 +1,7 @@
 import { applyRows, transposeRows } from '../format/rotation.ts';
 import { cellOf, createModel, EMPTY_VOXEL, IDENTITY_ROTATION, MAX_MODEL_SIZE, modelPivot, voxelIndex } from '../format/vox.ts';
 import type { ShapeNode, TransformNode, Vec3, VoxModel } from '../format/vox.ts';
+import { t, tn } from '../i18n/i18n.ts';
 import type { Instance, Pose } from '../scene/scene-graph.ts';
 import { groupNode, instancesUnder, parentMap, parentPose, rootLevel } from '../scene/scene-tree.ts';
 import type { Editor } from './editor.ts';
@@ -79,7 +80,7 @@ export function createObjectBooleans(editor: Editor) {
     const built = modelFromCells(cells);
     const levelId = state.level ?? rootLevel(state.vox) ?? -1;
     const level = groupNode(state.vox, levelId);
-    if (!built || !level) return editor.status('O resultado ficou vazio', 'error');
+    if (!built || !level) return editor.status(t('O resultado ficou vazio'), 'error');
     const parent = parentPose(state.vox, parentMap(state.vox), levelId, state.frame);
     const pivot = modelPivot(built.model.size);
     const world: Vec3 = [built.low[0] + pivot[0], built.low[1] + pivot[1], built.low[2] + pivot[2]];
@@ -114,13 +115,13 @@ export function createObjectBooleans(editor: Editor) {
 
   /** Recolours or empties the voxels of every selected object where an operand has a voxel. */
   const editTargets = (edit: (current: number, operand: number) => number, message: string) => {
-    if (operands.length === 0) return editor.status('Escolha os operandos primeiro (botão Operandos)', 'error');
+    if (operands.length === 0) return editor.status(t('Escolha os operandos primeiro (botão Operandos)'), 'error');
     const operandCells = new Map<number, number>();
     selectedInstances(operands)
       .flat()
       .forEach((instance) => worldCells(instance, state.vox.models).forEach((color, key) => operandCells.set(key, color)));
     const targets = selectedInstances(state.selection.filter((id) => !operands.includes(id))).flat();
-    if (targets.length === 0) return editor.status('Selecione os objetos a editar (além dos operandos)', 'error');
+    if (targets.length === 0) return editor.status(t('Selecione os objetos a editar (além dos operandos)'), 'error');
     const edits = [...new Set(targets.map((instance) => instance.model))].flatMap((modelId) => {
       const instance = targets.find((target) => target.model === modelId);
       if (!instance) return [];
@@ -136,7 +137,7 @@ export function createObjectBooleans(editor: Editor) {
       });
       return changed ? [{ modelId, before: model, after: { size: model.size, voxels: next } }] : [];
     });
-    if (edits.length === 0) return editor.status('Os operandos não tocam a seleção');
+    if (edits.length === 0) return editor.status(t('Os operandos não tocam a seleção'));
     change(
       () => edits.forEach(({ modelId, after }) => (state.vox.models[modelId] = after)),
       () => edits.forEach(({ modelId, before }) => (state.vox.models[modelId] = before)),
@@ -148,39 +149,39 @@ export function createObjectBooleans(editor: Editor) {
     /** MagicaVoxel `ounion`: one object with every selected voxel (later selections win where they overlap). */
     unionSelected() {
       const groups = selectedInstances(state.selection);
-      if (groups.flat().length < 2) return editor.status('Selecione dois ou mais objetos (ou um grupo) para unir', 'error');
+      if (groups.flat().length < 2) return editor.status(t('Selecione dois ou mais objetos (ou um grupo) para unir'), 'error');
       const cells = new Map<number, number>();
       groups.flat().forEach((instance) => worldCells(instance, state.vox.models).forEach((color, key) => cells.set(key, color)));
-      replaceWithObject(cells, 'Objetos unidos');
+      replaceWithObject(cells, t('Objetos unidos'));
     },
 
     /** MagicaVoxel `ointer`: one object with the voxels every selected object has (colours of the first). */
     intersectSelected() {
       const groups = selectedInstances(state.selection).filter((instances) => instances.length > 0);
-      if (groups.length < 2) return editor.status('Selecione dois ou mais objetos para intersectar', 'error');
+      if (groups.length < 2) return editor.status(t('Selecione dois ou mais objetos para intersectar'), 'error');
       const [first, ...rest] = groups.map((instances) => {
         const cells = new Map<number, number>();
         instances.forEach((instance) => worldCells(instance, state.vox.models).forEach((color, key) => cells.set(key, color)));
         return cells;
       });
       const shared = new Map([...first].filter(([key]) => rest.every((cells) => cells.has(key))));
-      replaceWithObject(shared, 'Interseção criada');
+      replaceWithObject(shared, t('Interseção criada'));
     },
 
     /** MagicaVoxel `ooper`: the selection becomes the operands of the next subtraction or replacement. */
     pickOperands() {
       operands = [...state.selection];
-      editor.status(operands.length ? `${operands.length} operando(s) escolhido(s); selecione os alvos` : 'Operandos limpos');
+      editor.status(operands.length ? tn(operands.length, '{n} operando escolhido; selecione os alvos', '{n} operandos escolhidos; selecione os alvos') : t('Operandos limpos'));
     },
 
     /** MagicaVoxel `osub`: removes from the selected objects every voxel an operand has. */
     subtractSelected() {
-      editTargets(() => EMPTY_VOXEL, 'Operandos subtraídos');
+      editTargets(() => EMPTY_VOXEL, t('Operandos subtraídos'));
     },
 
     /** MagicaVoxel `orep`: recolours the selected objects' voxels with the operands' colours where they overlap. */
     replaceSelected() {
-      editTargets((_current, operand) => operand, 'Voxels substituídos pelos operandos');
+      editTargets((_current, operand) => operand, t('Voxels substituídos pelos operandos'));
     },
   };
 }

@@ -1,3 +1,5 @@
+import { t } from '../i18n/i18n.ts';
+
 export type ZipEntry = { name: string; data: Uint8Array };
 
 const CRC_TABLE = Uint32Array.from({ length: 256 }, (_unused, index) => {
@@ -25,7 +27,7 @@ export function zipStore(entries: ZipEntry[]): Uint8Array<ArrayBuffer> {
   const records = entries.map(({ name, data }) => ({ name: encoder.encode(name), data, crc: crc32(data) }));
   const localSize = records.reduce((sum, { name, data }) => sum + 30 + name.length + data.length, 0);
   const centralSize = records.reduce((sum, { name }) => sum + 46 + name.length, 0);
-  if (localSize + centralSize + 22 > 0xffffffff) throw new Error('Arquivo zip grande demais (mais de 4 GiB)');
+  if (localSize + centralSize + 22 > 0xffffffff) throw new Error(t('Arquivo zip grande demais (mais de 4 GiB)'));
   const bytes = new Uint8Array(localSize + centralSize + 22);
   const view = new DataView(bytes.buffer);
   let offset = 0;

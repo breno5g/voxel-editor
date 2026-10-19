@@ -1,6 +1,7 @@
 import type { Editor } from '../editor/editor.ts';
 import type { ObjectCommands } from '../editor/object-commands.ts';
 import { spriteModel } from '../format/sprite.ts';
+import { t } from '../i18n/i18n.ts';
 import { element } from './dom.ts';
 
 const isImage = (name: string) => /\.png$/i.test(name);
@@ -19,7 +20,7 @@ export function bindImportActions(editor: Editor, commands: ObjectCommands): voi
           const bitmap = await createImageBitmap(file);
           const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
           const context = canvas.getContext('2d');
-          if (!context) throw new Error('Canvas 2D indisponível');
+          if (!context) throw new Error(t('Canvas 2D indisponível'));
           context.drawImage(bitmap, 0, 0);
           return spriteModel(context.getImageData(0, 0, bitmap.width, bitmap.height).data, bitmap.width, bitmap.height, editor.state.vox.palette);
         }),
@@ -28,7 +29,7 @@ export function bindImportActions(editor: Editor, commands: ObjectCommands): voi
       commands.importModels(models, images.map((file) => file.name.replace(/\.png$/i, '')));
       if (asAnimation && models.length > 1) commands.packSelected(true);
     } catch (error) {
-      editor.fail('Não foi possível importar as imagens', error);
+      editor.fail(t('Não foi possível importar as imagens'), error);
     }
   };
 

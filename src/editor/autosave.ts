@@ -1,5 +1,6 @@
 import { parseVox } from '../format/vox-reader.ts';
 import { writeVox } from '../format/vox-writer.ts';
+import { locale, t } from '../i18n/i18n.ts';
 import { isSnapshot, STORES, transact } from './browser-store.ts';
 import type { Snapshot } from './browser-store.ts';
 import type { Editor } from './editor.ts';
@@ -19,7 +20,7 @@ export function bindAutosave(editor: Editor) {
     try {
       await transact(STORES.autosave, 'readwrite', (store) => store.put({ fileName: state.fileName, bytes: writeVox(state.vox), savedAt: Date.now() } satisfies Snapshot, SNAPSHOT_KEY));
     } catch (error) {
-      editor.fail('Autosave falhou', error);
+      editor.fail(t('Autosave falhou'), error);
     }
   };
 
@@ -27,7 +28,7 @@ export function bindAutosave(editor: Editor) {
     try {
       await transact(STORES.autosave, 'readwrite', (store) => store.delete(SNAPSHOT_KEY));
     } catch (error) {
-      editor.fail('Não foi possível limpar o autosave', error);
+      editor.fail(t('Não foi possível limpar o autosave'), error);
     }
   };
 
@@ -48,17 +49,17 @@ export function bindAutosave(editor: Editor) {
       try {
         const snapshot: unknown = await transact(STORES.autosave, 'readonly', (store) => store.get(SNAPSHOT_KEY));
         if (!isSnapshot(snapshot)) return false;
-        const when = new Date(snapshot.savedAt).toLocaleString();
-        if (!window.confirm(`Há trabalho não salvo de "${snapshot.fileName}" (${when}). Recuperar?`)) {
+        const when = new Date(snapshot.savedAt).toLocaleString(locale);
+        if (!window.confirm(t('Há trabalho não salvo de "{file}" ({date}). Recuperar?', { file: snapshot.fileName, date: when }))) {
           await clear();
           return false;
         }
         editor.load(parseVox(snapshot.bytes), snapshot.fileName);
         editor.sceneChanged();
-        editor.status(`"${snapshot.fileName}" recuperado do autosave. Salve para manter.`);
+        editor.status(t('"{file}" recuperado do autosave. Salve para manter.', { file: snapshot.fileName }));
         return true;
       } catch (error) {
-        editor.fail('Não foi possível ler o autosave', error);
+        editor.fail(t('Não foi possível ler o autosave'), error);
         return false;
       }
     },

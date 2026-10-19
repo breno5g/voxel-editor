@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts';
 import { buildScene, createDefaultPalette } from './defaults.ts';
 import { paletteFromColors } from './sprite.ts';
 import { createModel, EMPTY_VOXEL, PALETTE_BYTES, paletteColor, voxelIndex } from './vox.ts';
@@ -34,7 +35,7 @@ function reader(bytes: Uint8Array) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let offset = 0;
   const need = (count: number) => {
-    if (offset + count > bytes.length) throw new Error('Arquivo truncado');
+    if (offset + count > bytes.length) throw new Error(t('Arquivo truncado'));
   };
   return {
     u8: () => (need(1), view.getUint8(offset++)),
@@ -60,7 +61,7 @@ function reader(bytes: Uint8Array) {
 }
 
 const checkSize = (size: Vec3) => {
-  if (size.some((axis) => !Number.isInteger(axis) || axis < 1 || axis > 2048)) throw new Error(`Tamanho inválido ${size.join('×')}`);
+  if (size.some((axis) => !Number.isInteger(axis) || axis < 1 || axis > 2048)) throw new Error(t('Tamanho inválido {size}', { size: size.join('×') }));
 };
 
 /** A document holding `models` side by side on the ground, with `palette`. */
@@ -90,9 +91,9 @@ export function encodeXraw(model: VoxModel, palette: Uint8Array): Uint8Array<Arr
 
 export function decodeXraw(bytes: Uint8Array): VoxDocument {
   const input = reader(bytes);
-  if (textDecoder.decode(input.raw(4)) !== 'XRAW') throw new Error('Não é um arquivo XRAW');
+  if (textDecoder.decode(input.raw(4)) !== 'XRAW') throw new Error(t('Não é um arquivo XRAW'));
   const [type, channels, bits, indexBits] = [input.u8(), input.u8(), input.u8(), input.u8()];
-  if (type !== 0 || bits !== 8 || channels < 3 || indexBits !== 8) throw new Error('XRAW suportado: índices de 8 bits e paleta RGB(A) de 8 bits');
+  if (type !== 0 || bits !== 8 || channels < 3 || indexBits !== 8) throw new Error(t('XRAW suportado: índices de 8 bits e paleta RGB(A) de 8 bits'));
   const size: Vec3 = [input.u32(), input.u32(), input.u32()];
   checkSize(size);
   const colors = input.u32();
@@ -129,7 +130,7 @@ export function decodeSlab(bytes: Uint8Array): VoxDocument {
   const size: Vec3 = [input.i32(), input.i32(), input.i32()];
   checkSize(size);
   const [sx, sy, sz] = size;
-  if (bytes.length !== 12 + sx * sy * sz + 768) throw new Error('Não é um .vox do Slab6');
+  if (bytes.length !== 12 + sx * sy * sz + 768) throw new Error(t('Não é um .vox do Slab6'));
   const model = createModel(size);
   for (let x = 0; x < sx; x++) {
     for (let y = 0; y < sy; y++) {
@@ -185,7 +186,7 @@ export function decodeQb(bytes: Uint8Array): VoxDocument {
   const compressed = input.u32() === 1;
   input.u32();
   const count = input.u32();
-  if (count > 1024) throw new Error('Matrizes demais no .qb');
+  if (count > 1024) throw new Error(t('Matrizes demais no .qb'));
   const matrices = Array.from({ length: count }, () => {
     const name = textDecoder.decode(input.raw(input.u8()));
     const size: Vec3 = [input.u32(), input.u32(), input.u32()];

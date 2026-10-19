@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import type { Vec3 } from '../format/vox.ts';
 import type { Viewport } from '../render/viewport.ts';
+import { t } from '../i18n/i18n.ts';
 import { element } from './dom.ts';
 
-type Face = { label: string; normal: Vec3; right: Vec3; down: Vec3; pitch: number; yaw: number };
+type Face = { label: string; title: string; normal: Vec3; right: Vec3; down: Vec3; pitch: number; yaw: number };
 
 /** Straight up or down stays just short of the pole, where the orbit's up vector degenerates. */
 const POLE = 89.9;
@@ -15,12 +16,12 @@ const RULER_PIXELS_PER_DEGREE = 3;
 
 /** Each face as seen from outside: its screen right and down in world axes, and the camera angles that look at it. */
 const FACES: Face[] = [
-  { label: 'Frente', normal: [0, -1, 0], right: [1, 0, 0], down: [0, 0, -1], pitch: 0, yaw: 0 },
-  { label: 'Trás', normal: [0, 1, 0], right: [-1, 0, 0], down: [0, 0, -1], pitch: 0, yaw: 180 },
-  { label: 'Direita', normal: [1, 0, 0], right: [0, 1, 0], down: [0, 0, -1], pitch: 0, yaw: 90 },
-  { label: 'Esquerda', normal: [-1, 0, 0], right: [0, -1, 0], down: [0, 0, -1], pitch: 0, yaw: -90 },
-  { label: 'Topo', normal: [0, 0, 1], right: [1, 0, 0], down: [0, -1, 0], pitch: -POLE, yaw: 0 },
-  { label: 'Base', normal: [0, 0, -1], right: [1, 0, 0], down: [0, 1, 0], pitch: POLE, yaw: 0 },
+  { label: t('Frente'), title: t('Olhar de frente'), normal: [0, -1, 0], right: [1, 0, 0], down: [0, 0, -1], pitch: 0, yaw: 0 },
+  { label: t('Trás'), title: t('Olhar de trás'), normal: [0, 1, 0], right: [-1, 0, 0], down: [0, 0, -1], pitch: 0, yaw: 180 },
+  { label: t('Direita'), title: t('Olhar de direita'), normal: [1, 0, 0], right: [0, 1, 0], down: [0, 0, -1], pitch: 0, yaw: 90 },
+  { label: t('Esquerda'), title: t('Olhar de esquerda'), normal: [-1, 0, 0], right: [0, -1, 0], down: [0, 0, -1], pitch: 0, yaw: -90 },
+  { label: t('Topo'), title: t('Olhar de topo'), normal: [0, 0, 1], right: [1, 0, 0], down: [0, -1, 0], pitch: -POLE, yaw: 0 },
+  { label: t('Base'), title: t('Olhar de base'), normal: [0, 0, -1], right: [1, 0, 0], down: [0, 1, 0], pitch: POLE, yaw: 0 },
 ];
 
 const faceMatrix = ({ normal, right, down }: Face) =>
@@ -44,7 +45,7 @@ export function bindViewCube(viewport: Viewport): void {
   const rulers = { yaw: element('ruler-yaw', HTMLElement), pitch: element('ruler-pitch', HTMLElement) };
 
   FACES.forEach((face) => {
-    const side = Object.assign(document.createElement('button'), { type: 'button', className: 'view-cube-face', textContent: face.label, title: `Olhar de ${face.label.toLowerCase()}` });
+    const side = Object.assign(document.createElement('button'), { type: 'button', className: 'view-cube-face', textContent: face.label, title: face.title });
     side.style.transform = faceMatrix(face);
     side.addEventListener('click', () => camera.setOrientation(face.pitch, face.yaw));
     body.append(side);

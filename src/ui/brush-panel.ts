@@ -3,6 +3,7 @@ import type { TransformTool } from '../editor/editor.ts';
 import type { Editor } from '../editor/editor.ts';
 import { GEO_SHAPES, STAMP_SHAPES } from '../editor/brush-shapes.ts';
 import { isAxis } from '../format/rotation.ts';
+import { t } from '../i18n/i18n.ts';
 import { bindButtonGroup, element } from './dom.ts';
 
 const oneOf =
@@ -24,10 +25,10 @@ function bindAxisToggles(groupId: string, toggle: (axis: 0 | 1 | 2) => void) {
 }
 
 const TRANSFORM_HINTS: Record<TransformTool, string> = {
-  move: 'Arraste a seleção; ela dá a volta no volume. Ctrl limita a um eixo.',
-  scale: 'Arraste uma face da seleção. Shift: dos dois lados. Enter aplica, Esc cancela.',
-  wrap: 'Arraste uma face para repetir a seleção. Shift: dos dois lados. Enter aplica, Esc cancela.',
-  rotate: 'Arraste na horizontal para girar em torno do eixo da face. Shift: de 15 em 15°. Enter aplica, Esc cancela.',
+  move: t('Arraste a seleção; ela dá a volta no volume. Ctrl limita a um eixo.'),
+  scale: t('Arraste uma face da seleção. Shift: dos dois lados. Enter aplica, Esc cancela.'),
+  wrap: t('Arraste uma face para repetir a seleção. Shift: dos dois lados. Enter aplica, Esc cancela.'),
+  rotate: t('Arraste na horizontal para girar em torno do eixo da face. Shift: de 15 em 15°. Enter aplica, Esc cancela.'),
 };
 
 /** MagicaVoxel's brush panel: mode, action, mirror, axis and the options of the current mode. */

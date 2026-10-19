@@ -5,6 +5,7 @@ import type { KeyCommands } from '../editor/key-commands.ts';
 import type { PatternCommands } from '../editor/pattern-commands.ts';
 import type { Axis } from '../format/rotation.ts';
 import type { Vec3 } from '../format/vox.ts';
+import { t, tn } from '../i18n/i18n.ts';
 import { isEditingText } from './dom.ts';
 import type { FileActions } from './file-actions.ts';
 import type { RenderShortcuts } from './render-panel.ts';
@@ -53,10 +54,10 @@ export type ShortcutActions = {
 export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: ModelCommands, files: FileActions, actions: ShortcutActions, keys: KeyCommands, patterns: PatternCommands, renderer: RenderShortcuts): void {
   const { state } = editor;
   const undo = () => {
-    if (!editor.history.undo()) editor.status('Nada para desfazer');
+    if (!editor.history.undo()) editor.status(t('Nada para desfazer'));
   };
   const redo = () => {
-    if (!editor.history.redo()) editor.status('Nada para refazer');
+    if (!editor.history.redo()) editor.status(t('Nada para refazer'));
   };
   const brushMode = (mode: BrushMode) => () => editor.setBrushMode(mode);
   const brushType = (type: BrushType) => () => editor.setBrushType(type);
@@ -70,7 +71,7 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
     state.brushMode === 'pattern' ? patterns.rotatePattern(axis, direction) : otherwise?.();
   const resizeBrush = (delta: number) => () => {
     editor.setVoxBrush({ size: state.voxBrush.size + delta });
-    editor.status(`Pincel de ${state.voxBrush.size} voxel(s)`);
+    editor.status(tn(state.voxBrush.size, 'Pincel de {n} voxel', 'Pincel de {n} voxels'));
   };
 
   const global: Keymap = new Map([

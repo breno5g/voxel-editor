@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts';
 import { PALETTE_BYTES, PALETTE_SIZE } from './vox.ts';
 
 /** Adobe .act: 256 RGB triplets (768 bytes), optionally followed by a count and a transparent index. */
@@ -16,7 +17,7 @@ export function paletteFromPixels(rgba: Uint8ClampedArray | Uint8Array, base: Ui
 
 /** .act triplets in the same order: entry i is colour i + 1. */
 export function parseAct(bytes: Uint8Array, base: Uint8Array): Uint8Array {
-  if (bytes.length < ACT_BYTES) throw new Error(`Paleta .act deve ter ${ACT_BYTES} bytes`);
+  if (bytes.length < ACT_BYTES) throw new Error(t('Paleta .act deve ter {bytes} bytes', { bytes: ACT_BYTES }));
   const palette = base.slice();
   for (let entry = 0; entry < PALETTE_SIZE - 1; entry++) palette.set([bytes[entry * 3], bytes[entry * 3 + 1], bytes[entry * 3 + 2], 255], entry * 4);
   return palette;

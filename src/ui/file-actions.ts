@@ -14,6 +14,7 @@ function readModelFile(name: string, bytes: Uint8Array) {
 import { writeVox } from '../format/vox-writer.ts';
 import { renderSnapshot, renderSpriteSheet } from '../render/image-export.ts';
 import type { Viewport } from '../render/viewport.ts';
+import { t, tn } from '../i18n/i18n.ts';
 import { downloadBlob, element } from './dom.ts';
 import { isPaletteFile } from './palette-panel.ts';
 
@@ -24,7 +25,7 @@ const SPRITE_FRAME_SIZE = 256;
 /** Open (button, drag-and-drop), save and export, with a guard against losing unsaved work. */
 export function createFileActions(editor: Editor, viewport: Viewport) {
   const input = element('file-input', HTMLInputElement);
-  const confirmDiscard = () => !editor.state.dirty || window.confirm('Há alterações não salvas. Descartar?');
+  const confirmDiscard = () => !editor.state.dirty || window.confirm(t('Há alterações não salvas. Descartar?'));
   const baseName = () => editor.state.fileName.replace(/\.vox$/i, '');
 
   const openFile = async (file: File) => {
@@ -33,9 +34,9 @@ export function createFileActions(editor: Editor, viewport: Viewport) {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const name = file.name.replace(/\.(qb|xraw)$/i, '.vox');
       editor.load(readModelFile(file.name, bytes), name);
-      editor.status(`${file.name} aberto`);
+      editor.status(t('{file} aberto', { file: file.name }));
     } catch (error) {
-      editor.fail(`Não foi possível abrir ${file.name}`, error);
+      editor.fail(t('Não foi possível abrir {file}', { file: file.name }), error);
     }
   };
 
@@ -58,9 +59,9 @@ export function createFileActions(editor: Editor, viewport: Viewport) {
     try {
       downloadBlob(new Blob([writeVox(editor.savedDocument())], { type: 'application/octet-stream' }), fileName);
       editor.markSaved(fileName);
-      editor.status(`${fileName} salvo`);
+      editor.status(t('{file} salvo', { file: fileName }));
     } catch (error) {
-      editor.fail('Falha ao salvar', error);
+      editor.fail(t('Falha ao salvar'), error);
     }
   };
 
@@ -77,7 +78,7 @@ export function createFileActions(editor: Editor, viewport: Viewport) {
 
     /** MagicaVoxel `saveas`: asks for a name, then saves under it. */
     saveAs() {
-      const name = window.prompt('Salvar como', editor.state.fileName)?.trim();
+      const name = window.prompt(t('Salvar como'), editor.state.fileName)?.trim();
       if (name) save(/\.vox$/i.test(name) ? name : `${name}.vox`);
     },
 
@@ -85,9 +86,9 @@ export function createFileActions(editor: Editor, viewport: Viewport) {
     async snapshot() {
       try {
         downloadBlob(await renderSnapshot(viewport.imageTarget), `${baseName()}-${editor.state.frame}.png`);
-        editor.status('Imagem da vista salva');
+        editor.status(t('Imagem da vista salva'));
       } catch (error) {
-        editor.fail('Falha ao capturar a vista', error);
+        editor.fail(t('Falha ao capturar a vista'), error);
       } finally {
         viewport.requestRender();
       }
@@ -101,9 +102,9 @@ export function createFileActions(editor: Editor, viewport: Viewport) {
       try {
         const sheet = await renderSpriteSheet(viewport.imageTarget, frameCount, SPRITE_FRAME_SIZE, (index) => editor.setFrame(range[0] + index));
         downloadBlob(sheet, `${baseName()}-sheet.png`);
-        editor.status(`Sprite sheet com ${frameCount} frames de ${SPRITE_FRAME_SIZE}px exportada`);
+        editor.status(tn(frameCount, 'Sprite sheet com {n} frame de {size}px exportada', 'Sprite sheet com {n} frames de {size}px exportada', { size: SPRITE_FRAME_SIZE }));
       } catch (error) {
-        editor.fail('Falha ao exportar sprite sheet', error);
+        editor.fail(t('Falha ao exportar sprite sheet'), error);
       } finally {
         editor.setFrame(frame);
         viewport.requestRender();

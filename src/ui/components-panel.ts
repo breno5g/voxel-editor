@@ -4,6 +4,7 @@ import type { Editor } from '../editor/editor.ts';
 import { COMPONENTS } from '../format/components.ts';
 import type { Component } from '../format/components.ts';
 import { parseVox } from '../format/vox-reader.ts';
+import { t } from '../i18n/i18n.ts';
 import { downloadBlob, element } from './dom.ts';
 
 const STORAGE_KEY = 'voxel-editor:saved-components';
@@ -41,24 +42,24 @@ export function bindComponentsPanel(editor: Editor, components: ComponentCommand
     ...COMPONENTS.map((component) => {
       const item = document.createElement('li');
       const label = COMPONENT_LABELS[component];
-      const saved = Object.assign(document.createElement('input'), { type: 'checkbox', checked: state.savedComponents[component], title: `Salvar ${label.toLowerCase()} no arquivo` });
+      const saved = Object.assign(document.createElement('input'), { type: 'checkbox', checked: state.savedComponents[component], title: t('Salvar {component} no arquivo', { component: label.toLowerCase() }) });
       saved.addEventListener('change', () => {
         editor.setSavedComponent(component, saved.checked);
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state.savedComponents));
         } catch (error) {
-          editor.fail('Não foi possível guardar a escolha', error);
+          editor.fail(t('Não foi possível guardar a escolha'), error);
         }
       });
       const check = Object.assign(document.createElement('label'), { className: 'check' });
-      check.append(saved, ' Salvar');
+      check.append(saved, ` ${t('Salvar')}`);
       const actions = Object.assign(document.createElement('div'), { className: 'segmented' });
       actions.append(
-        button('Importar', `Trazer ${label.toLowerCase()} de outro .vox`, () => {
+        button(t('Importar'), t('Trazer {component} de outro .vox', { component: label.toLowerCase() }), () => {
           importing = component;
           input.click();
         }),
-        button('Exportar', `Baixar um .vox só com ${label.toLowerCase()}`, () => {
+        button(t('Exportar'), t('Baixar um .vox só com {component}', { component: label.toLowerCase() }), () => {
           const base = state.fileName.replace(/\.vox$/i, '');
           downloadBlob(new Blob([components.exportComponent(component)], { type: 'application/octet-stream' }), `${base}-${component}.vox`);
         }),
@@ -75,7 +76,7 @@ export function bindComponentsPanel(editor: Editor, components: ComponentCommand
     try {
       components.importComponent(importing, parseVox(new Uint8Array(await file.arrayBuffer())));
     } catch (error) {
-      editor.fail(`Não foi possível ler ${file.name}`, error);
+      editor.fail(t('Não foi possível ler {file}', { file: file.name }), error);
     }
   });
 }

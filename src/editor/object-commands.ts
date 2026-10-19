@@ -1,6 +1,7 @@
 import { applyRows, rotationRows } from '../format/rotation.ts';
 import { cellOf, cloneModel, EMPTY_VOXEL, MAX_MODEL_SIZE, modelPivot, resizeModel } from '../format/vox.ts';
 import type { ShapeNode, TransformNode, Vec3, VoxModel } from '../format/vox.ts';
+import { t } from '../i18n/i18n.ts';
 import { adjacentKeyFrame, evaluateShape, evaluateTransform, isLooping, removeKeyAt, upsertKey } from '../scene/keyframes.ts';
 import type { Editor } from './editor.ts';
 import { sceneChange } from './scene-change.ts';
@@ -27,7 +28,7 @@ export function createObjectCommands(editor: Editor) {
     const transform = transformId === null ? undefined : state.vox.nodes[transformId];
     const shape = transform?.kind === 'transform' ? state.vox.nodes[transform.child] : undefined;
     if (transformId === null || transform?.kind !== 'transform' || shape?.kind !== 'shape') {
-      editor.status('Selecione um objeto primeiro', 'error');
+      editor.status(t('Selecione um objeto primeiro'), 'error');
       return null;
     }
     return { transformId, transform, shape, model: evaluateShape(shape.keys, state.frame, isLooping(shape.attrs)) };
@@ -70,10 +71,10 @@ export function createObjectCommands(editor: Editor) {
 
   const hasKeyAt = (keys: { frame: number }[]) => keys.some((key) => key.frame === state.frame);
 
-  const dropKey = (node: { keys: { frame: number }[] }, label: string) => {
-    if (node.keys.length <= 1) return editor.status(`O objeto precisa de pelo menos uma ${label}`, 'error');
-    if (!hasKeyAt(node.keys)) return editor.status(`Nenhuma ${label} no frame ${state.frame}`, 'error');
-    commitKeys(node, removeKeyAt(node.keys, state.frame), `${label} removida do frame ${state.frame}`);
+  const dropKey = (node: { keys: { frame: number }[] }, last: string, missing: string, removed: string) => {
+    if (node.keys.length <= 1) return editor.status(last, 'error');
+    if (!hasKeyAt(node.keys)) return editor.status(missing, 'error');
+    commitKeys(node, removeKeyAt(node.keys, state.frame), removed);
   };
 
   const setAttr = (attrs: Map<string, string>, key: string, value: string | null) => {
@@ -85,9 +86,9 @@ export function createObjectCommands(editor: Editor) {
     const selected = selection();
     if (!selected) return;
     const { transform } = selected;
-    if (hasKeyAt(transform.keys)) return editor.status(`Já existe key de posição no frame ${state.frame}`, 'error');
+    if (hasKeyAt(transform.keys)) return editor.status(t('Já existe key de posição no frame {frame}', { frame: state.frame }), 'error');
     const current = evaluateTransform(transform.keys, state.frame, isLooping(transform.attrs));
-    commitKeys(transform, upsertKey(transform.keys, { frame: state.frame, ...current }), `Key de posição no frame ${state.frame}`);
+    commitKeys(transform, upsertKey(transform.keys, { frame: state.frame, ...current }), t('Key de posição no frame {frame}', { frame: state.frame }));
   };
 
   /** Duplicates the model on screen into a new frame, ready to be edited (sprite-style animation). */
@@ -95,19 +96,21 @@ export function createObjectCommands(editor: Editor) {
     const selected = selection();
     if (!selected) return;
     const { shape, model } = selected;
-    if (hasKeyAt(shape.keys)) return editor.status(`Já existe frame de modelo no frame ${state.frame}`, 'error');
+    if (hasKeyAt(shape.keys)) return editor.status(t('Já existe frame de modelo no frame {frame}', { frame: state.frame }), 'error');
     state.vox.models.push(cloneModel(state.vox.models[model]));
-    commitKeys(shape, upsertKey(shape.keys, { frame: state.frame, model: state.vox.models.length - 1 }), `Frame de modelo no frame ${state.frame}`);
+    commitKeys(shape, upsertKey(shape.keys, { frame: state.frame, model: state.vox.models.length - 1 }), t('Frame de modelo no frame {frame}', { frame: state.frame }));
   };
 
   const removeTransformKey = () => {
     const selected = selection();
-    if (selected) dropKey(selected.transform, 'key de posição');
+    const frame = { frame: state.frame };
+    if (selected) dropKey(selected.transform, t('O objeto precisa de pelo menos uma key de posição'), t('Nenhuma key de posição no frame {frame}', frame), t('Key de posição removida do frame {frame}', frame));
   };
 
   const removeModelFrame = () => {
     const selected = selection();
-    if (selected) dropKey(selected.shape, 'frame de modelo');
+    const frame = { frame: state.frame };
+    if (selected) dropKey(selected.shape, t('O objeto precisa de pelo menos um frame de modelo'), t('Nenhum frame de modelo no frame {frame}', frame), t('Frame de modelo removido do frame {frame}', frame));
   };
 
   return {
@@ -123,7 +126,7 @@ export function createObjectCommands(editor: Editor) {
     /** MagicaVoxel `aadd` (F5): the editor on top decides the track. */
     addKey() {
       const recorded = editor.recordPending();
-      if (recorded > 0) return editor.status(`Key gravada no frame ${state.frame}`);
+      if (recorded > 0) return editor.status(t('Key gravada no frame {frame}', { frame: state.frame }));
       if (state.mode === 'model') addModelFrame();
       else addTransformKey();
     },
@@ -159,9 +162,9 @@ export function createObjectCommands(editor: Editor) {
      */
     resizeSelected(size: Vec3) {
       if (size.some((axis) => !Number.isInteger(axis) || axis < 1 || axis > MAX_MODEL_SIZE)) {
-        return editor.status(`Tamanho inválido: cada eixo vai de 1 a ${MAX_MODEL_SIZE}`, 'error');
+        return editor.status(t('Tamanho inválido: cada eixo vai de 1 a {max}', { max: MAX_MODEL_SIZE }), 'error');
       }
-      reshape(size, [0, 0, 0], `Modelo redimensionado para ${size.join('×')}`);
+      reshape(size, [0, 0, 0], t('Modelo redimensionado para {size}', { size: size.join('×') }));
     },
 
     /**
@@ -189,7 +192,7 @@ export function createObjectCommands(editor: Editor) {
         commit() {
           const after = current;
           if (after === before) return;
-          change(assignShape(selected, ids, after.models, after.keys), assignShape(selected, ids, before.models, before.keys), `Modelo redimensionado para ${after.models[0]?.size.join('×')}`);
+          change(assignShape(selected, ids, after.models, after.keys), assignShape(selected, ids, before.models, before.keys), t('Modelo redimensionado para {size}', { size: after.models[0]?.size.join('×') ?? '' }));
         },
       };
     },
@@ -210,9 +213,9 @@ export function createObjectCommands(editor: Editor) {
           });
         });
       }
-      if (low[0] === Infinity) return editor.status('O modelo está vazio', 'error');
+      if (low[0] === Infinity) return editor.status(t('O modelo está vazio'), 'error');
       const size: Vec3 = [high[0] - low[0] + 1, high[1] - low[1] + 1, high[2] - low[2] + 1];
-      reshape(size, low, `Modelo ajustado ao conteúdo: ${size.join('×')}`);
+      reshape(size, low, t('Modelo ajustado ao conteúdo: {size}', { size: size.join('×') }));
     },
 
     renameSelected(name: string) {

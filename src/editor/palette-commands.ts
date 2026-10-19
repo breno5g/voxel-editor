@@ -1,6 +1,7 @@
 import { allChunks } from '../geometry/mesher.ts';
 import { EMPTY_VOXEL, PALETTE_SIZE, paletteColor } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
+import { t, tn } from '../i18n/i18n.ts';
 import { evaluateShape, isLooping } from '../scene/keyframes.ts';
 import type { Editor } from './editor.ts';
 import { adjustColor, fromHex, gradient, identityMapping, invertMapping, permutePalette, remapVoxels, sortMapping, toHex, usedColors } from './palette-ops.ts';
@@ -63,7 +64,7 @@ export function createPaletteCommands(editor: Editor) {
   return {
     /** `pal set`: dragging colour `from` onto `to` copies it. */
     copyColorTo(from: number, to: number) {
-      if (from !== to) setColors(new Map([[to, paletteColor(state.vox.palette, from)]]), `Cor ${from} copiada para ${to}`);
+      if (from !== to) setColors(new Map([[to, paletteColor(state.vox.palette, from)]]), t('Cor {from} copiada para {to}', { from, to }));
     },
 
     /** `pal swap` (Ctrl+drag): exchanges two colours, voxels included. */
@@ -72,30 +73,30 @@ export function createPaletteCommands(editor: Editor) {
       const mapping = identityMapping();
       mapping[a] = b;
       mapping[b] = a;
-      reorder(mapping, `Cores ${a} e ${b} trocadas`);
+      reorder(mapping, t('Cores {a} e {b} trocadas', { a, b }));
       editor.setColor(b);
     },
 
     /** `pal grad` (Ctrl+Alt+drag): a gradient between two colours. */
     gradient(from: number, to: number) {
-      if (Math.abs(from - to) > 1) setColors(gradient(state.vox.palette, from, to), `Gradiente de ${from} a ${to}`);
+      if (Math.abs(from - to) > 1) setColors(gradient(state.vox.palette, from, to), t('Gradiente de {from} a {to}', { from, to }));
     },
 
     /** `pal sort`: the selection (or the whole palette) by hue and lightness, voxels included. */
     sortColors() {
       const indices = state.paletteSelection.length > 1 ? state.paletteSelection : ALL_COLORS;
-      reorder(sortMapping(state.vox.palette, indices), 'Paleta ordenada');
+      reorder(sortMapping(state.vox.palette, indices), t('Paleta ordenada'));
     },
 
     /** Sets the current colour (or the selection) to `rgb`. */
     setColor(rgb: Vec3) {
-      setColors(new Map(chosen().map((index) => [index, rgb])), 'Cor alterada');
+      setColors(new Map(chosen().map((index) => [index, rgb])), t('Cor alterada'));
     },
 
     /** `pal_add`: shifts one channel of every selected colour. */
     adjustColors(channel: ColorChannel, delta: number) {
       if (!delta) return;
-      setColors(new Map(chosen().map((index) => [index, adjustColor(paletteColor(state.vox.palette, index), channel, delta)])), 'Cores ajustadas');
+      setColors(new Map(chosen().map((index) => [index, adjustColor(paletteColor(state.vox.palette, index), channel, delta)])), t('Cores ajustadas'));
     },
 
     /** `pal_sel copy`: the current colour as hex. */
@@ -104,21 +105,21 @@ export function createPaletteCommands(editor: Editor) {
     /** `pal paste`: a hex colour onto the current colour (or the selection). */
     pasteColorCode(text: string) {
       const rgb = fromHex(text);
-      if (!rgb) return editor.status(`Código de cor inválido: ${text.slice(0, 16)}`, 'error');
-      setColors(new Map(chosen().map((index) => [index, rgb])), 'Cor colada');
+      if (!rgb) return editor.status(t('Código de cor inválido: {code}', { code: text.slice(0, 16) }), 'error');
+      setColors(new Map(chosen().map((index) => [index, rgb])), t('Cor colada'));
     },
 
     /** `pal_sel copy_region`. */
     copyRegion() {
       region = chosen().map((index) => paletteColor(state.vox.palette, index));
-      editor.status(`${region.length} cor(es) copiada(s)`);
+      editor.status(tn(region.length, '{n} cor copiada', '{n} cores copiadas'));
     },
 
     /** `pal paste_region`: the copied colours from the current colour onwards. */
     pasteRegion() {
-      if (region.length === 0) return editor.status('Nenhuma região copiada', 'error');
+      if (region.length === 0) return editor.status(t('Nenhuma região copiada'), 'error');
       const colors = new Map(region.flatMap((rgb, offset) => (state.color + offset < PALETTE_SIZE ? [[state.color + offset, rgb] as const] : [])));
-      setColors(colors, 'Região colada');
+      setColors(colors, t('Região colada'));
     },
 
     /** Loads a whole palette (a preset or an imported file) as one undo step. */
@@ -141,7 +142,7 @@ export function createPaletteCommands(editor: Editor) {
       };
       apply(after)();
       editor.history.push({ undo: apply(before), redo: apply(after) });
-      editor.status('Nota da paleta alterada');
+      editor.status(t('Nota da paleta alterada'));
     },
 
     /** `pal_sel all/none/inv`. */
@@ -154,7 +155,7 @@ export function createPaletteCommands(editor: Editor) {
     /** `pal_sel flag`: selects the colours the edited model's voxels (or its voxel selection) use. */
     flagUsedColors() {
       const model = editedModel();
-      if (!model) return editor.status('Edite um modelo para marcar as cores dele', 'error');
+      if (!model) return editor.status(t('Edite um modelo para marcar as cores dele'), 'error');
       const mask = editor.selectionOf(model);
       const used = new Set<number>();
       model.voxels.forEach((color, index) => color !== EMPTY_VOXEL && (!mask || mask[index]) && used.add(color));
@@ -168,8 +169,8 @@ export function createPaletteCommands(editor: Editor) {
     randomColors(random = Math.random) {
       const model = editedModel();
       const colors = chosen();
-      if (!model) return editor.status('Edite um modelo para colorir', 'error');
-      if (colors.length < 2) return editor.status('Selecione duas ou mais cores na paleta (Shift+clique)', 'error');
+      if (!model) return editor.status(t('Edite um modelo para colorir'), 'error');
+      if (colors.length < 2) return editor.status(t('Selecione duas ou mais cores na paleta (Shift+clique)'), 'error');
       const mask = editor.selectionOf(model);
       const before = model.voxels.slice();
       const after = before.map((color, index) => (color === EMPTY_VOXEL || (mask && !mask[index]) ? color : colors[Math.floor(random() * colors.length)]));
@@ -179,7 +180,7 @@ export function createPaletteCommands(editor: Editor) {
       };
       apply(after)();
       editor.history.push({ undo: apply(before), redo: apply(after) });
-      editor.status('Cores aleatórias aplicadas');
+      editor.status(t('Cores aleatórias aplicadas'));
     },
   };
 }

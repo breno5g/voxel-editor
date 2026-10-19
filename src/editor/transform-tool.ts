@@ -1,6 +1,7 @@
 import type { Axis } from '../format/rotation.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
 import { allChunks } from '../geometry/mesher.ts';
+import { t } from '../i18n/i18n.ts';
 import type { Viewport } from '../render/viewport.ts';
 import { addScaled, axisOf } from './brush-shapes.ts';
 import type { Editor } from './editor.ts';
@@ -70,7 +71,7 @@ export function createTransformTool(editor: Editor, viewport: Pick<Viewport, 'pi
   const finish = () => {
     if (!session) return false;
     session = null;
-    editor.status('Transformação aplicada');
+    editor.status(t('Transformação aplicada'));
     return true;
   };
 
@@ -86,7 +87,7 @@ export function createTransformTool(editor: Editor, viewport: Pick<Viewport, 'pi
       const { model, original, startMask, written, writtenMask } = active;
       write(model, original, startMask);
       editor.history.push({ undo: () => write(model, written, writtenMask), redo: () => write(model, original, startMask) });
-      editor.status('Transformação cancelada');
+      editor.status(t('Transformação cancelada'));
       return true;
     },
 
@@ -95,11 +96,11 @@ export function createTransformTool(editor: Editor, viewport: Pick<Viewport, 'pi
       if (tool === 'move') return;
       const mask = editor.selectionOf(object.model);
       const bounds = mask && selectionBounds(object.model.size, mask);
-      if (!mask || !bounds) return editor.status('Selecione voxels para transformar (M ou N)', 'error');
+      if (!mask || !bounds) return editor.status(t('Selecione voxels para transformar (M ou N)'), 'error');
       const continues = session?.model === object.model && session.tool === tool && sameVoxels(object.model.voxels, session.written);
       if (!continues) {
         const hit = viewport.pick(clientX, clientY, object.transformId)?.hit;
-        if (!hit || hit.normal.every((value) => value === 0)) return editor.status('Arraste uma face da seleção', 'error');
+        if (!hit || hit.normal.every((value) => value === 0)) return editor.status(t('Arraste uma face da seleção'), 'error');
         const axis = axisOf(hit.normal);
         session = {
           model: object.model,

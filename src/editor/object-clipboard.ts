@@ -1,6 +1,7 @@
 import { applyRows, encodeRotation, multiplyRows, rotationRows, transposeRows } from '../format/rotation.ts';
 import { cloneModel, IDENTITY_ROTATION } from '../format/vox.ts';
 import type { SceneNode, TransformKey, Vec3, VoxModel } from '../format/vox.ts';
+import { t } from '../i18n/i18n.ts';
 import { evaluateShape, evaluateTransform, isLooping, setTransformAt } from '../scene/keyframes.ts';
 import { compose, IDENTITY_POSE, ROOT_ID } from '../scene/scene-graph.ts';
 import type { Pose } from '../scene/scene-graph.ts';
@@ -56,7 +57,7 @@ export function createObjectClipboard(editor: Editor) {
 
   const copy = (mode: CopyMode) => {
     const picked = selectedTransforms();
-    if (picked.length === 0) return editor.status('Selecione objetos para copiar', 'error');
+    if (picked.length === 0) return editor.status(t('Selecione objetos para copiar'), 'error');
     const parents = parentMap(state.vox);
     const base = state.vox.nodes.length;
     const scratch = { ...state.vox, nodes: [...state.vox.nodes] };
@@ -91,7 +92,7 @@ export function createObjectClipboard(editor: Editor) {
       });
     }
     clipboard = { nodes, roots, base, owned: mode !== 'ref', models, parents: picked.map(({ id }) => parentPose(state.vox, parents, id, state.frame)) };
-    editor.status(mode === 'ref' ? 'Objetos copiados como referência' : 'Objetos copiados');
+    editor.status(mode === 'ref' ? t('Objetos copiados como referência') : t('Objetos copiados'));
   };
 
   /** Deletes nodes `ids` from their groups (one undo step), selecting nothing. */
@@ -140,7 +141,7 @@ export function createObjectClipboard(editor: Editor) {
       });
       return [{ node, before: node.keys, keys }];
     });
-    if (edits.length === 0) return editor.status('Nenhuma referência na seleção');
+    if (edits.length === 0) return editor.status(t('Nenhuma referência na seleção'));
     change(
       () => {
         state.vox.models.push(...copies);
@@ -158,7 +159,7 @@ export function createObjectClipboard(editor: Editor) {
   const primaryPose = (quiet = false): Pose | null => {
     const [primary] = selectedTransforms().slice(-1);
     if (!primary) {
-      if (!quiet) editor.status('Selecione um objeto primeiro', 'error');
+      if (!quiet) editor.status(t('Selecione um objeto primeiro'), 'error');
       return null;
     }
     const parent = parentPose(state.vox, parentMap(state.vox), primary.id, state.frame);
@@ -184,9 +185,9 @@ export function createObjectClipboard(editor: Editor) {
 
     /** MagicaVoxel `ocut`: copies as reference and deletes, so pasting moves the objects. */
     cut() {
-      if (selectedTransforms().length === 0) return editor.status('Selecione objetos para recortar', 'error');
+      if (selectedTransforms().length === 0) return editor.status(t('Selecione objetos para recortar'), 'error');
       copy('ref');
-      unlink(state.selection, 'Objetos recortados');
+      unlink(state.selection, t('Objetos recortados'));
     },
 
     /** MagicaVoxel `opaste`: the copies go into the current group at the world place they were copied from, selected. */
@@ -194,7 +195,7 @@ export function createObjectClipboard(editor: Editor) {
       const copied = clipboard;
       const levelId = state.level ?? rootLevel(state.vox) ?? -1;
       const level = groupNode(state.vox, levelId);
-      if (!copied) return editor.status('Nada copiado', 'error');
+      if (!copied) return editor.status(t('Nada copiado'), 'error');
       if (!level) return;
       const levelPose = parentPose(state.vox, parentMap(state.vox), levelId, state.frame);
       const firstNode = state.vox.nodes.length;
@@ -221,30 +222,30 @@ export function createObjectClipboard(editor: Editor) {
           state.vox.models.splice(firstModel);
           editor.setSelection(previous);
         },
-        'Objetos colados',
+        t('Objetos colados'),
       );
     },
 
     /** MagicaVoxel `oref2obj`: references become independent copies, for the selection or (`all`) the whole scene. */
     referencesToObjects(all: boolean) {
       const ids = all ? [ROOT_ID] : state.selection;
-      if (ids.length === 0) return editor.status('Selecione objetos primeiro', 'error');
-      ownModels(ids, 'Referências convertidas em cópias');
+      if (ids.length === 0) return editor.status(t('Selecione objetos primeiro'), 'error');
+      ownModels(ids, t('Referências convertidas em cópias'));
     },
 
     /** MagicaVoxel `m_copy`: the primary selection's world transform. */
     copyTransform() {
       copiedPose = primaryPose();
-      if (copiedPose) editor.status('Transformação copiada');
+      if (copiedPose) editor.status(t('Transformação copiada'));
     },
 
     pasteTransform(part: TransformPart) {
-      if (part === 'i') return setWorldPoses((world) => ({ ...world, rows: rotationRows(IDENTITY_ROTATION) }), 'Rotação zerada');
+      if (part === 'i') return setWorldPoses((world) => ({ ...world, rows: rotationRows(IDENTITY_ROTATION) }), t('Rotação zerada'));
       const copied = copiedPose;
-      if (!copied) return editor.status('Nenhuma transformação copiada', 'error');
+      if (!copied) return editor.status(t('Nenhuma transformação copiada'), 'error');
       setWorldPoses(
         (world) => ({ rows: part === 't' ? world.rows : copied.rows, translation: part === 'r' ? world.translation : copied.translation }),
-        'Transformação colada',
+        t('Transformação colada'),
       );
     },
 

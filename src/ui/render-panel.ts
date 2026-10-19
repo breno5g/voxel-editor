@@ -9,6 +9,7 @@ import { createPathTracer, MAX_SAMPLES, VOXEL_SHAPES } from '../render/path-trac
 import type { PathTracer, TraceOptions, TraceView } from '../render/path-tracer/path-tracer.ts';
 import { bakeSceneVolume } from '../render/path-tracer/scene-volume.ts';
 import type { Viewport } from '../render/viewport.ts';
+import { t, tn } from '../i18n/i18n.ts';
 import { element } from './dom.ts';
 import { buildRenderFields, RENDER_PANELS } from './render-fields.ts';
 
@@ -71,11 +72,11 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
   const syncPanels = () => {
     syncFields.forEach((sync) => sync());
     iblRow.hidden = settings.environment !== 'ibl';
-    iblName.textContent = !settings.ibl.path ? 'nenhuma' : settings.ibl.path === loadedIbl ? settings.ibl.path : `${settings.ibl.path} (não carregada)`;
+    iblName.textContent = !settings.ibl.path ? t('nenhuma') : settings.ibl.path === loadedIbl ? settings.ibl.path : t('{file} (não carregada)', { file: settings.ibl.path });
   };
 
   const fail = (error: unknown) => {
-    editor.status(`Renderizador: ${errorMessage(error)}`, 'error');
+    editor.status(t('Renderizador: {error}', { error: errorMessage(error) }), 'error');
     editor.setRendering(false);
   };
   const targetSamples = () => Math.min(Math.max(Math.round(Number(samplesInput.value)) || 1, 1), MAX_SAMPLES);
@@ -103,7 +104,7 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
       return fail(error);
     }
     const target = targetSamples();
-    samplesLabel.value = tracer.samples >= target ? `Vista pronta: ${tracer.samples} amostras por pixel` : `Vista refinando: ${tracer.samples} de ${target} amostras`;
+    samplesLabel.value = tracer.samples >= target ? tn(tracer.samples, 'Vista pronta: {n} amostra por pixel', 'Vista pronta: {n} amostras por pixel') : t('Vista refinando: {samples} de {target} amostras', { samples: tracer.samples, target });
     if (tracer.samples < target) requestFrame();
     else tracer.present();
   };
@@ -122,7 +123,7 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
       tracer.setOptions(options());
       return tracer;
     } catch (error) {
-      editor.status(`Renderizador: ${errorMessage(error)}`, 'error');
+      editor.status(t('Renderizador: {error}', { error: errorMessage(error) }), 'error');
       return null;
     }
   };
@@ -238,7 +239,7 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
     previewSamples: targetSamples,
     setBusy(next) {
       busy = next;
-      if (busy) samplesLabel.value = 'A vista mostra a imagem exportada sendo renderizada';
+      if (busy) samplesLabel.value = t('A vista mostra a imagem exportada sendo renderizada');
       tracer?.reset();
       requestFrame();
     },

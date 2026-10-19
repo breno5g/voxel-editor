@@ -3,6 +3,7 @@ import type { ModelCommands } from '../editor/model-commands.ts';
 import { createXsShader, EXAMPLE_SHADERS } from '../editor/xs-shader.ts';
 import type { XsShader } from '../editor/xs-shader.ts';
 import { createXsRunner } from '../render/xs-runner.ts';
+import { t, tn } from '../i18n/i18n.ts';
 import { element } from './dom.ts';
 
 const STORAGE_KEY = 'voxel-editor:xs-shaders';
@@ -34,13 +35,13 @@ export function bindXsPanel(editor: Editor, models: ModelCommands) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(custom));
     } catch (error) {
-      editor.fail('Não foi possível guardar os shaders', error);
+      editor.fail(t('Não foi possível guardar os shaders'), error);
     }
   };
 
   const renderArgs = () => {
     const shader = library.get(select.value);
-    argInputs = (shader?.args ?? []).map((arg) => Object.assign(document.createElement('input'), { type: 'number', min: String(arg.min), max: String(arg.max), step: String(arg.step), value: String(arg.value), title: `${arg.label} (${arg.min} a ${arg.max})` }));
+    argInputs = (shader?.args ?? []).map((arg) => Object.assign(document.createElement('input'), { type: 'number', min: String(arg.min), max: String(arg.max), step: String(arg.step), value: String(arg.value), title: t('{label} ({min} a {max})', { label: arg.label, min: arg.min, max: arg.max }) }));
     argsContainer.replaceChildren(
       ...argInputs.map((input, index) => {
         const row = Object.assign(document.createElement('label'), { className: 'control-row' });
@@ -73,7 +74,7 @@ export function bindXsPanel(editor: Editor, models: ModelCommands) {
             iterations: passes,
             random: Math.random,
           }),
-        `Shader ${shader.name} aplicado`,
+        t('Shader {name} aplicado', { name: shader.name }),
         region,
       );
     } catch (error) {
@@ -84,7 +85,7 @@ export function bindXsPanel(editor: Editor, models: ModelCommands) {
   /** The shader, arguments and iterations chosen in the panel, on the model, its selection, or `region`. */
   const runChosen = (region: Uint8Array | null = null) => {
     const shader = library.get(select.value);
-    if (!shader) return editor.status('Escolha um shader XS no painel', 'error');
+    if (!shader) return editor.status(t('Escolha um shader XS no painel'), 'error');
     run(shader, argInputs.map((input) => input.valueAsNumber), Math.max(1, Math.round(iterations.valueAsNumber) || 1), region);
   };
   element('xs-run', HTMLButtonElement).addEventListener('click', () => runChosen());
@@ -98,15 +99,15 @@ export function bindXsPanel(editor: Editor, models: ModelCommands) {
     renderOptions();
     if (files[0]) select.value = files[0].name.replace(/\.txt$/i, '');
     renderArgs();
-    editor.status(`${files.length} shader(s) carregado(s)`);
+    editor.status(tn(files.length, '{n} shader carregado', '{n} shaders carregados'));
   });
 
-  /** MagicaVoxel console: `xs [-n iterações] nome args…`. */
+  /** MagicaVoxel console: `xs [-n iterations] name args…`. */
   models.define('xs', (words) => {
     const passes = words[0] === '-n' ? Number(words[1]) : 1;
     const [name = '', ...values] = words[0] === '-n' ? words.slice(2) : words;
     const shader = library.get(name);
-    if (!shader) return `shader ${name || '?'} não carregado (${[...library.keys()].join(', ')})`;
+    if (!shader) return t('shader {name} não carregado ({loaded})', { name: name || '?', loaded: [...library.keys()].join(', ') });
     run(shader, shader.args.map((arg, index) => (values[index] === undefined ? arg.value : Number(values[index]))), Math.max(1, passes || 1));
   });
 

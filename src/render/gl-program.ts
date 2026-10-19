@@ -1,3 +1,5 @@
+import { t } from '../i18n/i18n.ts';
+
 /** A full-screen triangle; `main` in the fragment shader does the work. */
 export const FULL_SCREEN_VERTEX = `#version 300 es
 void main() {
@@ -7,10 +9,10 @@ void main() {
 
 function compile(gl: WebGL2RenderingContext, type: GLenum, source: string) {
   const shader = gl.createShader(type);
-  if (!shader) throw new Error('WebGL: não foi possível criar o shader');
+  if (!shader) throw new Error(t('WebGL: não foi possível criar o shader'));
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(`Erro no shader: ${gl.getShaderInfoLog(shader)?.trim() ?? ''}`);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(t('Erro no shader: {log}', { log: gl.getShaderInfoLog(shader)?.trim() ?? '' }));
   return shader;
 }
 
@@ -20,6 +22,6 @@ export function linkFullScreenProgram(gl: WebGL2RenderingContext, fragmentSource
   gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, FULL_SCREEN_VERTEX));
   gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, fragmentSource));
   gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(`Erro ao ligar o shader: ${gl.getProgramInfoLog(program) ?? ''}`);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(t('Erro ao ligar o shader: {log}', { log: gl.getProgramInfoLog(program) ?? '' }));
   return program;
 }

@@ -3,6 +3,7 @@ import { applyRows, encodeRotation, mirrorRotation, multiplyRows, rotationRows, 
 import type { Axis } from '../format/rotation.ts';
 import { createModel, IDENTITY_ROTATION } from '../format/vox.ts';
 import type { GroupNode, Matrix3, SceneNode, ShapeNode, TransformKey, TransformNode, Vec3, VoxModel } from '../format/vox.ts';
+import { t, tn } from '../i18n/i18n.ts';
 import { evaluateShape, evaluateTransform, isLooping, setTransformAt } from '../scene/keyframes.ts';
 import { compose, IDENTITY_POSE, isHidden } from '../scene/scene-graph.ts';
 import type { Pose } from '../scene/scene-graph.ts';
@@ -55,7 +56,7 @@ export function createWorldCommands(editor: Editor) {
 
   const requireSelection = () => {
     const nodes = picked();
-    if (nodes.length === 0) editor.status('Selecione um objeto primeiro', 'error');
+    if (nodes.length === 0) editor.status(t('Selecione um objeto primeiro'), 'error');
     return nodes;
   };
 
@@ -112,7 +113,7 @@ export function createWorldCommands(editor: Editor) {
         if (value === undefined) node.attrs.delete('_hidden');
         else node.attrs.set('_hidden', value);
       });
-    change(apply(nodes.map(() => (hidden ? '1' : undefined))), apply(before), hidden ? 'Objetos ocultos' : 'Objetos visíveis');
+    change(apply(nodes.map(() => (hidden ? '1' : undefined))), apply(before), hidden ? t('Objetos ocultos') : t('Objetos visíveis'));
   };
 
   /** Adds the subtrees copied from `sources` next to them in their groups, shifted by `offset`, and selects the copies. */
@@ -244,7 +245,7 @@ export function createWorldCommands(editor: Editor) {
           state.vox.nodes.splice(transformId, 2);
           editor.setSelection(previous);
         },
-        'Grupo criado',
+        t('Grupo criado'),
       );
     },
 
@@ -256,7 +257,7 @@ export function createWorldCommands(editor: Editor) {
         const group = groupId === null ? undefined : groupNode(state.vox, groupId);
         return group ? [{ id, node, group }] : [];
       });
-      if (!level || groups.length === 0) return editor.status('Selecione um grupo para desagrupar', 'error');
+      if (!level || groups.length === 0) return editor.status(t('Selecione um grupo para desagrupar'), 'error');
       const members = groups.flatMap(({ node: holder, group }) =>
         group.children.flatMap((childId) => {
           const child = state.vox.nodes[childId];
@@ -278,7 +279,7 @@ export function createWorldCommands(editor: Editor) {
           level.children = beforeChildren;
           editor.setSelection(previous);
         },
-        'Grupo desfeito',
+        t('Grupo desfeito'),
       );
     },
 
@@ -293,7 +294,7 @@ export function createWorldCommands(editor: Editor) {
       const first = before.findIndex((id) => ids.includes(id));
       const place = step === 2 ? 0 : step === -2 ? kept.length : Math.min(Math.max(first - step, 0), kept.length);
       const after = [...kept.slice(0, place), ...chosen, ...kept.slice(place)];
-      change(() => (level.children = after), () => (level.children = before), 'Ordem alterada');
+      change(() => (level.children = after), () => (level.children = before), t('Ordem alterada'));
     },
 
     /** `osel_all 0|1`: every node of the level, skipping hidden ones (and those on hidden layers) unless `includeHidden`. */
@@ -337,7 +338,7 @@ export function createWorldCommands(editor: Editor) {
           if (!moved) return;
           const after = nodes.map(({ node }) => node.keys);
           nodes.forEach(({ node }, index) => (node.keys = before[index]));
-          commitKeys(nodes.map(({ node }, index) => ({ node, keys: after[index] })), nodes.length > 1 ? 'Objetos movidos' : 'Objeto movido');
+          commitKeys(nodes.map(({ node }, index) => ({ node, keys: after[index] })), tn(nodes.length, 'Objeto movido', 'Objetos movidos'));
         },
       };
     },
@@ -347,28 +348,28 @@ export function createWorldCommands(editor: Editor) {
       const nodes = requireSelection();
       const bounds = nodes.length ? boundsOf(nodes) : null;
       if (!bounds) return;
-      editWorld(nodes, (pose) => ({ ...pose, translation: [pose.translation[0], pose.translation[1], pose.translation[2] - bounds.low[2]] }), 'Apoiado no chão');
+      editWorld(nodes, (pose) => ({ ...pose, translation: [pose.translation[0], pose.translation[1], pose.translation[2] - bounds.low[2]] }), t('Apoiado no chão'));
     },
 
     /** MagicaVoxel `orot`: a quarter turn about a world axis. */
     rotateSelected(axis: Axis, direction: 1 | -1) {
       const nodes = requireSelection();
       const center = nodes.length ? pivotOf(nodes) : null;
-      if (center) editWorld(nodes, aboutPoint(rotationRows(turnRotation(IDENTITY_ROTATION, axis, direction)), center), 'Girado 90°');
+      if (center) editWorld(nodes, aboutPoint(rotationRows(turnRotation(IDENTITY_ROTATION, axis, direction)), center), t('Girado 90°'));
     },
 
     /** MagicaVoxel `oflip`: mirrors along a world axis (the rotation becomes improper). */
     mirrorSelected(axis: Axis) {
       const nodes = requireSelection();
       const center = nodes.length ? pivotOf(nodes) : null;
-      if (center) editWorld(nodes, aboutPoint(rotationRows(mirrorRotation(IDENTITY_ROTATION, axis)), center), 'Espelhado');
+      if (center) editWorld(nodes, aboutPoint(rotationRows(mirrorRotation(IDENTITY_ROTATION, axis)), center), t('Espelhado'));
     },
 
     /** MagicaVoxel `oalign`: lines up each selected box with the selection's minimum (-1), centre (0) or maximum (1) on `axis`. */
     alignSelected(axis: Axis, side: -1 | 0 | 1) {
       const nodes = requireSelection();
       const all = nodes.length > 1 ? boundsOf(nodes) : null;
-      if (!all) return editor.status('Selecione dois ou mais objetos para alinhar', 'error');
+      if (!all) return editor.status(t('Selecione dois ou mais objetos para alinhar'), 'error');
       const anchor = (box: Bounds) => (side < 0 ? box.low[axis] : side > 0 ? box.high[axis] : Math.floor((box.low[axis] + box.high[axis]) / 2));
       const target = anchor(all);
       const poses = worldPoses(nodes);
@@ -380,7 +381,7 @@ export function createWorldCommands(editor: Editor) {
         const { parent, world } = poses[index];
         return [{ node, keys: keysFor(node, parent, { ...world, translation: add(world.translation, delta) }) }];
       });
-      commitKeys(edits, 'Objetos alinhados');
+      commitKeys(edits, t('Objetos alinhados'));
     },
 
     /** MagicaVoxel `ohide`: hides (true), shows (false) or toggles (no argument) the selection. */
@@ -418,7 +419,7 @@ export function createWorldCommands(editor: Editor) {
           [...ordered].reverse().forEach(({ group, id, index }) => group.children.splice(index, 0, id));
           editor.setSelection(previous);
         },
-        links.length > 1 ? 'Objetos apagados' : 'Objeto apagado',
+        tn(links.length, 'Objeto apagado', 'Objetos apagados'),
       );
     },
 
@@ -427,7 +428,7 @@ export function createWorldCommands(editor: Editor) {
       const nodes = requireSelection();
       const bounds = nodes.length ? boundsOf(nodes) : null;
       const gap: Vec3 = [inPlace || !bounds ? 0 : bounds.high[0] - bounds.low[0] + 1, 0, 0];
-      if (nodes.length) copyNodes(nodes, gap, false, nodes.length > 1 ? 'Objetos duplicados' : 'Objeto duplicado');
+      if (nodes.length) copyNodes(nodes, gap, false, tn(nodes.length, 'Objeto duplicado', 'Objetos duplicados'));
     },
 
     /**
@@ -476,7 +477,7 @@ export function createWorldCommands(editor: Editor) {
           const copies = added;
           apply({ nodes: [], roots: [] });
           if (copies.roots.length === 0) return editor.sceneChanged();
-          change(() => apply(copies), () => apply({ nodes: [], roots: [] }), `${copies.roots.length} cópia(s) por wrap`);
+          change(() => apply(copies), () => apply({ nodes: [], roots: [] }), tn(copies.roots.length, '{n} cópia por wrap', '{n} cópias por wrap'));
         },
       };
     },
@@ -491,7 +492,7 @@ export function createWorldCommands(editor: Editor) {
         const shape = state.vox.nodes[node.child];
         return shape?.kind === 'shape' ? [{ id, node, model: evaluateShape(shape.keys, state.frame, isLooping(shape.attrs)) }] : [];
       });
-      if (!level || objects.length < 2) return editor.status('Selecione dois ou mais objetos para empacotar', 'error');
+      if (!level || objects.length < 2) return editor.status(t('Selecione dois ou mais objetos para empacotar'), 'error');
       const [first] = objects;
       const transformId = state.vox.nodes.length;
       const nodes: [TransformNode, ShapeNode] = [
@@ -499,7 +500,7 @@ export function createWorldCommands(editor: Editor) {
         { kind: 'shape', attrs: new Map(loop ? [['_loop', '1']] : []), keys: objects.map(({ model }, frame) => ({ frame, model })) },
       ];
       if (loop) nodes[0].attrs.set('_loop', '1');
-      replaceInLevel(level, objects.map(({ id }) => id), nodes, `${objects.length} objetos empacotados em uma animação`);
+      replaceInLevel(level, objects.map(({ id }) => id), nodes, t('{n} objetos empacotados em uma animação', { n: objects.length }));
     },
 
     /** MagicaVoxel `ounpack`: each model frame of the selected object becomes an object of its own, at the current pose. */
@@ -507,14 +508,14 @@ export function createWorldCommands(editor: Editor) {
       const level = levelGroup();
       const [target] = picked().slice(-1);
       const shape = target && state.vox.nodes[target.node.child];
-      if (!level || !target || shape?.kind !== 'shape' || shape.keys.length < 2) return editor.status('Selecione um objeto com frames de modelo', 'error');
+      if (!level || !target || shape?.kind !== 'shape' || shape.keys.length < 2) return editor.status(t('Selecione um objeto com frames de modelo'), 'error');
       const value = evaluateTransform(target.node.keys, state.frame, isLooping(target.node.attrs));
       const models = [...new Set(shape.keys.map((key) => key.model))];
       const nodes = models.flatMap((model, index): [TransformNode, ShapeNode] => [
-        { ...target.node, attrs: new Map([...target.node.attrs].filter(([key]) => key !== '_loop')).set('_name', `${target.node.attrs.get('_name') ?? 'Frame'} ${index + 1}`), child: state.vox.nodes.length + index * 2 + 1, keys: [{ frame: 0, ...value }] },
+        { ...target.node, attrs: new Map([...target.node.attrs].filter(([key]) => key !== '_loop')).set('_name', `${target.node.attrs.get('_name') ?? t('Frame')} ${index + 1}`), child: state.vox.nodes.length + index * 2 + 1, keys: [{ frame: 0, ...value }] },
         { kind: 'shape', attrs: new Map(), keys: [{ frame: 0, model }] },
       ]);
-      replaceInLevel(level, [target.id], nodes, `${models.length} objetos desempacotados`);
+      replaceInLevel(level, [target.id], nodes, tn(models.length, '{n} objeto desempacotado', '{n} objetos desempacotados'));
     },
 
     /** Adds one object per model to the current group (on the current layer), side by side from `at` (the origin by default) and resting on its height, and selects them. */
@@ -547,14 +548,14 @@ export function createWorldCommands(editor: Editor) {
           state.vox.models.splice(firstModel);
           editor.setSelection(previous);
         },
-        `${models.length} modelo(s) importado(s)`,
+        tn(models.length, '{n} modelo importado', '{n} modelos importados'),
       );
     },
 
     /** MagicaVoxel `onew`: an empty object in the current group. */
     addObject() {
       const group = levelGroup();
-      if (!group) return editor.status('A cena não tem um grupo raiz para receber objetos', 'error');
+      if (!group) return editor.status(t('A cena não tem um grupo raiz para receber objetos'), 'error');
       const transformId = state.vox.nodes.length;
       const nodes: [TransformNode, ShapeNode] = [
         { ...objectTransform(transformId + 1, DEFAULT_MODEL_SIZE), layer: state.layer },
@@ -574,7 +575,7 @@ export function createWorldCommands(editor: Editor) {
           state.vox.models.pop();
           editor.setSelection(previous);
         },
-        'Objeto criado',
+        t('Objeto criado'),
       );
     },
   };

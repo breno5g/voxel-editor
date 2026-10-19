@@ -40,7 +40,11 @@ import { bindViewCube } from './ui/view-cube.ts';
 import { bindRenderPanel } from './ui/render-panel.ts';
 import { bindRenderImage } from './ui/render-image.ts';
 import { bindFullscreen } from './ui/fullscreen.ts';
+import { bindLocalePicker } from './ui/locale-picker.ts';
+import { t, translateDocument } from './i18n/i18n.ts';
 
+translateDocument(document);
+bindLocalePicker();
 const editor = createEditor();
 const viewport = createViewport(element('viewport', HTMLElement));
 const commands = createObjectCommands(editor);
@@ -88,5 +92,5 @@ bindPlayback(editor);
 const autosave = bindAutosave(editor);
 
 editor.load(createDocument(), UNTITLED);
-editor.status('Pronto. Modo Modelo: desenhe no chão do objeto. Tab no viewport alterna para o modo Mundo. Botão direito gira, do meio move, roda dá zoom.');
+editor.status(t('Pronto. Modo Modelo: desenhe no chão do objeto. Tab no viewport alterna para o modo Mundo. Botão direito gira, do meio move, roda dá zoom.'));
 void autosave.recover();

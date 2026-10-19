@@ -9,6 +9,7 @@ import type { Vec3 } from '../format/vox.ts';
 import { isLooping, previousShapeModel } from '../scene/keyframes.ts';
 import { evaluateScene } from '../scene/scene-graph.ts';
 import { isUnder, parentMap } from '../scene/scene-tree.ts';
+import { t } from '../i18n/i18n.ts';
 import { isEditingText } from './dom.ts';
 
 const MAIN_BUTTON = 0;
@@ -33,7 +34,7 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
   const { canvas } = viewport;
 
   canvas.tabIndex = 0;
-  canvas.setAttribute('aria-label', 'Viewport 3D. Tab entra no grupo ou objeto selecionado, Shift+Tab sobe um nível, Esc sai do viewport');
+  canvas.setAttribute('aria-label', t('Viewport 3D. Tab entra no grupo ou objeto selecionado, Shift+Tab sobe um nível, Esc sai do viewport'));
   /** MagicaVoxel transform sessions: Enter keeps the result, Esc reverts it (captured before Esc blurs the canvas). */
   window.addEventListener('keydown', (event) => {
     if (isEditingText(event) || state.mode !== 'model') return;
@@ -68,7 +69,7 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
   canvas.addEventListener('pointerdown', (event) => {
     if (event.button !== MAIN_BUTTON || viewport.camera.leftDrag()) return;
     if (focusHeld) {
-      if (!viewport.focusAt(event.clientX, event.clientY)) editor.status('Clique num voxel para centralizar a câmera nele');
+      if (!viewport.focusAt(event.clientX, event.clientY)) editor.status(t('Clique num voxel para centralizar a câmera nele'));
       return;
     }
     canvas.setPointerCapture(event.pointerId);

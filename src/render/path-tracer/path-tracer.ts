@@ -3,6 +3,7 @@ import { ENVIRONMENTS, PROJECTIONS } from '../../format/render-settings.ts';
 import type { RenderSettings } from '../../format/render-settings.ts';
 import { PALETTE_BYTES, PALETTE_SIZE } from '../../format/vox.ts';
 import type { Vec3 } from '../../format/vox.ts';
+import { t } from '../../i18n/i18n.ts';
 import { linkFullScreenProgram } from '../gl-program.ts';
 import { collectEmitterFaces, EMITTER_GROUPS, EMITTER_ROW, emitterPower } from './emitter-faces.ts';
 import type { EmitterFaces } from './emitter-faces.ts';
@@ -109,8 +110,8 @@ export function createPathTracer(container: HTMLElement) {
   const canvas = Object.assign(document.createElement('canvas'), { className: 'path-trace', hidden: true });
   container.append(canvas);
   const gl = canvas.getContext('webgl2', { antialias: false, premultipliedAlpha: true, preserveDrawingBuffer: true });
-  if (!gl) throw new Error('Este navegador não tem WebGL2 para o renderizador');
-  if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('A GPU não grava texturas float (EXT_color_buffer_float), que o renderizador usa');
+  if (!gl) throw new Error(t('Este navegador não tem WebGL2 para o renderizador'));
+  if (!gl.getExtension('EXT_color_buffer_float')) throw new Error(t('A GPU não grava texturas float (EXT_color_buffer_float), que o renderizador usa'));
 
   const tracePrograms = new Map<string, WebGLProgram>();
   const traceProgramFor = (shape: VoxelShape, guide = false) => {
@@ -174,7 +175,7 @@ export function createPathTracer(container: HTMLElement) {
   /** The area-light faces and where each group starts, in the textures the shader picks from. */
   const uploadEmitterFaces = ({ faces, offsets }: EmitterFaces) => {
     const rows = Math.max(1, Math.ceil(faces.length / EMITTER_ROW));
-    if (rows > gl.getParameter(gl.MAX_TEXTURE_SIZE)) throw new Error(`Faces emissivas demais para a GPU (${faces.length})`);
+    if (rows > gl.getParameter(gl.MAX_TEXTURE_SIZE)) throw new Error(t('Faces emissivas demais para a GPU ({count})', { count: faces.length }));
     const texels = new Uint32Array(rows * EMITTER_ROW);
     texels.set(faces);
     gl.bindTexture(gl.TEXTURE_2D, emitterFacesTexture);
@@ -207,7 +208,7 @@ export function createPathTracer(container: HTMLElement) {
   let bloomHeight = 0;
   const resize = (nextWidth: number, nextHeight: number) => {
     const limit = Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE), gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
-    if (nextWidth > limit || nextHeight > limit) throw new Error(`A GPU renderiza até ${limit}×${limit} pixels`);
+    if (nextWidth > limit || nextHeight > limit) throw new Error(t('A GPU renderiza até {limit}×{limit} pixels', { limit }));
     width = nextWidth;
     height = nextHeight;
     canvas.width = width;
@@ -515,8 +516,8 @@ export function createPathTracer(container: HTMLElement) {
   };
 
   /**
-   * MagicaVoxel's Denoise: the running mean filtered by the à-trous passes, guided by the first hit's
-   * albedo and normal; returns the filtered texture.
+   * MagicaVoxel's Denoise: the running mean filtered by the à-trous passes, guided by the albedo and
+   * normal of the first hit; returns the filtered texture.
    */
   const denoised = (view: TraceView, active: RenderSettings) => {
     if (!guidesReady) traceGuides(view, active);
@@ -549,7 +550,7 @@ export function createPathTracer(container: HTMLElement) {
 
     setVolume(next: SceneVolume | null) {
       const limit = gl.getParameter(gl.MAX_3D_TEXTURE_SIZE);
-      if (next && next.size.some((axis) => axis > limit)) throw new Error(`A GPU aceita até ${limit} voxels por eixo; a cena tem ${next.size.join('×')}`);
+      if (next && next.size.some((axis) => axis > limit)) throw new Error(t('A GPU aceita até {limit} voxels por eixo; a cena tem {size}', { limit, size: next.size.join('×') }));
       volume = next;
       emitters = null;
       if (next) upload3d(volumeTexture, next.size, next.voxels);

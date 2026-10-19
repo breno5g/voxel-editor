@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts';
 import { moveKeys, removeKeys, reverseKeys } from '../scene/keyframes.ts';
 import type { Editor, KeyTrack } from './editor.ts';
 import { sceneChange } from './scene-change.ts';
@@ -25,9 +26,9 @@ export function createKeyCommands(editor: Editor) {
   /** Applies `edit` to the selected keys of each track as one undo step, then selects `select(track)` frames. */
   const editSelected = (edit: <K extends { frame: number }>(keys: K[], frames: number[]) => K[], select: (frames: number[]) => number[], message: string) => {
     const nodes = trackNodes(editor);
-    if (!nodes) return editor.status('Selecione um objeto primeiro', 'error');
+    if (!nodes) return editor.status(t('Selecione um objeto primeiro'), 'error');
     const tracks = (['transform', 'shape'] as const).filter((track) => state.keySelection[track].length > 0);
-    if (tracks.length === 0) return editor.status('Selecione keys na timeline (clique, Shift soma)', 'error');
+    if (tracks.length === 0) return editor.status(t('Selecione keys na timeline (clique, Shift soma)'), 'error');
     const { transform, shape } = nodes;
     const before = { transform: transform.keys, shape: shape?.keys };
     const after = {
@@ -76,18 +77,18 @@ export function createKeyCommands(editor: Editor) {
       editSelected(
         (keys, frames) => moveKeys(keys, frames, delta, copy),
         (frames) => frames.map((frame) => frame + delta),
-        copy ? 'Keys duplicadas' : 'Keys movidas',
+        copy ? t('Keys duplicadas') : t('Keys movidas'),
       );
     },
 
     /** MagicaVoxel `adel` on the key selection. */
     deleteSelectedKeys() {
-      editSelected((keys, frames) => removeKeys(keys, frames), () => [], 'Keys apagadas');
+      editSelected((keys, frames) => removeKeys(keys, frames), () => [], t('Keys apagadas'));
     },
 
     /** MagicaVoxel `arev`. */
     reverseSelectedKeys() {
-      editSelected((keys, frames) => reverseKeys(keys, frames), (frames) => frames.map((frame) => Math.min(...frames) + Math.max(...frames) - frame), 'Keys invertidas');
+      editSelected((keys, frames) => reverseKeys(keys, frames), (frames) => frames.map((frame) => Math.min(...frames) + Math.max(...frames) - frame), t('Keys invertidas'));
     },
 
     hasKeySelection: () => state.keySelection.transform.length + state.keySelection.shape.length > 0,

@@ -1,5 +1,6 @@
 import { DEFAULT_DISPLAY, DISPLAY_COLORS, DISPLAY_OPTIONS, isDisplayOption } from '../editor/editor.ts';
 import type { Display, DisplayColor, DisplayOption, Editor } from '../editor/editor.ts';
+import { t } from '../i18n/i18n.ts';
 import { element } from './dom.ts';
 
 const STORAGE_KEY = 'voxel-editor:display';
@@ -90,7 +91,7 @@ export function bindDisplayPanel(editor: Editor): void {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.display));
     } catch (error) {
-      editor.fail('Não foi possível guardar as opções de exibição', error);
+      editor.fail(t('Não foi possível guardar as opções de exibição'), error);
     }
   });
 }

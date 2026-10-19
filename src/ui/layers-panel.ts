@@ -1,6 +1,7 @@
 import type { Editor } from '../editor/editor.ts';
 import { isLayerHidden, LAYER_COUNT, layerColor, layerName } from '../editor/layer-commands.ts';
 import type { ObjectCommands } from '../editor/object-commands.ts';
+import { t } from '../i18n/i18n.ts';
 import { element } from './dom.ts';
 
 const DEFAULT_LAYER_COLOR = '#808080';
@@ -32,13 +33,13 @@ export function bindLayersPanel(editor: Editor, commands: ObjectCommands): void 
   const sync = () => {
     buttons.forEach((button, id) => {
       button.setAttribute('aria-pressed', String(id === state.layer));
-      button.title = `${layerName(state.vox, id)}${isLayerHidden(state.vox, id) ? ' (oculta)' : ''}`;
+      button.title = isLayerHidden(state.vox, id) ? t('{layer} (oculta)', { layer: layerName(state.vox, id) }) : layerName(state.vox, id);
       button.dataset.hidden = String(isLayerHidden(state.vox, id));
       button.style.borderBottomColor = layerColor(state.vox, id) ?? 'transparent';
     });
     if (document.activeElement !== name) name.value = layerName(state.vox, state.layer);
     color.value = layerColor(state.vox, state.layer) ?? DEFAULT_LAYER_COLOR;
-    visible.textContent = isLayerHidden(state.vox, state.layer) ? 'Mostrar' : 'Ocultar';
+    visible.textContent = isLayerHidden(state.vox, state.layer) ? t('Mostrar') : t('Ocultar');
   };
   sync();
   editor.subscribe((event) => {

@@ -1,3 +1,5 @@
+import { t } from '../i18n/i18n.ts';
+
 /** One `// arg : { ... }` line of an XS shader header: becomes `#define <name> i_args[index]`. */
 export type XsArg = { name: string; label: string; value: number; min: number; max: number; step: number; precision: number };
 export type XsShader = { name: string; source: string; args: XsArg[] };
@@ -100,7 +102,7 @@ export const EXAMPLE_SHADERS: XsShader[] = [
   createXsShader(
     'bola',
     `// xs_begin
-// arg : { var = 'm_radius' name = 'Raio' value = '1' range = '0 1' step = '0.05' precision = '2' }
+// arg : { var = 'm_radius' name = '${t('Raio')}' value = '1' range = '0 1' step = '0.05' precision = '2' }
 // xs_end
 float map(vec3 v) {
   vec3 p = (v - i_volume_size * 0.5) / (i_volume_size * 0.5);
@@ -110,8 +112,8 @@ float map(vec3 v) {
   createXsShader(
     'anel',
     `// xs_begin
-// arg : { var = 'm_major' name = 'Raio' value = '0.65' range = '0 1' step = '0.05' precision = '2' }
-// arg : { var = 'm_minor' name = 'Espessura' value = '0.25' range = '0 1' step = '0.05' precision = '2' }
+// arg : { var = 'm_major' name = '${t('Raio')}' value = '0.65' range = '0 1' step = '0.05' precision = '2' }
+// arg : { var = 'm_minor' name = '${t('Espessura')}' value = '0.25' range = '0 1' step = '0.05' precision = '2' }
 // xs_end
 float map(vec3 v) {
   vec3 p = (v - i_volume_size * 0.5) / (i_volume_size * 0.5);
@@ -122,7 +124,7 @@ float map(vec3 v) {
   createXsShader(
     'degraus',
     `// xs_begin
-// arg : { var = 'm_step' name = 'Degrau' value = '4' range = '1 64' step = '1' precision = '0' }
+// arg : { var = 'm_step' name = '${t('Degrau')}' value = '4' range = '1 64' step = '1' precision = '0' }
 // xs_end
 float map(vec3 v) {
   float height = floor(v.x / m_step) * m_step;

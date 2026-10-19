@@ -3,6 +3,7 @@ import type { Editor } from '../editor/editor.ts';
 import { isCameraMode, isWheelZoom } from '../render/camera-rig.ts';
 import { cameraFromDict, cameraToDict } from '../render/camera-chunk.ts';
 import type { Viewport } from '../render/viewport.ts';
+import { t } from '../i18n/i18n.ts';
 import { bindButtonGroup, element } from './dom.ts';
 
 const SLOT_COUNT = 10;
@@ -109,15 +110,15 @@ export function bindCameraPanel(editor: Editor, viewport: Viewport) {
   const save = () => {
     editor.state.vox.cameras.set(slot(), cameraToDict(camera.state()));
     editor.state.dirty = true;
-    editor.status(`Câmera salva no slot ${slot()}`);
+    editor.status(t('Câmera salva no slot {slot}', { slot: slot() }));
   };
   const load = () => {
     const stored = editor.state.vox.cameras.get(slot());
     const saved = stored && cameraFromDict(stored);
-    if (!saved) return editor.status(`O slot de câmera ${slot()} está vazio`, 'error');
+    if (!saved) return editor.status(t('O slot de câmera {slot} está vazio', { slot: slot() }), 'error');
     camera.restore(saved);
     syncModes();
-    editor.status(`Câmera do slot ${slot()} carregada`);
+    editor.status(t('Câmera do slot {slot} carregada', { slot: slot() }));
   };
   bindCameraDetails(camera);
   element('camera-save', HTMLButtonElement).addEventListener('click', save);
@@ -137,7 +138,7 @@ export function bindCameraPanel(editor: Editor, viewport: Viewport) {
     load,
     selectSlot(index: number) {
       slotSelect.value = String(index);
-      editor.status(`Slot de câmera ${index}`);
+      editor.status(t('Slot de câmera {slot}', { slot: index }));
     },
   };
 }

@@ -70,7 +70,7 @@ describe('writeVox -> parseVox', () => {
 
 describe('parseVox', () => {
   it('rejects files that are not .vox', () => {
-    expect(() => parseVox(new TextEncoder().encode('not a voxel file at all'))).toThrow('Not a MagicaVoxel');
+    expect(() => parseVox(new TextEncoder().encode('not a voxel file at all'))).toThrow('Não é um arquivo .vox do MagicaVoxel');
   });
 
   it('rejects truncated files', () => {

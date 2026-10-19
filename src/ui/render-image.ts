@@ -4,6 +4,7 @@ import { zipStore } from '../format/zip.ts';
 import type { ZipEntry } from '../format/zip.ts';
 import type { PathTracer, TraceView } from '../render/path-tracer/path-tracer.ts';
 import type { Viewport } from '../render/viewport.ts';
+import { t } from '../i18n/i18n.ts';
 import { bindButtonGroup, downloadBlob, element } from './dom.ts';
 import type { RenderSession } from './render-panel.ts';
 
@@ -16,8 +17,10 @@ class Cancelled extends Error {}
 
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 const toPng = (canvas: HTMLCanvasElement) =>
-  new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Falha ao gerar o PNG'))), 'image/png'));
+  new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error(t('Falha ao gerar o PNG')))), 'image/png'));
 const frameName = (index: number) => `frame-${String(index).padStart(4, '0')}.png`;
+/** `width×height`, with the frame count when there are several. */
+const imageSize = (frames: number, width: number, height: number) => (frames > 1 ? t('{frames} frames de {width}×{height}', { frames, width, height }) : `${width}×${height}`);
 
 /** `camera` turned by `degrees` about the vertical axis through `target`, roll and all. */
 function turned(camera: THREE.Camera, target: THREE.Vector3, degrees: number): THREE.Camera {
@@ -57,9 +60,8 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
   const frameCount = () => (kind === 'turntable' ? read(inputs.spinFrames) : kind === 'animation' ? Math.abs(read(inputs.animEnd) - read(inputs.animStart)) + 1 : 1);
   /** What the button will make: a fresh render, not a copy of the preview. */
   const describe = () => {
-    const frames = frameCount();
-    const what = frames > 1 ? `${frames} frames de ${read(inputs.width)}×${read(inputs.height)}` : `${read(inputs.width)}×${read(inputs.height)}`;
-    summary.value = `Calculada do zero, à parte da prévia: ${what} com ${read(inputs.samples)} amostras por pixel (a prévia vai até ${session.previewSamples()}).`;
+    const image = imageSize(frameCount(), read(inputs.width), read(inputs.height));
+    summary.value = t('Calculada do zero, à parte da prévia: {image} com {samples} amostras por pixel (a prévia vai até {preview}).', { image, samples: read(inputs.samples), preview: session.previewSamples() });
   };
   const sync = () => {
     showKind(kind);
@@ -79,7 +81,7 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
       if (job?.cancelled) throw new Cancelled();
       tracer.trace(viewAt(sample), size, true);
       progress.value = (frame + (sample + 1) / samples) / frames;
-      summary.value = `${frames > 1 ? `Frame ${frame + 1} de ${frames} · ` : ''}amostra ${sample + 1} de ${samples}`;
+      summary.value = frames > 1 ? t('Frame {frame} de {frames} · amostra {sample} de {samples}', { frame: frame + 1, frames, sample: sample + 1, samples }) : t('amostra {sample} de {samples}', { sample: sample + 1, samples });
     }
     tracer.present();
     return toPng(tracer.canvas);
@@ -97,7 +99,7 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
     const restoreFrame = state.frame;
     job = { cancelled: false };
     session.setBusy(true);
-    button.textContent = 'Cancelar';
+    button.textContent = t('Cancelar');
     progress.hidden = false;
     try {
       if (kind === 'photo') {
@@ -126,16 +128,15 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
         }
         downloadBlob(new Blob([zipStore(entries)], { type: 'application/zip' }), `${baseName()}-anim.zip`);
       }
-      const frames = frameCount();
-      editor.status(`Render final salvo: ${frames > 1 ? `${frames} frames de ` : ''}${size.width}×${size.height}, ${samples} amostras por pixel`);
+      editor.status(t('Render final salvo: {image}, {samples} amostras por pixel', { image: imageSize(frameCount(), size.width, size.height), samples }));
     } catch (error) {
-      if (error instanceof Cancelled) editor.status('Render final cancelado');
-      else editor.status(`Render final: ${error instanceof Error ? error.message : String(error)}`, 'error');
+      if (error instanceof Cancelled) editor.status(t('Render final cancelado'));
+      else editor.status(t('Render final: {error}', { error: error instanceof Error ? error.message : String(error) }), 'error');
     } finally {
       if (kind === 'animation') editor.setFrame(restoreFrame);
       job = null;
       session.setBusy(false);
-      button.textContent = 'Renderizar';
+      button.textContent = t('Renderizar');
       progress.hidden = true;
       progress.value = 0;
       describe();

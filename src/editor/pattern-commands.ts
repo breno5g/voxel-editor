@@ -2,6 +2,7 @@ import { createModel, EMPTY_VOXEL, PALETTE_SIZE, voxelIndex } from '../format/vo
 import type { Vec3, VoxModel } from '../format/vox.ts';
 import type { Axis } from '../format/rotation.ts';
 import { nearestColor } from '../format/sprite.ts';
+import { t } from '../i18n/i18n.ts';
 import { isUnder, parentMap } from '../scene/scene-tree.ts';
 import { STORES, transact } from './browser-store.ts';
 import type { Editor } from './editor.ts';
@@ -48,7 +49,7 @@ export function createPatternCommands(editor: Editor, models: ModelCommands, obj
   const { state } = editor;
 
   const requirePattern = () => {
-    if (!state.pattern) editor.status('Crie um padrão primeiro (da seleção, ou da biblioteca)', 'error');
+    if (!state.pattern) editor.status(t('Crie um padrão primeiro (da seleção, ou da biblioteca)'), 'error');
     return state.pattern;
   };
 
@@ -57,9 +58,9 @@ export function createPatternCommands(editor: Editor, models: ModelCommands, obj
     if (pattern) models.apply((model) => operation(model, pattern), message);
   };
   const commands = {
-    fractal: withPattern(fractal, 'Fractal com o padrão'),
-    mask: withPattern(mask, 'Modelo mascarado pelo padrão'),
-    tex: withPattern(texture, 'Modelo texturizado com o padrão'),
+    fractal: withPattern(fractal, t('Fractal com o padrão')),
+    mask: withPattern(mask, t('Modelo mascarado pelo padrão')),
+    tex: withPattern(texture, t('Modelo texturizado com o padrão')),
   };
   models.define('fractal', commands.fractal);
   models.define('mask', commands.mask);
@@ -73,13 +74,13 @@ export function createPatternCommands(editor: Editor, models: ModelCommands, obj
       if (state.mode === 'model') {
         const instance = editor.selectedInstance();
         const model = instance && state.vox.models[instance.model];
-        if (!model) return editor.status('Selecione um objeto primeiro', 'error');
+        if (!model) return editor.status(t('Selecione um objeto primeiro'), 'error');
         const selected = editor.selectionOf(model);
         const filled = selected ?? model.voxels.map((color) => (color === EMPTY_VOXEL ? 0 : 1));
         const bounds = selectionBounds(model.size, filled);
-        if (!bounds) return editor.status('Nada para virar padrão', 'error');
+        if (!bounds) return editor.status(t('Nada para virar padrão'), 'error');
         editor.setPattern(crop(model, bounds, (index) => filled[index] === 1));
-        return editor.status('Padrão criado da seleção');
+        return editor.status(t('Padrão criado da seleção'));
       }
       const parents = parentMap(state.vox);
       const cells = new Map<number, number>();
@@ -87,9 +88,9 @@ export function createPatternCommands(editor: Editor, models: ModelCommands, obj
         .filter((instance) => state.selection.some((id) => isUnder(parents, instance.transformId, id)))
         .forEach((instance) => worldCells(instance, state.vox.models).forEach((color, key) => cells.set(key, color)));
       const built = modelFromCells(cells);
-      if (!built) return editor.status('Selecione objetos para virar padrão', 'error');
+      if (!built) return editor.status(t('Selecione objetos para virar padrão'), 'error');
       editor.setPattern(built.model);
-      editor.status('Padrão criado dos objetos');
+      editor.status(t('Padrão criado dos objetos'));
     },
 
     /** Pattern mode `-`/`+`/`0`/`9`: a quarter turn of the pattern. */
@@ -106,7 +107,7 @@ export function createPatternCommands(editor: Editor, models: ModelCommands, obj
       if (!requirePattern()) return;
       const [x, y, z] = state.patternOffset;
       editor.setPatternOffset(delta ? [x + delta[0], y + delta[1], z + delta[2]] : [0, 0, 0]);
-      editor.status(`Padrão deslocado ${state.patternOffset.join(', ')}`);
+      editor.status(t('Padrão deslocado {offset}', { offset: state.patternOffset.join(', ') }));
     },
 
     /** `onewpatt`: the pattern as a new object, resting on the ground at `at` (or beside the scene). */
@@ -114,7 +115,7 @@ export function createPatternCommands(editor: Editor, models: ModelCommands, obj
       const pattern = requirePattern();
       if (!pattern) return;
       const corner: Vec3 | undefined = at && [at[0] - Math.floor(pattern.size[0] / 2), at[1], at[2]];
-      objects.importModels([{ size: [...pattern.size], voxels: pattern.voxels.slice() }], ['padrão'], corner);
+      objects.importModels([{ size: [...pattern.size], voxels: pattern.voxels.slice() }], [t('padrão')], corner);
     },
 
     async listPatterns(): Promise<string[]> {
@@ -128,25 +129,25 @@ export function createPatternCommands(editor: Editor, models: ModelCommands, obj
       if (!pattern || !key) return;
       const stored: StoredPattern = { name: key, size: [...pattern.size], voxels: pattern.voxels.slice(), palette: state.vox.palette.slice(), savedAt: Date.now() };
       await transact(STORES.patterns, 'readwrite', (store) => store.put(stored, key));
-      editor.status(`Padrão ${key} salvo`);
+      editor.status(t('Padrão {name} salvo', { name: key }));
     },
 
     /** `i_patt`, with MagicaVoxel's "Match": each colour becomes the nearest one of the current palette. */
     async loadPattern(name: string) {
       const stored: unknown = await transact(STORES.patterns, 'readonly', (store) => store.get(name));
-      if (!isStoredPattern(stored)) return editor.status(`Padrão ${name} não encontrado`, 'error');
+      if (!isStoredPattern(stored)) return editor.status(t('Padrão {name} não encontrado', { name }), 'error');
       const mapping = Uint8Array.from({ length: PALETTE_SIZE }, (_unused, index) => {
         if (index === EMPTY_VOXEL) return EMPTY_VOXEL;
         const offset = (index - 1) * 4;
         return nearestColor(state.vox.palette, stored.palette[offset], stored.palette[offset + 1], stored.palette[offset + 2]);
       });
       editor.setPattern({ size: [stored.size[0], stored.size[1], stored.size[2]], voxels: stored.voxels.map((color) => mapping[color]) });
-      editor.status(`Padrão ${name} carregado`);
+      editor.status(t('Padrão {name} carregado', { name }));
     },
 
     async deletePattern(name: string) {
       await transact(STORES.patterns, 'readwrite', (store) => store.delete(name));
-      editor.status(`Padrão ${name} apagado`);
+      editor.status(t('Padrão {name} apagado', { name }));
     },
   };
 }

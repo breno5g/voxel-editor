@@ -4,6 +4,7 @@ import { createDocument } from '../format/defaults.ts';
 import type { Axis } from '../format/rotation.ts';
 import { MAX_MODEL_SIZE } from '../format/vox.ts';
 import type { Dict, TransformKey, TransformNode, Vec3, VoxDocument, VoxModel } from '../format/vox.ts';
+import { t } from '../i18n/i18n.ts';
 import { clampFrame, DEFAULT_RANGE, formatRange, parseRange, RANGE_META_KEY } from '../scene/keyframes.ts';
 import type { FrameRange } from '../scene/keyframes.ts';
 import { evaluateScene, ROOT_ID } from '../scene/scene-graph.ts';
@@ -250,7 +251,7 @@ export function createEditor() {
     };
     apply(pending.map(([, recorded]) => recorded))();
     history.push({ undo: apply(edited), redo: apply(pending.map(([, recorded]) => recorded)) });
-    status('Edição sem key descartada (F5 grava a key antes de trocar de frame)', 'error');
+    status(t('Edição sem key descartada (F5 grava a key antes de trocar de frame)'), 'error');
   };
 
   const setFrame = (frame: number) => {
@@ -367,8 +368,8 @@ export function createEditor() {
 
     setMode(mode: Mode) {
       if (state.mode === mode) return;
-      if (mode === 'model' && state.selected === null) return status('Selecione um objeto para editar o modelo', 'error');
-      if (mode === 'model' && state.selected !== null && !isObject(state.vox, state.selected)) return status('Entre no grupo (Tab) para editar um dos seus objetos', 'error');
+      if (mode === 'model' && state.selected === null) return status(t('Selecione um objeto para editar o modelo'), 'error');
+      if (mode === 'model' && state.selected !== null && !isObject(state.vox, state.selected)) return status(t('Entre no grupo (Tab) para editar um dos seus objetos'), 'error');
       state.mode = mode;
       emit({ type: 'mode' });
     },
@@ -518,7 +519,7 @@ export function createEditor() {
     notePendingKeys(node: TransformNode, recorded: TransformKey[]) {
       if (state.autoKey || recorded.length <= 1 || recorded.some((key) => key.frame === state.frame)) return;
       if (!state.pendingKeys.has(node)) state.pendingKeys.set(node, recorded);
-      status('Edição sem key: F5 grava, trocar de frame descarta');
+      status(t('Edição sem key: F5 grava, trocar de frame descarta'));
     },
 
     /** F5 keeps the pending edits as keys. */

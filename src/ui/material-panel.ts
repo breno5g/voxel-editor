@@ -1,6 +1,7 @@
 import { MATERIAL_PARAMS, MATERIAL_TYPES, materialParam, materialType, MEDIA_TYPES } from '../editor/material-commands.ts';
 import type { MaterialCommands, MaterialParam } from '../editor/material-commands.ts';
 import type { Editor } from '../editor/editor.ts';
+import { t } from '../i18n/i18n.ts';
 import { bindButtonGroup, element } from './dom.ts';
 
 const PARAM_KEYS = Object.keys(MATERIAL_PARAMS).filter((key): key is MaterialParam => key in MATERIAL_PARAMS);
@@ -42,7 +43,7 @@ export function bindMaterialPanel(editor: Editor, materials: MaterialCommands): 
     const attrs = materials.materialOf(state.color);
     const type = materialType(attrs);
     const count = state.paletteSelection.length;
-    title.textContent = count > 1 ? `Material de ${count} cores (a cor ${state.color} mostrada)` : `Material da cor ${state.color}`;
+    title.textContent = count > 1 ? t('Material de {count} cores (a cor {color} mostrada)', { count, color: state.color }) : t('Material da cor {color}', { color: state.color });
     showType(type);
     rows.forEach(({ key, row, slider }) => {
       row.hidden = !MATERIAL_PARAMS[key].types.some((owner) => owner === type);

@@ -2,6 +2,7 @@ import type { Axis } from '../format/rotation.ts';
 import { cellOf, EMPTY_VOXEL, isInside, voxelIndex } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
 import { chunksTouching } from '../geometry/mesher.ts';
+import { t, tn } from '../i18n/i18n.ts';
 import type { ClientRect, Viewport } from '../render/viewport.ts';
 import { addScaled, AXES, alongAxes, axisOf, cellsBetween, centeredShape, colorRegion, faceRegion, lineCells, regionOutline, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
 import type { BrushMode, BrushType, Editor } from './editor.ts';
@@ -101,7 +102,7 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
   const beginResize = (object: { transformId: number; model: VoxModel }, clientX: number, clientY: number, twoSided: boolean) => {
     const face = viewport.boxFace(clientX, clientY, object.transformId);
     const drag = face && resizeDrag();
-    if (!face || !drag) return editor.status('Arraste uma face da moldura do modelo', 'error');
+    if (!face || !drag) return editor.status(t('Arraste uma face da moldura do modelo'), 'error');
     const { size } = object.model;
     const center: Vec3 = [size[0] / 2, size[1] / 2, size[2] / 2];
     center[face.axis] = face.side > 0 ? size[face.axis] : 0;
@@ -123,7 +124,7 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
     if (active.twoSided || active.side < 0) below[active.axis] = cells;
     if (active.twoSided || active.side > 0) above[active.axis] = cells;
     const size = active.drag.preview(below, above);
-    editor.status(`Tamanho ${size.join('×')}`);
+    editor.status(t('Tamanho {size}', { size: size.join('×') }));
   };
 
   /** The box marquee is the box brush selecting; every other stroke follows `b_mode`. */
@@ -361,12 +362,12 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
   /** Transform tool: grabs the selected voxels on the face under the pointer. */
   const beginMove = (object: { transformId: number; model: VoxModel }, clientX: number, clientY: number, oneAxis: boolean) => {
     const mask = editor.selectionOf(object.model);
-    if (!mask) return editor.status('Selecione voxels para mover (M ou N)', 'error');
+    if (!mask) return editor.status(t('Selecione voxels para mover (M ou N)'), 'error');
     const lifted: [number, number][] = [];
     mask.forEach((selected, index) => {
       if (selected && object.model.voxels[index] !== EMPTY_VOXEL) lifted.push([index, object.model.voxels[index]]);
     });
-    if (lifted.length === 0) return editor.status('Selecione voxels para mover (M ou N)', 'error');
+    if (lifted.length === 0) return editor.status(t('Selecione voxels para mover (M ou N)'), 'error');
     const hit = viewport.pick(clientX, clientY, object.transformId)?.hit;
     const axis = hit ? axisOf(hit.normal) : 2;
     const anchor: Target = hit ? { cell: hit.voxel, axis, plane: facePlane(hit.voxel, hit.normal, axis) } : { cell: [0, 0, 0], axis: 2, plane: 0 };
@@ -436,7 +437,7 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
     const model = state.vox.models[instance.model];
     const color = model.voxels[voxelIndex(model.size, pick.hit.voxel[0], pick.hit.voxel[1], pick.hit.voxel[2])];
     editor.setColor(color);
-    editor.status(`Cor ${color} selecionada`);
+    editor.status(t('Cor {color} selecionada', { color }));
   };
 
   return {
@@ -492,7 +493,7 @@ export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag:
       if (resizing) return dragResize(resizing, clientX, clientY);
       if (sizing) {
         editor.setVoxBrush({ size: sizing.size + Math.round((clientX - sizing.start) / PIXELS_PER_SIZE) });
-        return editor.status(`Pincel de ${state.voxBrush.size} voxel(s)`);
+        return editor.status(tn(state.voxBrush.size, 'Pincel de {n} voxel', 'Pincel de {n} voxels'));
       }
       if (state.brushType === 'resize') return viewport.showHover(null);
       if (codeBox) {

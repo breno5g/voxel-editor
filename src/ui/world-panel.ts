@@ -4,6 +4,7 @@ import type { ObjectCommands } from '../editor/object-commands.ts';
 import { isAxis } from '../format/rotation.ts';
 import type { Axis } from '../format/rotation.ts';
 import type { Vec3 } from '../format/vox.ts';
+import { t } from '../i18n/i18n.ts';
 import { bindButtonGroup, element } from './dom.ts';
 
 const SIDES = { '-1': -1, '0': 0, '1': 1 } as const;
@@ -87,7 +88,7 @@ export function bindWorldPanel(editor: Editor, commands: ObjectCommands): void {
     if (event.key !== 'Enter') return;
     const move = parseMove(moveField.value);
     if (move === 'ground') return commands.groundSelected();
-    if (!move) return editor.status('Mover: use eixo e passos, ex.: x 4 z -2, ou g', 'error');
+    if (!move) return editor.status(t('Mover: use eixo e passos, ex.: x 4 z -2, ou g'), 'error');
     commands.moveSelected(move);
   });
 

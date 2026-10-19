@@ -30,6 +30,7 @@
       </div>
       <span id="file-name" class="file-name"></span>
       <button id="fullscreen-toggle" type="button" aria-pressed="false" title="Tela cheia: Ctrl+N, Ctrl+T e Ctrl+W passam a chegar ao editor, como no MagicaVoxel">Tela cheia</button>
+      <select id="locale-picker" aria-label="Idioma"></select>
       <button id="open-help" type="button" title="Atalhos (?)">Atalhos</button>
       <span id="app-version" class="version"></span>
     </header>
@@ -111,7 +112,7 @@
               <button type="button" data-palette="saveAct" title="Salvar a paleta como .act">ACT</button>
             </div>
             <div class="segmented" role="group" aria-label="Paletas prontas">
-              <button type="button" data-palette="presetMv" title="Paleta padrão do MagicaVoxel">Padrão</button>
+              <button type="button" data-palette="presetMv" data-i18n="Padrão@default-palette" title="Paleta padrão do MagicaVoxel">Padrão</button>
               <button type="button" data-palette="presetHue" title="Paleta de tons por matiz">Tons</button>
               <button type="button" data-palette="presetGray" title="Rampa de cinza do branco ao preto (pal bw)">Cinza</button>
               <button type="button" data-palette="presetNew" title="Paleta nova: todas as cores em cinza (pal fill 75)">Nova</button>
@@ -146,7 +147,7 @@
         <div id="brush-types" class="stack" role="group" aria-label="Ação do pincel">
           <div class="segmented">
             <button type="button" data-value="attach" title="Adicionar voxels (T)">Adicionar</button>
-            <button type="button" data-value="erase" title="Apagar voxels (R)">Apagar</button>
+            <button type="button" data-value="erase" data-i18n="Apagar@erase" title="Apagar voxels (R)">Apagar</button>
             <button type="button" data-value="paint" title="Pintar voxels (G)">Pintar</button>
           </div>
           <div class="segmented">
@@ -176,7 +177,7 @@
             <button type="button" data-value="rotate" title="Girar: arraste na horizontal em torno do eixo da face; Shift encaixa de 15 em 15°; Enter aplica, Esc cancela">Girar</button>
           </div>
           <div class="control-row" id="wrap-options">
-            <span class="label">Espaço</span>
+            <span class="label" data-i18n="Espaço@spacing">Espaço</span>
             <div class="size-fields">
               <input id="wrap-x" type="number" min="0" max="256" aria-label="Espaço do wrap em X" />
               <input id="wrap-y" type="number" min="0" max="256" aria-label="Espaço do wrap em Y" />
@@ -283,7 +284,7 @@
           <button type="button" data-value="patt" title="Padrão (P): clique no chão para colocar o padrão atual como objeto">Padrão</button>
         </div>
         <div class="control-row" id="object-wrap-options">
-          <span class="label" id="object-wrap-label">Espaço</span>
+          <span class="label" id="object-wrap-label" data-i18n="Espaço@spacing">Espaço</span>
           <div class="size-fields" role="group" aria-labelledby="object-wrap-label">
             <input id="object-wrap-x" type="number" min="0" max="256" aria-label="Espaço do wrap em X" />
             <input id="object-wrap-y" type="number" min="0" max="256" aria-label="Espaço do wrap em Y" />
@@ -302,7 +303,7 @@
         </div>
         <div class="segmented" role="group" aria-label="Cópias especiais">
           <button type="button" data-world="copyRef" title="Copiar como referência: as cópias mostram os mesmos voxels (Ctrl+Shift+C)">Ref</button>
-          <button type="button" data-world="copyFrame" title="Copiar só o frame atual">Frame</button>
+          <button type="button" data-world="copyFrame" data-i18n="Frame@copy" title="Copiar só o frame atual">Frame</button>
           <button type="button" data-world="refToObject" title="Converter referência em cópia própria (Ctrl+T; Ctrl+Shift+T na cena toda)">Separar</button>
         </div>
       </section>

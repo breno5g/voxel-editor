@@ -1,4 +1,5 @@
 import { applyRows } from '../../format/rotation.ts';
+import { t } from '../../i18n/i18n.ts';
 import { EMPTY_VOXEL, modelPivot } from '../../format/vox.ts';
 import type { Vec3, VoxModel } from '../../format/vox.ts';
 import type { Instance } from '../../scene/scene-graph.ts';
@@ -24,7 +25,7 @@ export function bakeSceneVolume(instances: Instance[], models: VoxModel[]): Scen
   const origin: Vec3 = [Math.floor(bounds.low[0]) - VOLUME_MARGIN, Math.floor(bounds.low[1]) - VOLUME_MARGIN, Math.floor(bounds.low[2]) - VOLUME_MARGIN];
   const extent = (axis: number) => Math.max(1, Math.ceil(bounds.high[axis]) - origin[axis] + VOLUME_MARGIN);
   const size: Vec3 = [extent(0), extent(1), extent(2)];
-  if (size.some((axis) => axis > MAX_VOLUME_AXIS) || size[0] * size[1] * size[2] > MAX_VOLUME_CELLS) throw new Error(`Cena grande demais para renderizar (${size.join('×')})`);
+  if (size.some((axis) => axis > MAX_VOLUME_AXIS) || size[0] * size[1] * size[2] > MAX_VOLUME_CELLS) throw new Error(t('Cena grande demais para renderizar ({size})', { size: size.join('×') }));
   const voxels = new Uint8Array(size[0] * size[1] * size[2]);
   const brickSize: Vec3 = [Math.ceil(size[0] / BRICK), Math.ceil(size[1] / BRICK), Math.ceil(size[2] / BRICK)];
   const bricks = new Uint8Array(brickSize[0] * brickSize[1] * brickSize[2]);

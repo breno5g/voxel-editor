@@ -1,6 +1,7 @@
 import type { Editor } from '../editor/editor.ts';
 import type { PatternCommands } from '../editor/pattern-commands.ts';
 import { isoImage, ISO_OPTIONS } from '../format/voxel-images.ts';
+import { t } from '../i18n/i18n.ts';
 import { bindButtonGroup, element } from './dom.ts';
 
 /** MagicaVoxel's pattern panel: the current pattern, its source, and the pattern library. */
@@ -14,7 +15,7 @@ export function bindPatternPanel(editor: Editor, patterns: PatternCommands): voi
       await action();
       await refreshLibrary();
     } catch (error) {
-      editor.fail('Padrões', error);
+      editor.fail(t('Padrões'), error);
     }
   };
 
@@ -39,12 +40,12 @@ export function bindPatternPanel(editor: Editor, patterns: PatternCommands): voi
   element('pattern-rotate', HTMLButtonElement).addEventListener('click', () => patterns.rotatePattern(2, 1));
   element('pattern-load', HTMLButtonElement).addEventListener('click', () => library.value && void guarded(() => patterns.loadPattern(library.value))());
   element('pattern-save', HTMLButtonElement).addEventListener('click', () => {
-    if (!state.pattern) return editor.status('Crie um padrão primeiro (da seleção, ou da biblioteca)', 'error');
-    const name = window.prompt('Nome do padrão', library.value || 'padrão');
+    if (!state.pattern) return editor.status(t('Crie um padrão primeiro (da seleção, ou da biblioteca)'), 'error');
+    const name = window.prompt(t('Nome do padrão'), library.value || t('padrão@pattern'));
     if (name?.trim()) void guarded(() => patterns.savePattern(name))().then(() => (library.value = name.trim()));
   });
   element('pattern-delete', HTMLButtonElement).addEventListener('click', () => {
-    if (library.value && window.confirm(`Apagar o padrão ${library.value}?`)) void guarded(() => patterns.deletePattern(library.value))();
+    if (library.value && window.confirm(t('Apagar o padrão {name}?', { name: library.value }))) void guarded(() => patterns.deletePattern(library.value))();
   });
   const showColor = bindButtonGroup('pattern-color', (raw) => (raw === 'palette' ? true : raw === 'voxel' ? false : undefined), editor.setPatternUsesPalette);
 

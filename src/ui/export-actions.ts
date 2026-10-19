@@ -9,6 +9,7 @@ import type { VoxModel } from '../format/vox.ts';
 import { flatImage, isoImage, sliceImage } from '../format/voxel-images.ts';
 import type { RgbaImage } from '../format/voxel-images.ts';
 import { isUnder, parentMap } from '../scene/scene-tree.ts';
+import { t } from '../i18n/i18n.ts';
 import { downloadBlob, element } from './dom.ts';
 
 const GRID_FORMATS = ['vox', 'qb', 'xraw', 'slab'] as const;
@@ -20,7 +21,7 @@ const isFormat = (format: string): format is ExportFormat => isMesh(format) || [
 async function pngBlob({ width, height, pixels }: RgbaImage): Promise<Blob> {
   const canvas = new OffscreenCanvas(width, height);
   const context = canvas.getContext('2d');
-  if (!context) throw new Error('Canvas 2D indisponível');
+  if (!context) throw new Error(t('Canvas 2D indisponível'));
   context.putImageData(new ImageData(pixels, width, height), 0, 0);
   return canvas.convertToBlob({ type: 'image/png' });
 }
@@ -75,7 +76,7 @@ export function bindExportActions(editor: Editor): void {
 
   const filesFor = async (chosen: ExportFormat, base: string): Promise<ExportFile[] | Blob> => {
     const items = objects();
-    if (items.length === 0) throw new Error('Nada para exportar');
+    if (items.length === 0) throw new Error(t('Nada para exportar'));
     const { palette } = state.vox;
     if (isMesh(chosen)) {
       const files = exportMesh(chosen, base, items, palette, { ...DEFAULT_MESH_OPTIONS[chosen], scale: scale.valueAsNumber || DEFAULT_MESH_OPTIONS[chosen].scale, axis: axis.value === 'XZ-Y' ? 'XZ-Y' : ('XYZ' satisfies ExportAxis) });
@@ -84,9 +85,9 @@ export function bindExportActions(editor: Editor): void {
       return [...files, { name: `${base}.png`, data: texture, type: 'image/png' }];
     }
     if (chosen === 'qb') return [{ name: `${base}.qb`, data: encodeQb(placed(items), palette), type: 'application/octet-stream' }];
-    if (chosen === 'vox') return [{ name: `${base}-objetos.vox`, data: writeVox(documentFromModels(placed(items), palette)), type: 'application/octet-stream' }];
+    if (chosen === 'vox') return [{ name: `${t('{base}-objetos', { base })}.vox`, data: writeVox(documentFromModels(placed(items), palette)), type: 'application/octet-stream' }];
     const model = mergedModel(items);
-    if (!model) throw new Error('Exporte um objeto só em espaço local, ou a cena em espaço do mundo');
+    if (!model) throw new Error(t('Exporte um objeto só em espaço local, ou a cena em espaço do mundo'));
     if (chosen === 'xraw') return [{ name: `${base}.xraw`, data: encodeXraw(model, palette), type: 'application/octet-stream' }];
     if (chosen === 'slab') return [{ name: `${base}-slab6.vox`, data: encodeSlab(model, palette), type: 'application/octet-stream' }];
     const image = chosen === 'iso' ? isoImage(model, palette) : chosen === '2d' ? flatImage(model, palette) : sliceImage(model, palette);
@@ -104,9 +105,9 @@ export function bindExportActions(editor: Editor): void {
       } else {
         result.forEach((file) => downloadBlob(new Blob([file.data], { type: file.type }), file.name));
       }
-      editor.status(`Exportado como ${chosen.toUpperCase()}`);
+      editor.status(t('Exportado como {format}', { format: chosen.toUpperCase() }));
     } catch (error) {
-      editor.fail('Falha ao exportar', error);
+      editor.fail(t('Falha ao exportar'), error);
     }
   };
 

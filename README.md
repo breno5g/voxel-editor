@@ -2,7 +2,7 @@
 
 A browser-based voxel editor with animation, built for Linux. It reads and writes [MagicaVoxel](https://ephtracy.github.io/)'s `.vox` format, including the animation keys the [public spec](https://github.com/ephtracy/voxel-model) leaves out, and reproduces MagicaVoxel 0.99.7's shortcuts, panels and path tracer.
 
-The format and the animation evaluation come from reverse engineering the binary, documented in [`docs/magicavoxel-re.md`](docs/magicavoxel-re.md). The road to 1:1 parity is tracked in [`docs/roadmap-v1.md`](docs/roadmap-v1.md). Both documents, like the app's interface, are in Brazilian Portuguese.
+The format and the animation evaluation come from reverse engineering the binary, documented in [`docs/magicavoxel-re.md`](docs/magicavoxel-re.md). The road to 1:1 parity is tracked in [`docs/roadmap-v1.md`](docs/roadmap-v1.md). Both documents are in Brazilian Portuguese.
 
 > An independent project, not affiliated with MagicaVoxel or its author. No MagicaVoxel code or binaries are distributed here.
 
@@ -21,10 +21,11 @@ The format and the animation evaluation come from reverse engineering the binary
 - **Path tracer:** progressive, in WebGL2 (`F2`), with sun, atmospheric sky and `.hdr` IBL, fog, media with SSS, GGX with MIS, area lights on emissive faces, depth of field, bloom and denoising. Exports stills, turntables and animations.
 - **Import/export:** `obj`, `ply`, `mc`, `qb`, `xraw`, `slab`, `iso`, `.png` sprites, sprite sheets and more.
 - **In-browser projects:** a project list in IndexedDB, plus autosave every 3 s with recovery on reopen.
+- **Interface in English, Spanish and Brazilian Portuguese:** follows the browser language; the picker in the toolbar switches it.
 
 ## Getting started
 
-Requires Node 22+, pnpm and a browser with WebGL2. In Chromium, the **Tela cheia** (fullscreen) button uses the Keyboard Lock API so `Ctrl+N`, `Ctrl+T` and `Ctrl+W` reach the editor.
+Requires Node 22+, pnpm and a browser with WebGL2. In Chromium, the **Fullscreen** button uses the Keyboard Lock API so `Ctrl+N`, `Ctrl+T` and `Ctrl+W` reach the editor.
 
 ```sh
 pnpm install
@@ -34,15 +35,15 @@ pnpm build      # typecheck + production build into dist/
 
 ## Usage
 
-Shortcuts follow MagicaVoxel 0.99.7's `config/hotkey.txt`. The **Atalhos** (shortcuts, `?`) button lists them all inside the app.
+Shortcuts follow MagicaVoxel 0.99.7's `config/hotkey.txt`. The **Shortcuts** (`?`) button lists them all inside the app.
 
-The editor has two modes. **Modelo** (Model) edits the voxels of the selected object, with the others dimmed in the background. **Mundo** (World) arranges and animates objects. Switch with `Tab` (viewport focused), the buttons at the top, or a double click: on an object it enters the model, on empty space it returns to the world.
+The editor has two modes. **Model** edits the voxels of the selected object, with the others dimmed in the background. **World** arranges and animates objects. Switch with `Tab` (viewport focused), the buttons at the top, or a double click: on an object it enters the model, on empty space it returns to the world.
 
 To animate:
 
 1. Draw in Model mode.
 2. Go to another frame and press `F5`. In Model mode this creates a model frame, an editable copy (`O` toggles onion skin). In World mode it creates a position key: move with the arrow keys or by dragging, rotate with `+`/`-`.
-3. Save with **Salvar** (`.vox`, opens in MagicaVoxel) or export with **Sprite sheet** (a PNG of the frame range).
+3. Save with **Save** (`.vox`, opens in MagicaVoxel) or export with **Sprite sheet** (a PNG of the frame range).
 
 ### Main shortcuts
 
@@ -69,7 +70,7 @@ To animate:
 | Undo / redo | `Ctrl+Z` / `Ctrl+Y` |
 | New / open / save / save as | `Ctrl+P` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` (or drop a `.vox`) |
 
-- The **Pincel** (brush) panel on the left holds each mode's options and the region actions: eyedropper, remove and replace region.
+- The **Brush** panel on the left holds each mode's options and the region actions: eyedropper, remove and replace region.
 - The panel on the right renames, resizes (every model frame; the world position is kept), rotates, mirrors, duplicates and deletes the selected object. In the list, `●`/`◌` shows/hides and `◆` marks animated objects.
 - Every edit, palette changes included, goes into undo.
 
@@ -93,6 +94,7 @@ src/render/       three.js viewport, cameras, palette-texture material, mesh cac
 src/render/path-tracer/  WebGL2 path tracer: scene volume, materials, emitters, IBL
 src/editor/       state and events, history, tools, model, world, palette and animation commands
 src/ui/           one module per panel
+src/i18n/         t()/tn() and the catalog: Portuguese source text to English and Spanish, by area
 tools/vox_anim.py Python reference implementation of the parser and animation evaluation
 ```
 

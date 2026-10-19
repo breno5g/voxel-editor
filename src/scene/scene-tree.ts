@@ -1,6 +1,7 @@
 import { applyRows, transposeRows } from '../format/rotation.ts';
 import { cloneModel, modelPivot } from '../format/vox.ts';
 import type { GroupNode, SceneNode, Vec3, VoxDocument, VoxModel } from '../format/vox.ts';
+import { t } from '../i18n/i18n.ts';
 import { evaluateTransform, isLooping } from './keyframes.ts';
 import { compose, IDENTITY_POSE, ROOT_ID } from './scene-graph.ts';
 import type { Instance, Pose } from './scene-graph.ts';
@@ -117,7 +118,7 @@ export function cloneSubtree(scene: VoxDocument, rootId: number, shareModels: bo
     const node = scene.nodes[id];
     const slot = nodes.length;
     nodes.push(node);
-    if (path.has(id)) throw new Error(`O nó ${id} contém a si mesmo`);
+    if (path.has(id)) throw new Error(t('O nó {node} contém a si mesmo', { node: id }));
     const inner = new Set(path).add(id);
     if (node.kind === 'transform') {
       nodes[slot] = { ...node, attrs: new Map(node.attrs), keys: node.keys.map((key) => ({ ...key })), child: visit(node.child, inner) };

@@ -1,5 +1,6 @@
 import { parseVox } from '../format/vox-reader.ts';
 import { writeVox } from '../format/vox-writer.ts';
+import { t } from '../i18n/i18n.ts';
 import { isSnapshot, STORES, transact } from './browser-store.ts';
 import type { Editor } from './editor.ts';
 
@@ -23,14 +24,14 @@ export function createProjectStore(editor: Editor) {
       const key = keyOf(name);
       await put(key, writeVox(editor.savedDocument()));
       editor.markSaved(key);
-      editor.status(`${key} salvo no navegador`);
+      editor.status(t('{file} salvo no navegador', { file: key }));
     },
 
     async open(name: string) {
       const snapshot: unknown = await transact(STORES.projects, 'readonly', (store) => store.get(name));
-      if (!isSnapshot(snapshot)) return editor.status(`Projeto ${name} não encontrado`, 'error');
+      if (!isSnapshot(snapshot)) return editor.status(t('Projeto {name} não encontrado', { name }), 'error');
       editor.load(parseVox(snapshot.bytes), snapshot.fileName);
-      editor.status(`${snapshot.fileName} aberto`);
+      editor.status(t('{file} aberto', { file: snapshot.fileName }));
     },
 
     /** MagicaVoxel `dup`: a copy of project `name` as `name-copia`. */
@@ -39,12 +40,12 @@ export function createProjectStore(editor: Editor) {
       if (!isSnapshot(snapshot)) return;
       const copy = keyOf(`${name.replace(/\.vox$/i, '')}-copia`);
       await put(copy, snapshot.bytes);
-      editor.status(`${copy} criado`);
+      editor.status(t('{file} criado', { file: copy }));
     },
 
     async remove(name: string) {
       await transact(STORES.projects, 'readwrite', (store) => store.delete(name));
-      editor.status(`${name} apagado do navegador`);
+      editor.status(t('{file} apagado do navegador', { file: name }));
     },
   };
 }
