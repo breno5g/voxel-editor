@@ -37,6 +37,8 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
   const samplesLabel = element('render-samples', HTMLOutputElement);
   const shadowsCheck = element('render-shadows', HTMLInputElement);
   const bloomCheck = element('render-bloom-toggle', HTMLInputElement);
+  const translucentCheck = element('render-translucent-shadows', HTMLInputElement);
+  const antialiasCheck = element('render-antialias', HTMLInputElement);
   const shapeSelect = element('render-shape', HTMLSelectElement);
   const fixFocusCheck = element('render-fix-focus', HTMLInputElement);
   const focusInput = element('render-focus', HTMLInputElement);
@@ -141,8 +143,14 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
 
   toggleButton.addEventListener('click', toggle);
   /** MagicaVoxel keeps these out of the file: they last for the session. */
-  const options = (): TraceOptions => ({ shadows: shadowsCheck.checked, shape: VOXEL_SHAPES.find((shape) => shape === shapeSelect.value) ?? 'cube', bloom: bloomCheck.checked });
-  for (const control of [shadowsCheck, bloomCheck, shapeSelect]) {
+  const options = (): TraceOptions => ({
+    shadows: shadowsCheck.checked,
+    translucentShadows: translucentCheck.checked,
+    antialias: antialiasCheck.checked,
+    shape: VOXEL_SHAPES.find((shape) => shape === shapeSelect.value) ?? 'cube',
+    bloom: bloomCheck.checked,
+  });
+  for (const control of [shadowsCheck, translucentCheck, antialiasCheck, bloomCheck, shapeSelect]) {
     control.addEventListener('change', () => {
       tracer?.setOptions(options());
       requestFrame();

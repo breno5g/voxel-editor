@@ -12,7 +12,7 @@ import { BRICK } from './scene-volume.ts';
  * Alpha is the pixel's scene coverage: primary rays that escape write 0 when the background is a flat
  * colour or transparent, and the display pass composites.
  */
-export const PATH_TRACE_FRAGMENT = `#version 300 es
+export const pathTraceFragment = (shape: number) => `#version 300 es
 precision highp float;
 precision highp int;
 precision highp usampler3D;
@@ -82,8 +82,13 @@ uniform int u_specularBounces;
 uniform int u_scatterBounces;
 uniform float u_energy;
 uniform bool u_shadows;
-/* MagicaVoxel \`pt_prim\` (numbered as VOXEL_SHAPES) and \`pt_cell\`, the share of its cell a voxel fills. */
-uniform int u_shape;
+/** \`pt_tr\`: glass tints the sunlight through it instead of blocking it. */
+uniform bool u_translucentShadows;
+/** \`pt_b_aa\`: jitter each sample inside its pixel. */
+uniform bool u_antialias;
+/* MagicaVoxel \`pt_prim\` (numbered as VOXEL_SHAPES; one program per shape keeps other shapes' work out of the
+   DDA loop) and \`pt_cell\`, the share of its cell a voxel fills. */
+const int SHAPE = ${shape};
 uniform float u_cell;
 
 out vec4 o_color;
@@ -248,9 +253,9 @@ float cylinderHit(vec3 origin, vec3 direction, vec3 center, float radius, float 
 float primitiveHit(vec3 origin, vec3 direction, vec3 inverse, ivec3 cell, out vec3 normal) {
   vec3 center = vec3(cell) + 0.5;
   float extent = 0.5 * u_cell;
-  if (u_shape == 4) return sphereHit(origin, direction, center, extent, normal);
-  if (u_shape == 5) return cylinderHit(origin, direction, center, extent, center.z - extent, center.z + extent, normal);
-  if (u_shape == 1) {
+  if (SHAPE == 4) return sphereHit(origin, direction, center, extent, normal);
+  if (SHAPE == 5) return cylinderHit(origin, direction, center, extent, center.z - extent, center.z + extent, normal);
+  if (SHAPE == 1) {
     float stud = solid(cell + ivec3(0, 0, 1)) ? 0.0 : 0.2 * u_cell;
     vec3 studNormal;
     float body = boxHit(origin, inverse, center - extent, center + vec3(extent, extent, extent - stud), normal);
@@ -279,8 +284,8 @@ Hit traceVolume(vec3 origin, vec3 direction) {
   float tExit = min(tFar.x, min(tFar.y, tFar.z));
   if (tEnter >= tExit) return hit;
 
-  bool fullCubes = u_shape == 0 && u_cell >= 1.0;
-  bool smoothShape = u_shape == 2 || u_shape == 3;
+  bool fullCubes = SHAPE == 0 && u_cell >= 1.0;
+  bool smoothShape = SHAPE == 2 || SHAPE == 3;
   ivec3 stepDirection = ivec3(sign(direction));
   vec3 tDelta = abs(inverse);
   float t = tEnter;
@@ -388,8 +393,24 @@ Surface traceScene(vec3 origin, vec3 direction) {
   return surface;
 }
 
-bool occluded(vec3 origin, vec3 direction) {
-  return traceScene(origin, direction).hit;
+const int MAX_SHADOW_LAYERS = 8;
+
+/** How much sunlight gets from \`origin\` along \`direction\`: none past opaque voxels, tinted through glass. */
+vec3 sunlightThrough(vec3 origin, vec3 direction) {
+  if (!u_shadows) return vec3(1.0);
+  vec3 transmittance = vec3(1.0);
+  for (int layer = 0; layer < MAX_SHADOW_LAYERS; layer++) {
+    Surface surface = traceScene(origin, direction);
+    if (!surface.hit) return transmittance;
+    if (!u_translucentShadows || surface.ground) return vec3(0.0);
+    vec4 shape = texelFetch(u_materials, ivec2(int(surface.color), 0), 0);
+    int kind = int(shape.x + 0.5);
+    float transparency = kind == 2 || kind == 4 ? texelFetch(u_materials, ivec2(int(surface.color), 1), 0).x : 0.0;
+    if (transparency <= 0.0) return vec3(0.0);
+    transmittance *= transparency * pow(texelFetch(u_palette, ivec2(int(surface.color), 0), 0).rgb, vec3(2.2));
+    origin = surface.position + direction * 2e-3 * max(max(u_scale.x, u_scale.y), max(u_scale.z, 1.0));
+  }
+  return vec3(0.0);
 }
 
 /** Distance (in voxels) from a point on a voxel face to the nearest border of that face lying on a geometric edge. */
@@ -466,7 +487,8 @@ void main() {
   random();
   vec3 origin;
   vec3 direction;
-  cameraRay(gl_FragCoord.xy - 0.5 + vec2(random(), random()), origin, direction);
+  vec2 jitter = vec2(random(), random());
+  cameraRay(gl_FragCoord.xy - 0.5 + (u_antialias ? jitter : vec2(0.5)), origin, direction);
 
   vec3 radiance = vec3(0.0);
   vec3 throughput = vec3(1.0);
@@ -483,7 +505,7 @@ void main() {
         scatter++;
         origin += direction * fogDistance;
         throughput *= u_fogColor;
-        if (!u_shadows || !occluded(origin, u_sunDirection)) radiance += throughput * u_sunRadiance * PI * phaseHG(dot(direction, u_sunDirection), u_fogPhase) * 4.0 * PI;
+        radiance += throughput * sunlightThrough(origin, u_sunDirection) * u_sunRadiance * PI * phaseHG(dot(direction, u_sunDirection), u_fogPhase) * 4.0 * PI;
         direction = henyeyGreenstein(direction, u_fogPhase);
         showSun = false;
         continue;
@@ -515,7 +537,7 @@ void main() {
       extra = texelFetch(u_materials, ivec2(int(surface.color), 1), 0);
     }
     vec3 world = surface.position / u_scale;
-    bool fullCubes = u_shape == 0 && u_cell >= 1.0;
+    bool fullCubes = SHAPE == 0 && u_cell >= 1.0;
     if (u_edges && fullCubes && !surface.ground && edgeDistance(surface.cell, normal, (surface.position - u_origin) / u_scale) < u_edgeWidth * 0.5) albedo = u_edgeColor;
     if (u_grid && (surface.ground || !u_gridGroundOnly)) {
       vec2 plane = abs(normal.x) > 0.5 ? world.yz : abs(normal.y) > 0.5 ? world.xz : world.xy;
@@ -530,7 +552,7 @@ void main() {
     radiance += throughput * albedo * extra.y;
 
     /* Smooth surfaces sit on 8-bit density, so rays leave them with a wider gap. */
-    float bias = (u_shape == 2 || u_shape == 3 ? 0.05 : 1e-3) * max(max(u_scale.x, u_scale.y), max(u_scale.z, 1.0));
+    float bias = (SHAPE == 2 || SHAPE == 3 ? 0.05 : 1e-3) * max(max(u_scale.x, u_scale.y), max(u_scale.z, 1.0));
     bool entering = dot(direction, normal) < 0.0;
     vec3 facing = entering ? normal : -normal;
     // ponytail: media voxels (clouds) pass light through with probability 1 - density instead of a real volume walk.
@@ -569,7 +591,7 @@ void main() {
     origin = surface.position + facing * bias;
     vec3 toSun = cone(u_sunDirection, u_sunCos);
     float cosSun = dot(toSun, facing);
-    if (cosSun > 0.0 && (!u_shadows || !occluded(origin, toSun))) radiance += throughput * albedo * u_sunRadiance * cosSun;
+    if (cosSun > 0.0) radiance += throughput * albedo * sunlightThrough(origin, toSun) * u_sunRadiance * cosSun;
     if (diffuse >= u_diffuseBounces) break;
     diffuse++;
     throughput *= albedo;

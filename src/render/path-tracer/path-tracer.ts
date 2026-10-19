@@ -6,7 +6,7 @@ import type { Vec3 } from '../../format/vox.ts';
 import { linkFullScreenProgram } from '../gl-program.ts';
 import type { HdrImage } from './hdr-image.ts';
 import { MATERIAL_ROWS } from './material-table.ts';
-import { BLOOM_BLUR_FRAGMENT, BLOOM_DOWNSAMPLE, BLOOM_EXTRACT_FRAGMENT, DISPLAY_FRAGMENT, PATH_TRACE_FRAGMENT } from './path-trace-shader.ts';
+import { BLOOM_BLUR_FRAGMENT, BLOOM_DOWNSAMPLE, BLOOM_EXTRACT_FRAGMENT, DISPLAY_FRAGMENT, pathTraceFragment } from './path-trace-shader.ts';
 import { dilateBricks, shapeDensity } from './scene-volume.ts';
 import type { SceneVolume } from './scene-volume.ts';
 
@@ -14,7 +14,7 @@ export type PathTracer = ReturnType<typeof createPathTracer>;
 /** The camera to trace from and the distance along its view where the lens focuses. */
 export type TraceView = { camera: THREE.Camera; focusDistance: number };
 /** Options that only live while rendering (MagicaVoxel keeps them out of the file). */
-export type TraceOptions = { shadows: boolean; shape: VoxelShape; bloom: boolean };
+export type TraceOptions = { shadows: boolean; translucentShadows: boolean; antialias: boolean; shape: VoxelShape; bloom: boolean };
 /** MagicaVoxel's `pt_prim`: how each voxel is drawn. */
 export const VOXEL_SHAPES = ['cube', 'lego', 'mc', 'clay', 'sphr', 'cyli'] as const;
 export type VoxelShape = (typeof VOXEL_SHAPES)[number];
@@ -52,7 +52,13 @@ export function createPathTracer(container: HTMLElement) {
   if (!gl) throw new Error('Este navegador não tem WebGL2 para o renderizador');
   if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('A GPU não grava texturas float (EXT_color_buffer_float), que o renderizador usa');
 
-  const traceProgram = linkFullScreenProgram(gl, PATH_TRACE_FRAGMENT);
+  const tracePrograms = new Map<VoxelShape, WebGLProgram>();
+  const traceProgramFor = (shape: VoxelShape) => {
+    const program = tracePrograms.get(shape) ?? linkFullScreenProgram(gl, pathTraceFragment(VOXEL_SHAPES.indexOf(shape)));
+    tracePrograms.set(shape, program);
+    return program;
+  };
+  let traceProgram = traceProgramFor('cube');
   const displayProgram = linkFullScreenProgram(gl, DISPLAY_FRAGMENT);
   const extractProgram = linkFullScreenProgram(gl, BLOOM_EXTRACT_FRAGMENT);
   const blurProgram = linkFullScreenProgram(gl, BLOOM_BLUR_FRAGMENT);
@@ -135,7 +141,7 @@ export function createPathTracer(container: HTMLElement) {
 
   let volume: SceneVolume | null = null;
   let settings: RenderSettings | null = null;
-  let options: TraceOptions = { shadows: true, shape: 'cube', bloom: false };
+  let options: TraceOptions = { shadows: true, translucentShadows: true, antialias: true, shape: 'cube', bloom: false };
   let hasIbl = false;
   let samples = 0;
   let current = 0;
@@ -340,6 +346,7 @@ export function createPathTracer(container: HTMLElement) {
         resize(nextWidth, nextHeight);
         reset();
       }
+      traceProgram = traceProgramFor(options.shape);
       gl.useProgram(traceProgram);
       const viewKey = applyCamera(view, settings.lens);
       if (viewKey !== lastView && !moving) reset();
@@ -347,7 +354,8 @@ export function createPathTracer(container: HTMLElement) {
       if (samples >= MAX_SAMPLES) return;
       applySettings(settings);
       gl.uniform1i(at(traceProgram, 'u_shadows'), Number(options.shadows));
-      gl.uniform1i(at(traceProgram, 'u_shape'), VOXEL_SHAPES.indexOf(options.shape));
+      gl.uniform1i(at(traceProgram, 'u_translucentShadows'), Number(options.translucentShadows));
+      gl.uniform1i(at(traceProgram, 'u_antialias'), Number(options.antialias));
       gl.uniform1f(at(traceProgram, 'u_cell'), Math.min(Math.max(settings.show.cell, 0.01), 1));
       const previous = current;
       current = 1 - current;
