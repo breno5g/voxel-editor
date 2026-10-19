@@ -64,7 +64,7 @@ export function createObjectCommands(editor: Editor) {
 
   const hasKeyAt = (keys: { frame: number }[]) => keys.some((key) => key.frame === state.frame);
 
-  const removeKey = (node: { keys: { frame: number }[] }, label: string) => {
+  const dropKey = (node: { keys: { frame: number }[] }, label: string) => {
     if (node.keys.length <= 1) return editor.status(`O objeto precisa de pelo menos uma ${label}`, 'error');
     if (!hasKeyAt(node.keys)) return editor.status(`Nenhuma ${label} no frame ${state.frame}`, 'error');
     commitKeys(node, removeKeyAt(node.keys, state.frame), `${label} removida do frame ${state.frame}`);
@@ -75,7 +75,53 @@ export function createObjectCommands(editor: Editor) {
     else attrs.set(key, value);
   };
 
+  const addTransformKey = () => {
+    const selected = selection();
+    if (!selected) return;
+    const { transform } = selected;
+    if (hasKeyAt(transform.keys)) return editor.status(`Já existe key de posição no frame ${state.frame}`, 'error');
+    const current = evaluateTransform(transform.keys, state.frame, isLooping(transform.attrs));
+    commitKeys(transform, upsertKey(transform.keys, { frame: state.frame, ...current }), `Key de posição no frame ${state.frame}`);
+  };
+
+  /** Duplicates the model on screen into a new frame, ready to be edited (sprite-style animation). */
+  const addModelFrame = () => {
+    const selected = selection();
+    if (!selected) return;
+    const { shape, model } = selected;
+    if (hasKeyAt(shape.keys)) return editor.status(`Já existe frame de modelo no frame ${state.frame}`, 'error');
+    state.vox.models.push(cloneModel(state.vox.models[model]));
+    commitKeys(shape, upsertKey(shape.keys, { frame: state.frame, model: state.vox.models.length - 1 }), `Frame de modelo no frame ${state.frame}`);
+  };
+
+  const removeTransformKey = () => {
+    const selected = selection();
+    if (selected) dropKey(selected.transform, 'key de posição');
+  };
+
+  const removeModelFrame = () => {
+    const selected = selection();
+    if (selected) dropKey(selected.shape, 'frame de modelo');
+  };
+
   return {
+    addTransformKey,
+    addModelFrame,
+    removeTransformKey,
+    removeModelFrame,
+
+    /** MagicaVoxel `aadd` (F5): the editor on top decides the track, as in `***REMOVED***`. */
+    addKey() {
+      if (state.mode === 'model') addModelFrame();
+      else addTransformKey();
+    },
+
+    /** MagicaVoxel `adel` (F6). */
+    removeKey() {
+      if (state.mode === 'model') removeModelFrame();
+      else removeTransformKey();
+    },
+
     moveSelected(delta: Vec3) {
       changeTransform((current) => ({ ...current, translation: add(current.translation, delta) }));
     },
@@ -88,35 +134,6 @@ export function createObjectCommands(editor: Editor) {
       changeTransform((current) => ({ ...current, rotation: mirrorRotation(current.rotation, axis) }), 'Objeto espelhado');
     },
 
-    addTransformKey() {
-      const selected = selection();
-      if (!selected) return;
-      const { transform } = selected;
-      if (hasKeyAt(transform.keys)) return editor.status(`Já existe key de posição no frame ${state.frame}`, 'error');
-      const current = evaluateTransform(transform.keys, state.frame, isLooping(transform.attrs));
-      commitKeys(transform, upsertKey(transform.keys, { frame: state.frame, ...current }), `Key de posição no frame ${state.frame}`);
-    },
-
-    removeTransformKey() {
-      const selected = selection();
-      if (selected) removeKey(selected.transform, 'key de posição');
-    },
-
-    /** Duplicates the model on screen into a new frame, ready to be edited (sprite-style animation). */
-    addModelFrame() {
-      const selected = selection();
-      if (!selected) return;
-      const { shape, model } = selected;
-      if (hasKeyAt(shape.keys)) return editor.status(`Já existe frame de modelo no frame ${state.frame}`, 'error');
-      state.vox.models.push(cloneModel(state.vox.models[model]));
-      commitKeys(shape, upsertKey(shape.keys, { frame: state.frame, model: state.vox.models.length - 1 }), `Frame de modelo no frame ${state.frame}`);
-    },
-
-    removeModelFrame() {
-      const selected = selection();
-      if (selected) removeKey(selected.shape, 'frame de modelo');
-    },
-
     toggleLoop(track: 'transform' | 'shape') {
       const selected = selection();
       if (!selected) return;
@@ -126,11 +143,11 @@ export function createObjectCommands(editor: Editor) {
       change(() => setAttr(attrs, '_loop', after), () => setAttr(attrs, '_loop', before));
     },
 
-    /** Next/previous key of the selected object across both tracks; `toEdge` jumps to the first/last. */
+    /** MagicaVoxel `astep key`: next/previous key of the mode's track; `toEdge` jumps to the first/last. */
     stepKey(direction: 1 | -1, toEdge = false) {
       const selected = selection();
       if (!selected) return;
-      const frames = [...selected.transform.keys, ...selected.shape.keys].map((key) => key.frame);
+      const frames = selected[state.mode === 'model' ? 'shape' : 'transform'].keys.map((key) => key.frame);
       const edge = direction > 0 ? Math.max(...frames) : Math.min(...frames);
       const target = toEdge ? edge : adjacentKeyFrame(frames, state.frame, direction);
       if (target !== null) editor.setFrame(target);

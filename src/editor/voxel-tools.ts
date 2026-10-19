@@ -37,33 +37,32 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
     return instance && state.vox.models[instance.model];
   };
 
+  /** Brushes only reach the edited object: other objects are background in model mode. */
   const targetAt = (clientX: number, clientY: number): Target | null => {
-    const { tool, selected } = state;
-    const pick = viewport.pick(clientX, clientY);
-    const model = pick && modelOf(pick.transformId);
-    if (pick && model) {
-      const { voxel, normal } = pick.hit;
-      if (tool !== 'attach') return { transformId: pick.transformId, model, cell: voxel };
-      const cell: Vec3 = [voxel[0] + normal[0], voxel[1] + normal[1], voxel[2] + normal[2]];
-      return isZero(normal) || !isInside(model.size, cell) ? null : { transformId: pick.transformId, model, cell };
+    const { brushType, selected } = state;
+    const model = selected === null ? undefined : modelOf(selected);
+    if (selected === null || !model) return null;
+    const hit = viewport.pick(clientX, clientY, selected)?.hit;
+    if (hit) {
+      if (brushType !== 'attach') return { transformId: selected, model, cell: hit.voxel };
+      const cell: Vec3 = [hit.voxel[0] + hit.normal[0], hit.voxel[1] + hit.normal[1], hit.voxel[2] + hit.normal[2]];
+      return isZero(hit.normal) || !isInside(model.size, cell) ? null : { transformId: selected, model, cell };
     }
-    if (tool !== 'attach' || selected === null) return null;
-    const selectedModel = modelOf(selected);
-    const cell = selectedModel && viewport.floorCell(clientX, clientY, selected);
-    return selectedModel && cell ? { transformId: selected, model: selectedModel, cell } : null;
+    const cell = brushType === 'attach' ? viewport.floorCell(clientX, clientY, selected) : null;
+    return cell ? { transformId: selected, model, cell } : null;
   };
 
   /** Applies the current tool to `cells` and emits one remesh request for everything touched. */
   const applyTo = (model: VoxModel, cells: Iterable<Vec3>) => {
-    const { tool, color } = state;
-    const after = tool === 'erase' ? EMPTY_VOXEL : color;
+    const { brushType, color } = state;
+    const after = brushType === 'erase' ? EMPTY_VOXEL : color;
     const chunks = new Set<number>();
     stroke ??= new Map();
     const changes = stroke.get(model) ?? new Map<number, [number, number]>();
     for (const cell of cells) {
       const index = voxelIndex(model.size, cell[0], cell[1], cell[2]);
       const before = model.voxels[index];
-      const skips = before === after || (tool === 'paint' && before === EMPTY_VOXEL) || (tool === 'attach' && before !== EMPTY_VOXEL);
+      const skips = before === after || (brushType === 'paint' && before === EMPTY_VOXEL) || (brushType === 'attach' && before !== EMPTY_VOXEL);
       if (skips) continue;
       changes.set(index, [changes.get(index)?.[0] ?? before, after]);
       model.voxels[index] = after;
@@ -96,20 +95,18 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
   return {
     begin(clientX: number, clientY: number, isColorPick: boolean) {
       if (isColorPick) return pickColor(clientX, clientY);
-      if (state.tool === 'select') return editor.select(viewport.pick(clientX, clientY)?.transformId ?? null);
       const target = targetAt(clientX, clientY);
       if (!target) return;
-      editor.select(target.transformId);
-      if (state.brush === 'box') {
+      if (state.brushMode === 'box') {
         box = { anchor: target, end: target.cell };
         return viewport.showHover(target.transformId, target.cell);
       }
       applyTo(target.model, [target.cell]);
-      dragging = state.tool !== 'attach';
+      dragging = state.brushType !== 'attach';
     },
 
     move(clientX: number, clientY: number) {
-      const target = state.tool === 'select' ? null : targetAt(clientX, clientY);
+      const target = targetAt(clientX, clientY);
       if (box) {
         if (target?.model === box.anchor.model) box.end = target.cell;
         return viewport.showHover(box.anchor.transformId, box.anchor.cell, box.end);

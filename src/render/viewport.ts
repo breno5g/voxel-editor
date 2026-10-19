@@ -217,10 +217,11 @@ export function createViewport(container: HTMLElement) {
       requestRender();
     },
 
-    /** Nearest voxel under the pointer across every visible object. */
-    pick(clientX: number, clientY: number): ViewportPick | null {
+    /** Nearest voxel under the pointer across every visible object, or only object `only`. */
+    pick(clientX: number, clientY: number, only?: number): ViewportPick | null {
       let nearest: ViewportPick | null = null;
       for (const [transformId, view] of views) {
+        if (only !== undefined && transformId !== only) continue;
         const ray = view.model && modelRay(view, clientX, clientY);
         const hit = ray && view.model ? raycastVoxels(view.model, ray.origin, ray.direction) : null;
         if (hit && (!nearest || hit.distance < nearest.hit.distance)) nearest = { transformId, hit };

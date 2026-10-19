@@ -42,6 +42,16 @@ export function createFileActions(editor: Editor, viewport: Viewport) {
     if (editor.state.dirty) event.preventDefault();
   });
 
+  const save = (fileName: string) => {
+    try {
+      downloadBlob(new Blob([writeVox(editor.state.vox)], { type: 'application/octet-stream' }), fileName);
+      editor.markSaved(fileName);
+      editor.status(`${fileName} salvo`);
+    } catch (error) {
+      editor.fail('Falha ao salvar', error);
+    }
+  };
+
   return {
     newDocument() {
       if (confirmDiscard()) editor.load(createDocument(), UNTITLED);
@@ -51,14 +61,12 @@ export function createFileActions(editor: Editor, viewport: Viewport) {
       input.click();
     },
 
-    save() {
-      try {
-        downloadBlob(new Blob([writeVox(editor.state.vox)], { type: 'application/octet-stream' }), editor.state.fileName);
-        editor.markSaved();
-        editor.status(`${editor.state.fileName} salvo`);
-      } catch (error) {
-        editor.fail('Falha ao salvar', error);
-      }
+    save: () => save(editor.state.fileName),
+
+    /** MagicaVoxel `saveas`: asks for a name, then saves under it. */
+    saveAs() {
+      const name = window.prompt('Salvar como', editor.state.fileName)?.trim();
+      if (name) save(/\.vox$/i.test(name) ? name : `${name}.vox`);
     },
 
     /** Renders every frame of the current range from the current camera. */

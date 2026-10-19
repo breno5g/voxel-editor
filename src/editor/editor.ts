@@ -6,10 +6,15 @@ import { evaluateScene } from '../scene/scene-graph.ts';
 import type { Instance } from '../scene/scene-graph.ts';
 import { createHistory } from './history.ts';
 
-export const TOOLS = ['select', 'attach', 'erase', 'paint'] as const;
-export type Tool = (typeof TOOLS)[number];
-export const BRUSHES = ['voxel', 'box'] as const;
-export type Brush = (typeof BRUSHES)[number];
+/** MagicaVoxel's editors: `model` edits the selected object's voxels, `world` arranges objects. */
+export const MODES = ['model', 'world'] as const;
+export type Mode = (typeof MODES)[number];
+/** MagicaVoxel `b_type`. */
+export const BRUSH_TYPES = ['attach', 'erase', 'paint'] as const;
+export type BrushType = (typeof BRUSH_TYPES)[number];
+/** MagicaVoxel `b_mode`: `vox` follows the pointer, `box` fills the cells between press and release. */
+export const BRUSH_MODES = ['vox', 'box'] as const;
+export type BrushMode = (typeof BRUSH_MODES)[number];
 export type StatusTone = 'info' | 'error';
 
 export type EditorEvent =
@@ -21,6 +26,7 @@ export type EditorEvent =
   | { type: 'saved' }
   | { type: 'color' }
   | { type: 'tool' }
+  | { type: 'mode' }
   | { type: 'playback' }
   | { type: 'voxels'; model: VoxModel; chunks: Set<number> }
   | { type: 'status'; message: string; tone: StatusTone };
@@ -35,11 +41,11 @@ export type EditorState = {
   fps: number;
   /** Visible objects at `frame`, recomputed whenever the frame or the scene changes. */
   instances: Instance[];
-  /** Transform node id of the selected object. */
+  mode: Mode;
+  /** Transform node id of the selected object; in model mode, the object being edited. */
   selected: number | null;
-  tool: Tool;
-  /** `box` applies the tool to every cell between press and release. */
-  brush: Brush;
+  brushType: BrushType;
+  brushMode: BrushMode;
   color: number;
   /** Shows the previous model frame translucent while editing frame-by-frame animation. */
   onionSkin: boolean;
@@ -53,8 +59,13 @@ const DEFAULT_FPS = 12;
 /** A mid-lightness orange in the default palette, readable against the dark viewport. */
 const DEFAULT_COLOR = 100;
 
-export const isTool = (value: unknown): value is Tool => TOOLS.some((tool) => tool === value);
-export const isBrush = (value: unknown): value is Brush => BRUSHES.some((brush) => brush === value);
+const isOneOf =
+  <T extends string>(values: readonly T[]) =>
+  (value: unknown): value is T =>
+    values.some((candidate) => candidate === value);
+export const isMode = isOneOf(MODES);
+export const isBrushType = isOneOf(BRUSH_TYPES);
+export const isBrushMode = isOneOf(BRUSH_MODES);
 
 /**
  * Single source of editor state. Mutations go through these methods, which
@@ -73,9 +84,10 @@ export function createEditor() {
     playing: false,
     fps: DEFAULT_FPS,
     instances: [],
+    mode: 'model',
     selected: null,
-    tool: 'attach',
-    brush: 'voxel',
+    brushType: 'attach',
+    brushMode: 'vox',
     color: DEFAULT_COLOR,
     onionSkin: false,
   };
@@ -110,6 +122,7 @@ export function createEditor() {
       state.frame = state.range[0];
       evaluate();
       state.selected = state.instances[0]?.transformId ?? null;
+      state.mode = state.selected === null ? 'world' : 'model';
       history.clear();
       emit({ type: 'document' });
     },
@@ -147,24 +160,37 @@ export function createEditor() {
       emit({ type: 'palette' });
     },
 
-    markSaved() {
+    markSaved(fileName = state.fileName) {
+      state.fileName = fileName;
       state.dirty = false;
       emit({ type: 'saved' });
     },
 
+    /** Clearing the selection leaves model mode, which always edits one object. */
     select(transformId: number | null) {
       if (state.selected === transformId) return;
       state.selected = transformId;
       emit({ type: 'selection' });
+      if (transformId === null && state.mode === 'model') {
+        state.mode = 'world';
+        emit({ type: 'mode' });
+      }
     },
 
-    setTool(tool: Tool) {
-      state.tool = tool;
+    setMode(mode: Mode) {
+      if (state.mode === mode) return;
+      if (mode === 'model' && state.selected === null) return status('Selecione um objeto para editar o modelo', 'error');
+      state.mode = mode;
+      emit({ type: 'mode' });
+    },
+
+    setBrushType(brushType: BrushType) {
+      state.brushType = brushType;
       emit({ type: 'tool' });
     },
 
-    setBrush(brush: Brush) {
-      state.brush = brush;
+    setBrushMode(brushMode: BrushMode) {
+      state.brushMode = brushMode;
       emit({ type: 'tool' });
     },
 

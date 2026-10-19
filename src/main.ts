@@ -29,10 +29,10 @@ bindPalettePanel(editor);
 bindObjectsPanel(editor, commands);
 bindObjectInspector(editor, commands);
 bindTimeline(editor, commands);
-bindShortcuts(editor, commands, files, frameScene, bindHelp().open);
+bindShortcuts(editor, commands, files, { focusCamera: frameScene, openHelp: bindHelp().open });
 bindPlayback(editor);
 const autosave = bindAutosave(editor);
 
 editor.load(createDocument(), UNTITLED);
-editor.status('Pronto. Botão direito gira, do meio move, roda dá zoom. Abra ou arraste um .vox, ou desenhe direto no chão.');
+editor.status('Pronto. Modo Modelo: desenhe no chão do objeto. Tab no viewport alterna para o modo Mundo. Botão direito gira, do meio move, roda dá zoom.');
 void autosave.recover();

@@ -107,3 +107,48 @@ describe('object commands', () => {
     expect(editor.state.vox.models[editor.state.instances[0].model].voxels.some((color) => color !== 0)).toBe(true);
   });
 });
+
+describe('editor-dependent keys', () => {
+  const shapeKeys = (editor: ReturnType<typeof createEditor>) => {
+    const node = editor.state.vox.nodes[OBJECT + 1];
+    return node.kind === 'shape' ? node.keys : [];
+  };
+
+  it('adds a model frame in model mode and a transform key in world mode', () => {
+    const { editor, commands } = setup();
+    editor.setFrame(4);
+    commands.addKey();
+    expect(shapeKeys(editor).map((key) => key.frame)).toEqual([0, 4]);
+    expect(transformKeys(editor).map((key) => key.frame)).toEqual([0]);
+    editor.setMode('world');
+    editor.setFrame(8);
+    commands.addKey();
+    expect(transformKeys(editor).map((key) => key.frame)).toEqual([0, 8]);
+    commands.removeKey();
+    expect(transformKeys(editor).map((key) => key.frame)).toEqual([0]);
+  });
+
+  it('steps through the keys of the current editor only', () => {
+    const { editor, commands } = setup();
+    editor.setFrame(4);
+    commands.addModelFrame();
+    editor.setFrame(9);
+    commands.addTransformKey();
+    editor.setFrame(0);
+    commands.stepKey(1);
+    expect(editor.state.frame).toBe(4);
+    editor.setMode('world');
+    editor.setFrame(0);
+    commands.stepKey(1);
+    expect(editor.state.frame).toBe(9);
+  });
+
+  it('leaves model mode when nothing is selected', () => {
+    const { editor } = setup();
+    expect(editor.state.mode).toBe('model');
+    editor.select(null);
+    expect(editor.state.mode).toBe('world');
+    editor.setMode('model');
+    expect(editor.state.mode).toBe('world');
+  });
+});

@@ -7,24 +7,27 @@
   </head>
   <body>
     <header class="toolbar" role="toolbar" aria-label="Arquivo e ferramentas">
-      <button id="new-file" type="button" title="Novo documento">Novo</button>
+      <button id="new-file" type="button" title="Novo documento (Ctrl+P)">Novo</button>
       <button id="open-file" type="button" title="Abrir .vox (Ctrl+O)">Abrir</button>
-      <button id="save-file" type="button" title="Salvar .vox (Ctrl+S)">Salvar</button>
+      <button id="save-file" type="button" title="Salvar .vox (Ctrl+S; salvar como: Ctrl+Shift+S)">Salvar</button>
       <input id="file-input" type="file" accept=".vox" hidden />
       <span class="separator" aria-hidden="true"></span>
-      <div id="tools" class="tools" role="group" aria-label="Ferramenta">
-        <button type="button" data-tool="select" title="Selecionar objeto (1)">Selecionar</button>
-        <button type="button" data-tool="attach" title="Adicionar voxel (2)">Adicionar</button>
-        <button type="button" data-tool="erase" title="Apagar voxel (3)">Apagar</button>
-        <button type="button" data-tool="paint" title="Pintar voxel (4)">Pintar</button>
+      <div id="modes" class="tools" role="group" aria-label="Editor (Tab no viewport ou duplo clique alterna)">
+        <button type="button" data-mode="model" title="Editar os voxels do objeto selecionado (Tab)">Modelo</button>
+        <button type="button" data-mode="world" title="Organizar e animar objetos (Tab)">Mundo</button>
       </div>
-      <div id="brushes" class="tools" role="group" aria-label="Pincel (B alterna)">
-        <button type="button" data-brush="voxel" title="Um voxel por clique; Apagar/Pintar seguem o arrasto (B)">Voxel</button>
-        <button type="button" data-brush="box" title="Arraste para aplicar numa caixa (B)">Caixa</button>
+      <div id="brush-modes" class="tools" role="group" aria-label="Pincel" data-only-mode="model">
+        <button type="button" data-brush-mode="vox" title="Voxel: um por clique; Apagar e Pintar seguem o arrasto (V)">Voxel</button>
+        <button type="button" data-brush-mode="box" title="Caixa: arraste para aplicar numa caixa (B)">Caixa</button>
+      </div>
+      <div id="brush-types" class="tools" role="group" aria-label="Ação do pincel" data-only-mode="model">
+        <button type="button" data-brush-type="attach" title="Adicionar voxels (T)">Adicionar</button>
+        <button type="button" data-brush-type="erase" title="Apagar voxels (R)">Apagar</button>
+        <button type="button" data-brush-type="paint" title="Pintar voxels (G)">Pintar</button>
       </div>
       <span class="separator" aria-hidden="true"></span>
-      <button id="add-object" type="button" title="Novo objeto 32³">Novo objeto</button>
-      <button id="frame-camera" type="button" title="Enquadrar cena (F)">Enquadrar</button>
+      <button id="add-object" type="button" title="Novo objeto 32³ (Ctrl+N no modo Mundo)">Novo objeto</button>
+      <button id="frame-camera" type="button" title="Recentralizar câmera (5)">Enquadrar</button>
       <button id="export-sheet" type="button" title="Exporta o intervalo de frames como PNG">Exportar sprite sheet</button>
       <span id="file-name" class="file-name"></span>
       <button id="open-help" type="button" title="Atalhos (?)">Atalhos</button>
@@ -88,11 +91,11 @@
         <label class="field">Até <input id="range-end" type="number" min="0" max="360" /></label>
         <label class="field">FPS <input id="fps" type="number" min="1" max="60" /></label>
         <span class="separator" aria-hidden="true"></span>
-        <button id="add-transform-key" type="button" class="track-transform" title="Key de posição (F5)">+ Posição</button>
-        <button id="remove-transform-key" type="button" class="track-transform" title="Remover key de posição (F6)">− Posição</button>
+        <button id="add-transform-key" type="button" class="track-transform" title="Key de posição (F5 no modo Mundo)">+ Posição</button>
+        <button id="remove-transform-key" type="button" class="track-transform" title="Remover key de posição (F6 no modo Mundo)">− Posição</button>
         <label class="field track-transform"><input id="loop-transform" type="checkbox" /> Loop posição</label>
-        <button id="add-model-frame" type="button" class="track-shape" title="Duplica o modelo atual neste frame (Shift+F5)">+ Modelo</button>
-        <button id="remove-model-frame" type="button" class="track-shape" title="Remover frame de modelo (Shift+F6)">− Modelo</button>
+        <button id="add-model-frame" type="button" class="track-shape" title="Duplica o modelo atual neste frame (F5 no modo Modelo)">+ Modelo</button>
+        <button id="remove-model-frame" type="button" class="track-shape" title="Remover frame de modelo (F6 no modo Modelo)">− Modelo</button>
         <label class="field track-shape"><input id="loop-shape" type="checkbox" /> Loop modelo</label>
         <label class="field track-shape" title="Mostra o frame de modelo anterior translúcido (O)"><input id="onion-skin" type="checkbox" /> Onion skin</label>
       </div>
@@ -104,22 +107,26 @@
       <h2 id="help-title">Atalhos</h2>
       <table>
         <tbody>
+          <tr><th scope="row" colspan="2" class="group">Geral</th></tr>
           <tr><th scope="row">Girar / mover câmera / zoom</th><td>botão direito / botão do meio / roda</td></tr>
-          <tr><th scope="row">Selecionar, Adicionar, Apagar, Pintar</th><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></td></tr>
-          <tr><th scope="row">Pincel voxel / caixa</th><td><kbd>B</kbd></td></tr>
-          <tr><th scope="row">Pegar cor do voxel</th><td><kbd>Alt</kbd> + clique</td></tr>
-          <tr><th scope="row">Mover objeto</th><td>setas, <kbd>PageUp</kbd> / <kbd>PageDown</kbd></td></tr>
-          <tr><th scope="row">Girar objeto 90° em Z</th><td><kbd>R</kbd> / <kbd>Shift+R</kbd></td></tr>
-          <tr><th scope="row">Duplicar / apagar objeto</th><td><kbd>Ctrl+D</kbd> / <kbd>Delete</kbd></td></tr>
+          <tr><th scope="row">Alternar modo Modelo / Mundo</th><td><kbd>Tab</kbd> com o viewport focado (<kbd>Esc</kbd> sai dele)</td></tr>
+          <tr><th scope="row">Recentralizar câmera</th><td><kbd>5</kbd></td></tr>
+          <tr><th scope="row">Desfazer / refazer</th><td><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></td></tr>
+          <tr><th scope="row">Novo / abrir / salvar / salvar como</th><td><kbd>Ctrl+P</kbd> / <kbd>Ctrl+O</kbd> / <kbd>Ctrl+S</kbd> / <kbd>Ctrl+Shift+S</kbd></td></tr>
+          <tr><th scope="row" colspan="2" class="group">Animação</th></tr>
+          <tr><th scope="row">Key: adicionar / remover</th><td><kbd>F5</kbd> / <kbd>F6</kbd> (frame de modelo no modo Modelo, posição no modo Mundo)</td></tr>
           <tr><th scope="row">Frame anterior / próximo</th><td><kbd>,</kbd> <kbd>.</kbd></td></tr>
           <tr><th scope="row">Key anterior / próxima (primeira / última)</th><td><kbd>Ctrl+,</kbd> <kbd>Ctrl+.</kbd> (+<kbd>Shift</kbd>)</td></tr>
-          <tr><th scope="row">Key de posição: adicionar / remover</th><td><kbd>F5</kbd> / <kbd>F6</kbd></td></tr>
-          <tr><th scope="row">Frame de modelo: adicionar / remover</th><td><kbd>Shift+F5</kbd> / <kbd>Shift+F6</kbd></td></tr>
           <tr><th scope="row">Onion skin</th><td><kbd>O</kbd></td></tr>
-          <tr><th scope="row">Play / pausa</th><td><kbd>Espaço</kbd></td></tr>
-          <tr><th scope="row">Desfazer / refazer</th><td><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></td></tr>
-          <tr><th scope="row">Abrir / salvar</th><td><kbd>Ctrl+O</kbd> / <kbd>Ctrl+S</kbd> (ou arraste um .vox)</td></tr>
-          <tr><th scope="row">Enquadrar cena</th><td><kbd>F</kbd></td></tr>
+          <tr><th scope="row" colspan="2" class="group">Modo Modelo</th></tr>
+          <tr><th scope="row">Pincel voxel / caixa</th><td><kbd>V</kbd> / <kbd>B</kbd></td></tr>
+          <tr><th scope="row">Adicionar / apagar / pintar</th><td><kbd>T</kbd> / <kbd>R</kbd> / <kbd>G</kbd></td></tr>
+          <tr><th scope="row">Pegar cor do voxel</th><td><kbd>Alt</kbd> + clique</td></tr>
+          <tr><th scope="row" colspan="2" class="group">Modo Mundo</th></tr>
+          <tr><th scope="row">Selecionar / desmarcar</th><td>clique / <kbd>Ctrl+D</kbd></td></tr>
+          <tr><th scope="row">Mover objeto</th><td>setas, <kbd>PageUp</kbd> / <kbd>PageDown</kbd></td></tr>
+          <tr><th scope="row">Girar 90° em Z / em X</th><td><kbd>+</kbd> <kbd>-</kbd> / <kbd>9</kbd> <kbd>0</kbd></td></tr>
+          <tr><th scope="row">Novo / apagar objeto</th><td><kbd>Ctrl+N</kbd> (só em janela própria) / <kbd>Delete</kbd></td></tr>
         </tbody>
       </table>
       <form method="dialog"><button type="submit" autofocus>Fechar</button></form>

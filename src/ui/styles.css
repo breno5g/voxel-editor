@@ -17,6 +17,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   height: 100vh;
@@ -301,6 +305,14 @@ label.track-shape {
   font-weight: normal;
   color: var(--muted);
   padding: 3px 16px 3px 0;
+}
+
+.help th.group {
+  color: var(--accent);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-top: 10px;
 }
 
 .help kbd {
