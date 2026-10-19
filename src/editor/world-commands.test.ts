@@ -163,3 +163,30 @@ describe('object wrap', () => {
     expect(translations(editor).slice(2)).toEqual([[0, -2, 1], [0, 2, 1]]);
   });
 });
+
+describe('pack and unpack', () => {
+  it('packs the selection into one animated object and unpacks it back', () => {
+    const { editor, commands } = setup();
+    commands.packSelected(true);
+    expect(editor.state.instances).toHaveLength(1);
+    const [packed] = editor.state.selection;
+    const node = editor.state.vox.nodes[packed];
+    const shape = node.kind === 'transform' ? editor.state.vox.nodes[node.child] : undefined;
+    expect(shape?.kind === 'shape' && shape.keys).toEqual([{ frame: 0, model: 0 }, { frame: 1, model: 1 }]);
+    editor.setFrame(1);
+    expect(editor.state.instances[0].model).toBe(1);
+    commands.unpackSelected();
+    expect(editor.state.instances.map((instance) => instance.model)).toEqual([0, 1]);
+    editor.history.undo();
+    editor.history.undo();
+    expect(editor.state.instances).toHaveLength(2);
+  });
+
+  it('imports models as objects side by side on the ground', () => {
+    const { editor, commands } = setup();
+    commands.importModels([createModel([3, 1, 4]), createModel([2, 1, 2])], ['a', 'b']);
+    const added = editor.state.instances.slice(2);
+    expect(added.map((instance) => instance.pose.translation)).toEqual([[1, 0, 2], [5, 0, 1]]);
+    expect(editor.state.selection).toHaveLength(2);
+  });
+});

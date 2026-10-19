@@ -130,9 +130,12 @@ export function bindPalettePanel(editor: Editor, palette: PaletteCommands): void
     fileInput.value = '';
     if (file) void importPalette(file);
   });
+  /** MagicaVoxel: a palette file dropped on the palette opens as the palette (elsewhere a .png imports as a sprite). */
+  const paletteSection = container.closest('section') ?? container;
   window.addEventListener('drop', (event) => {
     const file = event.dataTransfer?.files[0];
-    if (file && isPaletteFile(file.name)) void importPalette(file);
+    const onPalette = event.target instanceof Node && paletteSection.contains(event.target);
+    if (file && (/\.act$/i.test(file.name) || (onPalette && isPaletteFile(file.name)))) void importPalette(file);
   });
 
   const importPalette = async (file: File) => {

@@ -42,6 +42,8 @@ export function bindWorldPanel(editor: Editor, commands: ObjectCommands): void {
     exit: commands.exitLevel,
     first: () => commands.orderSelected(2),
     last: () => commands.orderSelected(-2),
+    pack: () => commands.packSelected(true),
+    unpack: commands.unpackSelected,
     union: commands.unionSelected,
     intersect: commands.intersectSelected,
     operands: commands.pickOperands,

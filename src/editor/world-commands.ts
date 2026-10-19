@@ -2,8 +2,8 @@ import { DEFAULT_MODEL_SIZE, objectTransform } from '../format/defaults.ts';
 import { applyRows, encodeRotation, mirrorRotation, multiplyRows, rotationRows, transposeRows, turnRotation } from '../format/rotation.ts';
 import type { Axis } from '../format/rotation.ts';
 import { createModel, IDENTITY_ROTATION } from '../format/vox.ts';
-import type { GroupNode, Matrix3, ShapeNode, TransformKey, TransformNode, Vec3 } from '../format/vox.ts';
-import { evaluateTransform, isLooping, setTransformAt } from '../scene/keyframes.ts';
+import type { GroupNode, Matrix3, SceneNode, ShapeNode, TransformKey, TransformNode, Vec3, VoxModel } from '../format/vox.ts';
+import { evaluateShape, evaluateTransform, isLooping, setTransformAt } from '../scene/keyframes.ts';
 import { compose, IDENTITY_POSE, isHidden } from '../scene/scene-graph.ts';
 import type { Pose } from '../scene/scene-graph.ts';
 import { cloneSubtree, groupNode, groupOf, instanceBounds, instancesUnder, parentMap, parentPose, rootLevel, unionBounds } from '../scene/scene-tree.ts';
@@ -163,6 +163,30 @@ export function createWorldCommands(editor: Editor) {
     const above = holder === undefined ? undefined : parents.get(holder);
     if (holder === undefined || above === undefined) return editor.setLevel(null);
     editor.setLevel(above, [holder]);
+  };
+
+  /** Swaps nodes `ids` of `level` for new `nodes` (transforms at even positions become its children), as one undo step. */
+  const replaceInLevel = (level: GroupNode, ids: number[], nodes: SceneNode[], message: string) => {
+    const firstNode = state.vox.nodes.length;
+    const roots = nodes.flatMap((node, index) => (node.kind === 'transform' && index % 2 === 0 ? [firstNode + index] : []));
+    const before = level.children;
+    const position = Math.min(...ids.map((id) => before.indexOf(id)).filter((index) => index >= 0));
+    const after = before.filter((id) => !ids.includes(id));
+    after.splice(Math.min(position, after.length), 0, ...roots);
+    const previous = state.selection;
+    change(
+      () => {
+        state.vox.nodes.push(...nodes);
+        level.children = after;
+        editor.setSelection(roots);
+      },
+      () => {
+        level.children = before;
+        state.vox.nodes.splice(firstNode);
+        editor.setSelection(previous);
+      },
+      message,
+    );
   };
 
   return {
@@ -445,6 +469,76 @@ export function createWorldCommands(editor: Editor) {
           change(() => apply(copies), () => apply({ nodes: [], roots: [] }), `${copies.roots.length} cópia(s) por wrap`);
         },
       };
+    },
+
+    /**
+     * MagicaVoxel `opack`: the selected objects become the frames of one animated object (one model
+     * per frame, in selection order) that takes the first one's place and transform.
+     */
+    packSelected(loop: boolean) {
+      const level = levelGroup();
+      const objects = picked().flatMap(({ id, node }) => {
+        const shape = state.vox.nodes[node.child];
+        return shape?.kind === 'shape' ? [{ id, node, model: evaluateShape(shape.keys, state.frame, isLooping(shape.attrs)) }] : [];
+      });
+      if (!level || objects.length < 2) return editor.status('Selecione dois ou mais objetos para empacotar', 'error');
+      const [first] = objects;
+      const transformId = state.vox.nodes.length;
+      const nodes: [TransformNode, ShapeNode] = [
+        { ...first.node, attrs: new Map(first.node.attrs), child: transformId + 1, keys: first.node.keys.map((key) => ({ ...key })) },
+        { kind: 'shape', attrs: new Map(loop ? [['_loop', '1']] : []), keys: objects.map(({ model }, frame) => ({ frame, model })) },
+      ];
+      if (loop) nodes[0].attrs.set('_loop', '1');
+      replaceInLevel(level, objects.map(({ id }) => id), nodes, `${objects.length} objetos empacotados em uma animação`);
+    },
+
+    /** MagicaVoxel `ounpack`: each model frame of the selected object becomes an object of its own, at the current pose. */
+    unpackSelected() {
+      const level = levelGroup();
+      const [target] = picked().slice(-1);
+      const shape = target && state.vox.nodes[target.node.child];
+      if (!level || !target || shape?.kind !== 'shape' || shape.keys.length < 2) return editor.status('Selecione um objeto com frames de modelo', 'error');
+      const value = evaluateTransform(target.node.keys, state.frame, isLooping(target.node.attrs));
+      const models = [...new Set(shape.keys.map((key) => key.model))];
+      const nodes = models.flatMap((model, index): [TransformNode, ShapeNode] => [
+        { ...target.node, attrs: new Map([...target.node.attrs].filter(([key]) => key !== '_loop')).set('_name', `${target.node.attrs.get('_name') ?? 'Frame'} ${index + 1}`), child: state.vox.nodes.length + index * 2 + 1, keys: [{ frame: 0, ...value }] },
+        { kind: 'shape', attrs: new Map(), keys: [{ frame: 0, model }] },
+      ]);
+      replaceInLevel(level, [target.id], nodes, `${models.length} objetos desempacotados`);
+    },
+
+    /** Adds one object per model to the current group (on the current layer), side by side on the ground, and selects them. */
+    importModels(models: VoxModel[], names: string[]) {
+      const level = levelGroup();
+      if (!level || models.length === 0) return;
+      const firstModel = state.vox.models.length;
+      const firstNode = state.vox.nodes.length;
+      let x = 0;
+      const nodes = models.flatMap((model, index): [TransformNode, ShapeNode] => {
+        const transform: TransformNode = { ...objectTransform(firstNode + index * 2 + 1, model.size), layer: state.layer };
+        transform.keys = [{ ...transform.keys[0], translation: [x + Math.floor(model.size[0] / 2), 0, Math.floor(model.size[2] / 2)] }];
+        if (names[index]) transform.attrs.set('_name', names[index]);
+        x += model.size[0] + 1;
+        return [transform, { kind: 'shape', attrs: new Map(), keys: [{ frame: 0, model: firstModel + index }] }];
+      });
+      const before = level.children;
+      const previous = state.selection;
+      const roots = nodes.flatMap((_node, index) => (index % 2 === 0 ? [firstNode + index] : []));
+      change(
+        () => {
+          state.vox.models.push(...models);
+          state.vox.nodes.push(...nodes);
+          level.children = [...before, ...roots];
+          editor.setSelection(roots);
+        },
+        () => {
+          level.children = before;
+          state.vox.nodes.splice(firstNode);
+          state.vox.models.splice(firstModel);
+          editor.setSelection(previous);
+        },
+        `${models.length} modelo(s) importado(s)`,
+      );
     },
 
     /** MagicaVoxel `onew`: an empty object in the current group. */

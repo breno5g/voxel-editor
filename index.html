@@ -14,6 +14,7 @@
       </div>
       <input id="file-input" type="file" accept=".vox" hidden />
       <input id="palette-input" type="file" accept=".png,.act,image/png" hidden />
+      <input id="sprite-input" type="file" accept=".png,image/png" multiple hidden />
       <div id="modes" class="segmented" role="group" aria-label="Editor (Tab/Shift+Tab no viewport ou duplo clique alterna)">
         <button type="button" data-value="model" title="Editar os voxels do objeto selecionado (Tab)">Modelo</button>
         <button type="button" data-value="world" title="Organizar e animar objetos (Tab)">Mundo</button>
@@ -22,6 +23,7 @@
         <button id="add-object" type="button" title="Novo objeto 32³ (Ctrl+N no modo Mundo)">Novo objeto</button>
         <button id="frame-camera" type="button" title="Recentralizar câmera (5)">Enquadrar</button>
         <button id="export-sheet" type="button" title="Exporta o intervalo de frames como PNG">Sprite sheet</button>
+        <button id="import-sprites" type="button" title="Importar imagens PNG como objetos (ou solte-as no viewport); Shift+clique monta uma animação com elas (opack loop)">Importar</button>
       </div>
       <span id="file-name" class="file-name"></span>
       <button id="open-help" type="button" title="Atalhos (?)">Atalhos</button>
@@ -408,6 +410,10 @@
           <div class="segmented" role="group" aria-label="Níveis do grupo">
             <button type="button" data-world="enter" title="Entrar no grupo ou objeto selecionado (Tab)">Entrar</button>
             <button type="button" data-world="exit" title="Subir um nível (Shift+Tab)">Sair</button>
+          </div>
+          <div class="segmented" role="group" aria-label="Animação">
+            <button type="button" data-world="pack" title="Juntar os objetos selecionados como frames de uma animação (opack loop)">Empacotar</button>
+            <button type="button" data-world="unpack" title="Separar os frames do objeto em objetos (ounpack)">Desempacotar</button>
           </div>
           <div class="segmented" role="group" aria-label="Ordem de render">
             <button type="button" data-world="first" title="Trazer para o primeiro lugar (order +2)">Primeiro</button>
