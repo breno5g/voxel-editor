@@ -6,6 +6,10 @@ O formato e a avaliação de animação vêm de engenharia reversa do binário, 
 
 > Projeto independente, sem vínculo com o MagicaVoxel ou com seu autor. Nenhum código ou binário do MagicaVoxel é distribuído aqui.
 
+![Editor no modo Modelo, com paleta e pincéis à esquerda e as operações do objeto à direita](docs/editor.png)
+
+![A mesma cena no path tracer, com céu atmosférico](docs/render.webp)
+
 ## Recursos
 
 - **Formato `.vox` v200** com round-trip das chaves de animação, câmeras (`rCAM`), render (`rOBJ`), materiais (`MATL`), notas e chunks desconhecidos.
