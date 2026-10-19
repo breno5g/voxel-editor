@@ -6,10 +6,6 @@ export const COMPONENTS = ['palette', 'material', 'render', 'camera', 'note'] as
 export type Component = (typeof COMPONENTS)[number];
 export const isComponent = (value: unknown): value is Component => COMPONENTS.some((component) => component === value);
 
-/** Render settings live in rOBJ chunks (`_type _setting` …), which this editor keeps verbatim. */
-const RENDER_CHUNKS = ['rOBJ'];
-const isRender = (id: string) => RENDER_CHUNKS.includes(id);
-
 /** Replaces `component` of `target` with a copy of `source`'s. */
 export const copyComponent: Record<Component, (source: VoxDocument, target: VoxDocument) => void> = {
   palette: (source, target) => {
@@ -19,8 +15,7 @@ export const copyComponent: Record<Component, (source: VoxDocument, target: VoxD
     target.materials = new Map([...source.materials].map(([id, attrs]) => [id, new Map(attrs)]));
   },
   render: (source, target) => {
-    const copies = source.extras.filter(({ id }) => isRender(id)).map((chunk) => ({ id: chunk.id, content: chunk.content.slice(), children: chunk.children.slice() }));
-    target.extras = [...target.extras.filter(({ id }) => !isRender(id)), ...copies];
+    target.renderObjects = source.renderObjects.map((attrs) => new Map(attrs));
   },
   camera: (source, target) => {
     target.cameras = new Map([...source.cameras].map(([id, attrs]) => [id, new Map(attrs)]));
@@ -39,6 +34,7 @@ export const emptyDocument = (): VoxDocument => ({
   materials: new Map(),
   notes: [],
   cameras: new Map(),
+  renderObjects: [],
   meta: new Map(),
   extras: [],
 });

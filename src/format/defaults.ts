@@ -87,6 +87,7 @@ export function createDocument(size: Vec3 = DEFAULT_MODEL_SIZE): VoxDocument {
     layers: [],
     materials: new Map(),
     cameras: new Map(),
+    renderObjects: [],
     notes: [],
     meta: new Map(),
     extras: [],

@@ -27,8 +27,10 @@ export type VoxDocument = {
   notes: string[];
   /** rCAM: MagicaVoxel's camera slots (`_mode`, `_focus`, `_angle`, `_radius`, `_frustum`, `_fov`) by slot id. */
   cameras: Map<number, Dict>;
+  /** rOBJ: the renderer settings, one dictionary per `_type` (`_inf` sun, `_lens`, `_film`, …), in file order. */
+  renderObjects: Dict[];
   meta: Dict;
-  /** Chunks this editor does not model (rOBJ, IMAP, ...), written back verbatim. */
+  /** Chunks this editor does not model (IMAP, ...), written back verbatim. */
   extras: RawChunk[];
 };
 

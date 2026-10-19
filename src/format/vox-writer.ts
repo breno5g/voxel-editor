@@ -129,6 +129,7 @@ export function writeVox(document: VoxDocument): Uint8Array<ArrayBuffer> {
     ...document.layers.map((layer) => chunk('LAYR', concat(int32s([layer.id]), encodeDict(layer.attrs), int32s([RESERVED_ID])))),
     chunk('RGBA', document.palette),
     ...[...document.materials].sort(([a], [b]) => a - b).map(([id, attrs]) => chunk('MATL', concat(int32s([id]), encodeDict(attrs)))),
+    ...document.renderObjects.map((attrs) => chunk('rOBJ', encodeDict(attrs))),
     ...[...document.cameras].sort(([a], [b]) => a - b).map(([id, attrs]) => chunk('rCAM', concat(int32s([id]), encodeDict(attrs)))),
     ...(document.notes.length > 0 ? [chunk('NOTE', concat(int32s([document.notes.length]), ...document.notes.map(encodeString)))] : []),
     ...document.extras.map((extra) => chunk(extra.id, extra.content, extra.children)),

@@ -27,8 +27,9 @@ function animatedDocument(): VoxDocument {
   shape.keys = [{ frame: 0, model: 0 }, { frame: 6, model: 1 }];
   document.meta.set('_anim_range', '0 24');
   document.layers.push({ id: 0, attrs: new Map([['_name', 'base']]) });
-  document.extras.push({ id: 'rOBJ', content: Uint8Array.of(1, 2, 3, 4), children: new Uint8Array(0) });
+  document.extras.push({ id: 'IMAP', content: Uint8Array.of(1, 2, 3, 4), children: new Uint8Array(0) });
   document.cameras.set(2, new Map([['_mode', 'orth'], ['_focus', '1 2 3'], ['_radius', '40']]));
+  document.renderObjects.push(new Map([['_type', '_inf'], ['_i', '0.6']]), new Map([['_type', '_film'], ['_expo', '1']]));
   document.palette[0] = 200;
   document.materials.set(5, new Map([['_type', '_glass'], ['_trans', '0.5'], ['_ri', '1.3']]));
   document.notes = ['pele', '', 'metal'];

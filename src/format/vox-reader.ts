@@ -130,7 +130,7 @@ export function parseVox(input: Uint8Array): VoxDocument {
   const [main] = readChunks(bytes.subarray(8));
   if (main?.id !== 'MAIN') throw new Error('Missing MAIN chunk');
 
-  const document: VoxDocument = { models: [], nodes: [], palette: createDefaultPalette(), layers: [], materials: new Map(), notes: [], cameras: new Map(), meta: new Map(), extras: [] };
+  const document: VoxDocument = { models: [], nodes: [], palette: createDefaultPalette(), layers: [], materials: new Map(), notes: [], cameras: new Map(), renderObjects: [], meta: new Map(), extras: [] };
   const nodes = new Map<number, SceneNode>();
   let pendingSize: Vec3 | null = null;
 
@@ -172,6 +172,9 @@ export function parseVox(input: Uint8Array): VoxDocument {
     ['MATL', (content) => {
       const cursor = createCursor(content);
       document.materials.set(cursor.int32(), cursor.dict());
+    }],
+    ['rOBJ', (content) => {
+      document.renderObjects.push(createCursor(content).dict());
     }],
     ['rCAM', (content) => {
       const cursor = createCursor(content);
