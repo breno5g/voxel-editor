@@ -6,7 +6,7 @@ O formato e a avaliação de animação vêm de engenharia reversa do binário, 
 
 > Projeto independente, sem vínculo com o MagicaVoxel ou com seu autor. Nenhum código ou binário do MagicaVoxel é distribuído aqui.
 
-![Editor no modo Modelo, com paleta e pincéis à esquerda e as operações do objeto à direita](docs/editor.png)
+![Editor no modo Modelo, com paleta e pincéis à esquerda e as operações do objeto à direita](docs/editor.webp)
 
 ![A mesma cena no path tracer, com céu atmosférico](docs/render.webp)
 
