@@ -7,19 +7,21 @@
   </head>
   <body>
     <header class="toolbar" role="toolbar" aria-label="Arquivo e ferramentas">
-      <button id="new-file" type="button" title="Novo documento (Ctrl+P)">Novo</button>
-      <button id="open-file" type="button" title="Abrir .vox (Ctrl+O)">Abrir</button>
-      <button id="save-file" type="button" title="Salvar .vox (Ctrl+S; salvar como: Ctrl+Shift+S)">Salvar</button>
+      <div class="segmented" role="group" aria-label="Arquivo">
+        <button id="new-file" type="button" title="Novo documento (Ctrl+P)">Novo</button>
+        <button id="open-file" type="button" title="Abrir .vox (Ctrl+O)">Abrir</button>
+        <button id="save-file" type="button" title="Salvar .vox (Ctrl+S; salvar como: Ctrl+Shift+S)">Salvar</button>
+      </div>
       <input id="file-input" type="file" accept=".vox" hidden />
-      <span class="separator" aria-hidden="true"></span>
-      <div id="modes" class="tools" role="group" aria-label="Editor (Tab no viewport ou duplo clique alterna)">
+      <div id="modes" class="segmented" role="group" aria-label="Editor (Tab no viewport ou duplo clique alterna)">
         <button type="button" data-value="model" title="Editar os voxels do objeto selecionado (Tab)">Modelo</button>
         <button type="button" data-value="world" title="Organizar e animar objetos (Tab)">Mundo</button>
       </div>
-      <span class="separator" aria-hidden="true"></span>
-      <button id="add-object" type="button" title="Novo objeto 32³ (Ctrl+N no modo Mundo)">Novo objeto</button>
-      <button id="frame-camera" type="button" title="Recentralizar câmera (5)">Enquadrar</button>
-      <button id="export-sheet" type="button" title="Exporta o intervalo de frames como PNG">Exportar sprite sheet</button>
+      <div class="segmented" role="group" aria-label="Cena">
+        <button id="add-object" type="button" title="Novo objeto 32³ (Ctrl+N no modo Mundo)">Novo objeto</button>
+        <button id="frame-camera" type="button" title="Recentralizar câmera (5)">Enquadrar</button>
+        <button id="export-sheet" type="button" title="Exporta o intervalo de frames como PNG">Sprite sheet</button>
+      </div>
       <span id="file-name" class="file-name"></span>
       <button id="open-help" type="button" title="Atalhos (?)">Atalhos</button>
       <span id="app-version" class="version"></span>
@@ -29,82 +31,116 @@
       <section aria-labelledby="palette-title">
         <h2 id="palette-title">Paleta</h2>
         <div id="palette" class="palette" role="group" aria-label="Cores da paleta"></div>
-        <label class="field">Editar cor <input id="palette-color" type="color" /></label>
+        <label class="control-row"><span class="label">Editar cor</span><input id="palette-color" type="color" /></label>
       </section>
       <section aria-labelledby="brush-title" data-only-mode="model">
         <h2 id="brush-title">Pincel</h2>
-        <div id="brush-modes" class="tools" role="group" aria-label="Pincel">
+        <div id="brush-modes" class="segmented columns-2" role="group" aria-label="Modo do pincel">
           <button type="button" data-value="vox" title="Voxel: tamanho com - e +; Adicionar desenha no plano onde começou (V)">Voxel</button>
           <button type="button" data-value="face" title="Face: a região plana sob o cursor; arraste para extrudar ou cavar camadas (F)">Face</button>
           <button type="button" data-value="box" title="Caixa: arraste para aplicar numa caixa (B)">Caixa</button>
           <button type="button" data-value="geo" title="Geometria: linha, quadrado ou círculo no plano onde o arrasto começou (L)">Geometria</button>
         </div>
-        <div id="brush-types" class="tools" role="group" aria-label="Ação do pincel">
-          <button type="button" data-value="attach" title="Adicionar voxels (T)">Adicionar</button>
-          <button type="button" data-value="erase" title="Apagar voxels (R)">Apagar</button>
-          <button type="button" data-value="paint" title="Pintar voxels (G)">Pintar</button>
-          <button type="button" data-value="pick" title="Pegar a cor do voxel clicado (ou Alt + clique)">Conta-gotas</button>
-          <button type="button" data-value="remove" title="Apagar a região de cor clicada">Remover região</button>
-          <button type="button" data-value="replace" title="Pintar a região clicada com a cor atual">Substituir região</button>
-        </div>
-        <div class="brush-options" data-region-options>
-          <div id="region-scope" class="tools" role="group" aria-label="Alcance da região">
-            <button type="button" data-value="connected" title="Só os voxels ligados ao clicado">Conectada</button>
-            <button type="button" data-value="color" title="Todos os voxels da cor clicada">Toda a cor</button>
+        <div id="brush-types" class="stack" role="group" aria-label="Ação do pincel">
+          <div class="segmented">
+            <button type="button" data-value="attach" title="Adicionar voxels (T)">Adicionar</button>
+            <button type="button" data-value="erase" title="Apagar voxels (R)">Apagar</button>
+            <button type="button" data-value="paint" title="Pintar voxels (G)">Pintar</button>
           </div>
-          <div id="region-connect" class="tools" role="group" aria-label="Conexão da região">
-            <button type="button" data-value="color" title="Só atravessa a mesma cor">Mesma cor</button>
-            <button type="button" data-value="geometry" title="Atravessa qualquer voxel">Geometria</button>
-          </div>
-          <div id="region-neighbors" class="tools" role="group" aria-label="Vizinhança">
-            <button type="button" data-value="6" title="Só faces">6 vizinhos</button>
-            <button type="button" data-value="26" title="Faces, arestas e cantos">26 vizinhos</button>
+          <div class="segmented">
+            <button type="button" data-value="pick" title="Pegar a cor do voxel clicado (ou Alt + clique)">Pegar cor</button>
+            <button type="button" data-value="remove" title="Remover região: apaga a região de cor clicada">Remover</button>
+            <button type="button" data-value="replace" title="Substituir região: pinta a região clicada com a cor atual">Substituir</button>
           </div>
         </div>
-        <div id="mirror" class="tools" role="group" aria-label="Espelho do pincel">
-          <button type="button" data-axis="0" title="Espelhar o pincel em X (1)">↔X</button>
-          <button type="button" data-axis="1" title="Espelhar o pincel em Y (2)">↔Y</button>
-          <button type="button" data-axis="2" title="Espelhar o pincel em Z (3)">↔Z</button>
-        </div>
-        <div id="axes" class="tools" role="group" aria-label="Modo eixo: o traço atravessa o modelo">
-          <button type="button" data-axis="0" title="Atravessar o modelo em X (Ctrl+1)">⇥X</button>
-          <button type="button" data-axis="1" title="Atravessar o modelo em Y (Ctrl+2)">⇥Y</button>
-          <button type="button" data-axis="2" title="Atravessar o modelo em Z (Ctrl+3)">⇥Z</button>
-        </div>
-        <div class="brush-options" data-brush-options="vox">
-          <label class="field">Tamanho <input id="vox-size" type="number" min="1" max="64" /></label>
-          <div id="vox-shape" class="tools" role="group" aria-label="Forma do pincel voxel">
-            <button type="button" data-value="cube">Cubo</button>
-            <button type="button" data-value="sphere">Esfera</button>
+        <div class="stack" data-region-options>
+          <div class="control-row">
+            <span class="label" id="region-scope-label">Região</span>
+            <div id="region-scope" class="segmented" role="group" aria-labelledby="region-scope-label">
+              <button type="button" data-value="connected" title="Só os voxels ligados ao clicado">Ligada</button>
+              <button type="button" data-value="color" title="Todos os voxels da cor clicada">Toda a cor</button>
+            </div>
           </div>
-          <div id="vox-volume" class="tools" role="group" aria-label="Volume do pincel voxel">
-            <button type="button" data-value="3d" title="Volume inteiro">3D</button>
-            <button type="button" data-value="2d" title="Só no plano da face sob o cursor">2D</button>
+          <div class="control-row">
+            <span class="label" id="region-connect-label">Conexão</span>
+            <div id="region-connect" class="segmented" role="group" aria-labelledby="region-connect-label">
+              <button type="button" data-value="color" title="Só atravessa a mesma cor">Cor</button>
+              <button type="button" data-value="geometry" title="Atravessa qualquer voxel">Geometria</button>
+            </div>
           </div>
-        </div>
-        <div class="brush-options" data-brush-options="face">
-          <div id="face-color" class="tools" role="group" aria-label="Cor dos voxels extrudados">
-            <button type="button" data-value="palette">Cor da paleta</button>
-            <button type="button" data-value="voxel">Cor do voxel</button>
-          </div>
-          <div id="face-connect" class="tools" role="group" aria-label="Conexão da região">
-            <button type="button" data-value="geometry" title="Toda a face plana">Geometria</button>
-            <button type="button" data-value="color" title="Só voxels da mesma cor">Mesma cor</button>
-          </div>
-          <div id="face-neighbors" class="tools" role="group" aria-label="Vizinhança">
-            <button type="button" data-value="4">4 vizinhos</button>
-            <button type="button" data-value="8">8 vizinhos</button>
+          <div class="control-row">
+            <span class="label" id="region-neighbors-label">Vizinhos</span>
+            <div id="region-neighbors" class="segmented" role="group" aria-labelledby="region-neighbors-label">
+              <button type="button" data-value="6" title="Só faces">6</button>
+              <button type="button" data-value="26" title="Faces, arestas e cantos">26</button>
+            </div>
           </div>
         </div>
-        <div class="brush-options" data-brush-options="geo">
-          <div id="geo-shape" class="tools" role="group" aria-label="Forma">
+        <div class="control-row">
+          <span class="label" id="mirror-label">Espelho</span>
+          <div id="mirror" class="segmented" role="group" aria-labelledby="mirror-label">
+            <button type="button" data-axis="0" title="Espelhar o pincel em X (1)">X</button>
+            <button type="button" data-axis="1" title="Espelhar o pincel em Y (2)">Y</button>
+            <button type="button" data-axis="2" title="Espelhar o pincel em Z (3)">Z</button>
+          </div>
+        </div>
+        <div class="control-row">
+          <span class="label" id="axes-label" title="O traço atravessa o modelo inteiro no eixo">Eixo</span>
+          <div id="axes" class="segmented" role="group" aria-labelledby="axes-label">
+            <button type="button" data-axis="0" title="Atravessar o modelo em X (Ctrl+1)">X</button>
+            <button type="button" data-axis="1" title="Atravessar o modelo em Y (Ctrl+2)">Y</button>
+            <button type="button" data-axis="2" title="Atravessar o modelo em Z (Ctrl+3)">Z</button>
+          </div>
+        </div>
+        <div class="stack" data-brush-options="vox">
+          <label class="control-row"><span class="label">Tamanho</span><input id="vox-size" type="number" min="1" max="64" /></label>
+          <div class="control-row">
+            <span class="label" id="vox-shape-label">Forma</span>
+            <div id="vox-shape" class="segmented" role="group" aria-labelledby="vox-shape-label">
+              <button type="button" data-value="cube">Cubo</button>
+              <button type="button" data-value="sphere">Esfera</button>
+            </div>
+          </div>
+          <div class="control-row">
+            <span class="label" id="vox-volume-label">Volume</span>
+            <div id="vox-volume" class="segmented" role="group" aria-labelledby="vox-volume-label">
+              <button type="button" data-value="3d" title="Volume inteiro">3D</button>
+              <button type="button" data-value="2d" title="Só no plano da face sob o cursor">2D</button>
+            </div>
+          </div>
+        </div>
+        <div class="stack" data-brush-options="face">
+          <div class="control-row">
+            <span class="label" id="face-color-label">Cor</span>
+            <div id="face-color" class="segmented" role="group" aria-labelledby="face-color-label">
+              <button type="button" data-value="palette" title="Os voxels extrudados usam a cor da paleta">Paleta</button>
+              <button type="button" data-value="voxel" title="Os voxels extrudados copiam a cor da face">Voxel</button>
+            </div>
+          </div>
+          <div class="control-row">
+            <span class="label" id="face-connect-label">Conexão</span>
+            <div id="face-connect" class="segmented" role="group" aria-labelledby="face-connect-label">
+              <button type="button" data-value="geometry" title="Toda a face plana">Geometria</button>
+              <button type="button" data-value="color" title="Só voxels da mesma cor">Cor</button>
+            </div>
+          </div>
+          <div class="control-row">
+            <span class="label" id="face-neighbors-label">Vizinhos</span>
+            <div id="face-neighbors" class="segmented" role="group" aria-labelledby="face-neighbors-label">
+              <button type="button" data-value="4">4</button>
+              <button type="button" data-value="8">8</button>
+            </div>
+          </div>
+        </div>
+        <div class="stack" data-brush-options="geo">
+          <div id="geo-shape" class="segmented" role="group" aria-label="Forma da geometria">
             <button type="button" data-value="line">Linha</button>
             <button type="button" data-value="square">Quadrado</button>
             <button type="button" data-value="circle">Círculo</button>
           </div>
-          <label class="field"><input id="geo-project" type="checkbox" /> Projetar na superfície</label>
-          <label class="field"><input id="geo-fill" type="checkbox" /> Preencher centro</label>
-          <label class="field"><input id="geo-even" type="checkbox" /> Tamanho par</label>
+          <label class="check"><input id="geo-project" type="checkbox" /> Projetar na superfície</label>
+          <label class="check"><input id="geo-fill" type="checkbox" /> Preencher centro</label>
+          <label class="check"><input id="geo-even" type="checkbox" /> Tamanho par</label>
         </div>
       </section>
     </aside>
@@ -116,36 +152,42 @@
       </section>
       <section aria-labelledby="inspector-title">
         <h2 id="inspector-title">Objeto selecionado</h2>
-        <fieldset id="inspector" class="inspector" disabled>
-          <label class="field">Nome <input id="object-name" type="text" placeholder="sem nome" /></label>
-          <div class="row">
-            <span class="field">Tamanho</span>
-            <input id="size-x" type="number" min="1" max="256" aria-label="Tamanho X" />
-            <input id="size-y" type="number" min="1" max="256" aria-label="Tamanho Y" />
-            <input id="size-z" type="number" min="1" max="256" aria-label="Tamanho Z" />
-            <button id="apply-size" type="button" title="Redimensiona todos os frames do objeto">OK</button>
+        <fieldset id="inspector" class="inspector stack" disabled>
+          <label class="control-row"><span class="label">Nome</span><input id="object-name" type="text" placeholder="sem nome" /></label>
+          <div class="control-row">
+            <span class="label">Tamanho</span>
+            <div class="size-fields">
+              <input id="size-x" type="number" min="1" max="256" aria-label="Tamanho X" />
+              <input id="size-y" type="number" min="1" max="256" aria-label="Tamanho Y" />
+              <input id="size-z" type="number" min="1" max="256" aria-label="Tamanho Z" />
+              <button id="apply-size" type="button" title="Redimensiona todos os frames do objeto">OK</button>
+            </div>
           </div>
-          <div class="row" role="group" aria-label="Girar 90 graus (Shift inverte)">
-            <span class="field">Girar</span>
-            <button type="button" data-rotate="0" title="Girar em X (Shift: sentido inverso)">X</button>
-            <button type="button" data-rotate="1" title="Girar em Y (Shift: sentido inverso)">Y</button>
-            <button type="button" data-rotate="2" title="Girar em Z (R / Shift+R)">Z</button>
+          <div class="control-row">
+            <span class="label" id="rotate-label" title="Shift inverte o sentido">Girar 90°</span>
+            <div class="segmented" role="group" aria-labelledby="rotate-label">
+              <button type="button" data-rotate="0" title="Girar em X (9 / 0; Shift: sentido inverso)">X</button>
+              <button type="button" data-rotate="1" title="Girar em Y (Shift: sentido inverso)">Y</button>
+              <button type="button" data-rotate="2" title="Girar em Z (+ / -; Shift: sentido inverso)">Z</button>
+            </div>
           </div>
-          <div class="row" role="group" aria-label="Espelhar">
-            <span class="field">Espelhar</span>
-            <button type="button" data-mirror="0">X</button>
-            <button type="button" data-mirror="1">Y</button>
-            <button type="button" data-mirror="2">Z</button>
+          <div class="control-row">
+            <span class="label" id="flip-label">Espelhar</span>
+            <div class="segmented" role="group" aria-labelledby="flip-label">
+              <button type="button" data-mirror="0">X</button>
+              <button type="button" data-mirror="1">Y</button>
+              <button type="button" data-mirror="2">Z</button>
+            </div>
           </div>
-          <div class="row">
-            <button id="duplicate-object" type="button" title="Duplicar (Ctrl+D)">Duplicar</button>
-            <button id="delete-object" type="button" title="Apagar (Delete)">Apagar</button>
+          <div class="segmented">
+            <button id="duplicate-object" type="button" title="Duplicar o objeto com cópia própria dos voxels">Duplicar</button>
+            <button id="delete-object" type="button" title="Apagar o objeto (Delete no modo Mundo)">Apagar</button>
           </div>
         </fieldset>
       </section>
       <section aria-labelledby="model-title" data-only-mode="model">
         <h2 id="model-title">Modelo</h2>
-        <div class="row" role="group" aria-label="Volume inteiro">
+        <div class="segmented" role="group" aria-label="Volume inteiro">
           <button id="model-full" type="button" title="Encher o volume com a cor atual (U)">Encher</button>
           <button id="model-fill" type="button" title="Pintar todos os voxels com a cor atual (I)">Pintar tudo</button>
           <button id="model-zero" type="button" title="Apagar todos os voxels (Delete)">Limpar</button>
@@ -154,44 +196,59 @@
     </aside>
 
     <main id="viewport" class="viewport" aria-label="Viewport 3D: botão direito gira, do meio move, roda dá zoom">
-      <div id="display-options" class="view-options" role="group" aria-label="Exibição">
+      <div id="display-options" class="segmented overlay top" role="group" aria-label="Exibição">
         <button type="button" data-display="grid" title="Grade do chão (Ctrl+G)">Grade</button>
         <button type="button" data-display="frame" title="Moldura do modelo no modo Modelo (Ctrl+F)">Moldura</button>
         <button type="button" data-display="edges" title="Arestas dos voxels (Ctrl+E)">Arestas</button>
         <button type="button" data-display="backgroundObjects" title="Outros objetos, esmaecidos, no modo Modelo (Ctrl+B)">Fundo</button>
       </div>
-      <div id="camera-options" class="view-options bottom" role="group" aria-label="Câmera">
-        <button type="button" data-camera-mode="pers" title="Câmera em perspectiva">Persp</button>
-        <button type="button" data-camera-mode="free" title="Câmera livre: W/A/S/D move, Q/E desce e sobe">Livre</button>
-        <button type="button" data-camera-mode="orth" title="Câmera ortogonal">Orto</button>
-        <button type="button" data-camera-mode="iso" title="Câmera isométrica">Iso</button>
+      <div id="camera-options" class="overlay bottom" role="group" aria-label="Câmera">
+        <div class="segmented">
+          <button type="button" data-camera-mode="pers" title="Câmera em perspectiva">Persp</button>
+          <button type="button" data-camera-mode="free" title="Câmera livre: W/A/S/D move, Q/E desce e sobe">Livre</button>
+          <button type="button" data-camera-mode="orth" title="Câmera ortogonal">Orto</button>
+          <button type="button" data-camera-mode="iso" title="Câmera isométrica">Iso</button>
+        </div>
         <label class="field" title="Slot de câmera (teclado numérico 0–9)">Slot <select id="camera-slot"></select></label>
-        <button id="camera-save" type="button" title="Salvar a câmera no slot (7)">Salvar</button>
-        <button id="camera-load" type="button" title="Carregar a câmera do slot (8)">Carregar</button>
+        <div class="segmented">
+          <button id="camera-save" type="button" title="Salvar a câmera no slot (7)">Salvar</button>
+          <button id="camera-load" type="button" title="Carregar a câmera do slot (8)">Carregar</button>
+        </div>
       </div>
     </main>
 
     <footer class="timeline" aria-label="Linha do tempo">
       <div class="timeline-controls">
-        <button id="first-key" type="button" title="Primeira key (Ctrl+Shift+,)">⇤</button>
-        <button id="prev-key" type="button" title="Key anterior (Ctrl+,)">◁◁</button>
-        <button id="prev-frame" type="button" title="Frame anterior (,)">◁</button>
-        <button id="play" type="button" title="Play/pausa (Espaço)">▶</button>
-        <button id="next-frame" type="button" title="Próximo frame (.)">▷</button>
-        <button id="next-key" type="button" title="Próxima key (Ctrl+.)">▷▷</button>
-        <button id="last-key" type="button" title="Última key (Ctrl+Shift+.)">⇥</button>
+        <div class="segmented transport" role="group" aria-label="Reprodução">
+          <button id="first-key" type="button" title="Primeira key (Ctrl+Shift+,)">⇤</button>
+          <button id="prev-key" type="button" title="Key anterior (Ctrl+,)">◁◁</button>
+          <button id="prev-frame" type="button" title="Frame anterior (,)">◁</button>
+          <button id="play" type="button" title="Play/pausa">▶</button>
+          <button id="next-frame" type="button" title="Próximo frame (.)">▷</button>
+          <button id="next-key" type="button" title="Próxima key (Ctrl+.)">▷▷</button>
+          <button id="last-key" type="button" title="Última key (Ctrl+Shift+.)">⇥</button>
+        </div>
         <label class="field">Frame <input id="frame" type="number" min="0" max="360" /></label>
         <label class="field">De <input id="range-start" type="number" min="0" max="360" /></label>
         <label class="field">Até <input id="range-end" type="number" min="0" max="360" /></label>
         <label class="field">FPS <input id="fps" type="number" min="1" max="60" /></label>
-        <span class="separator" aria-hidden="true"></span>
-        <button id="add-transform-key" type="button" class="track-transform" title="Key de posição (F5 no modo Mundo)">+ Posição</button>
-        <button id="remove-transform-key" type="button" class="track-transform" title="Remover key de posição (F6 no modo Mundo)">− Posição</button>
-        <label class="field track-transform"><input id="loop-transform" type="checkbox" /> Loop posição</label>
-        <button id="add-model-frame" type="button" class="track-shape" title="Duplica o modelo atual neste frame (F5 no modo Modelo)">+ Modelo</button>
-        <button id="remove-model-frame" type="button" class="track-shape" title="Remover frame de modelo (F6 no modo Modelo)">− Modelo</button>
-        <label class="field track-shape"><input id="loop-shape" type="checkbox" /> Loop modelo</label>
-        <label class="field track-shape" title="Mostra o frame de modelo anterior translúcido (O)"><input id="onion-skin" type="checkbox" /> Onion skin</label>
+        <div class="track-group track-transform" role="group" aria-label="Keys de posição">
+          <span class="track-label">Posição</span>
+          <div class="segmented">
+            <button id="add-transform-key" type="button" aria-label="Adicionar key de posição" title="Adicionar key de posição (F5 no modo Mundo)">+ Key</button>
+            <button id="remove-transform-key" type="button" aria-label="Remover key de posição" title="Remover key de posição (F6 no modo Mundo)">−</button>
+          </div>
+          <label class="check"><input id="loop-transform" type="checkbox" /> Loop</label>
+        </div>
+        <div class="track-group track-shape" role="group" aria-label="Frames de modelo">
+          <span class="track-label">Modelo</span>
+          <div class="segmented">
+            <button id="add-model-frame" type="button" aria-label="Adicionar frame de modelo" title="Duplica o modelo atual neste frame (F5 no modo Modelo)">+ Frame</button>
+            <button id="remove-model-frame" type="button" aria-label="Remover frame de modelo" title="Remover frame de modelo (F6 no modo Modelo)">−</button>
+          </div>
+          <label class="check"><input id="loop-shape" type="checkbox" /> Loop</label>
+          <label class="check" title="Mostra o frame de modelo anterior translúcido (O)"><input id="onion-skin" type="checkbox" /> Onion skin</label>
+        </div>
       </div>
       <canvas id="timeline-track" class="timeline-track" role="slider" aria-label="Frame atual" tabindex="0"></canvas>
     </footer>
