@@ -62,6 +62,12 @@ export const RENDER_PANELS = {
     { kind: 'check', label: 'ACES (tom fílmico)', get: (s) => s.film.aces, set: (s, v) => (s.film.aces = v) },
     { kind: 'number', label: 'Gama', min: 1, max: 5, step: 0.1, get: (s) => s.film.gamma, set: (s, v) => (s.film.gamma = v) },
   ],
+  bloom: [
+    { kind: 'number', label: 'Mistura', min: 0, max: 1, step: 0.01, get: (s) => s.bloom.mix, set: (s, v) => (s.bloom.mix = v) },
+    { kind: 'number', label: 'Tamanho', title: 'Raio do brilho, em fração da altura da imagem', min: 0, max: 1, step: 0.01, get: (s) => s.bloom.scale, set: (s, v) => (s.bloom.scale = v) },
+    { kind: 'number', label: 'Proporção', title: 'Achata o brilho na vertical', min: 0, max: 1, step: 0.01, get: (s) => s.bloom.aspect, set: (s, v) => (s.bloom.aspect = v) },
+    { kind: 'number', label: 'Limiar', title: 'Só o que passa deste brilho espalha', min: 0, max: 100, step: 0.1, get: (s) => s.bloom.threshold, set: (s, v) => (s.bloom.threshold = v) },
+  ],
   display: [
     { kind: 'check', label: 'Chão', title: 'Ctrl+U', get: (s) => s.show.ground, set: (s, v) => (s.show.ground = v) },
     { kind: 'color', label: 'Cor', get: (s) => s.ground.color, set: (s, v) => (s.ground.color = v) },
@@ -77,6 +83,7 @@ export const RENDER_PANELS = {
     { kind: 'check', label: 'Cor de fundo', title: 'Ctrl+B: o fundo mostra uma cor em vez do céu', get: (s) => s.show.backgroundColor, set: (s, v) => (s.show.backgroundColor = v) },
     { kind: 'color', label: 'Fundo', when: (s) => s.show.backgroundColor, get: (s) => s.background.color, set: (s, v) => (s.background.color = v) },
     { kind: 'check', label: 'Fundo transparente', get: (s) => s.show.transparent, set: (s, v) => (s.show.transparent = v) },
+    { kind: 'number', label: 'Célula', title: 'Quanto da célula cada voxel ocupa: menos de 1 separa os voxels', min: 0.01, max: 1, step: 0.01, get: (s) => s.show.cell, set: (s, v) => (s.show.cell = v) },
     { kind: 'number', label: 'Escala X', title: 'Tamanho do voxel no render', min: 0, max: 10, step: 0.1, get: (s) => s.show.scale[0], set: (s, v) => (s.show.scale = [v, s.show.scale[1], s.show.scale[2]]) },
     { kind: 'number', label: 'Escala Y', min: 0, max: 100, step: 0.1, get: (s) => s.show.scale[1], set: (s, v) => (s.show.scale = [s.show.scale[0], v, s.show.scale[2]]) },
     { kind: 'number', label: 'Escala Z', min: 0, max: 100, step: 0.1, get: (s) => s.show.scale[2], set: (s, v) => (s.show.scale = [s.show.scale[0], s.show.scale[1], v]) },

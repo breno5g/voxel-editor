@@ -5,8 +5,8 @@ import { EMPTY_VOXEL, voxelIndex } from '../format/vox.ts';
 import type { RenderSettings } from '../format/render-settings.ts';
 import { parseHdr } from '../render/path-tracer/hdr-image.ts';
 import { materialTable } from '../render/path-tracer/material-table.ts';
-import { createPathTracer, MAX_SAMPLES } from '../render/path-tracer/path-tracer.ts';
-import type { PathTracer, TraceView } from '../render/path-tracer/path-tracer.ts';
+import { createPathTracer, MAX_SAMPLES, VOXEL_SHAPES } from '../render/path-tracer/path-tracer.ts';
+import type { PathTracer, TraceOptions, TraceView } from '../render/path-tracer/path-tracer.ts';
 import { bakeSceneVolume } from '../render/path-tracer/scene-volume.ts';
 import type { Viewport } from '../render/viewport.ts';
 import { element } from './dom.ts';
@@ -36,6 +36,8 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
   const toggleButton = element('render-toggle', HTMLButtonElement);
   const samplesLabel = element('render-samples', HTMLOutputElement);
   const shadowsCheck = element('render-shadows', HTMLInputElement);
+  const bloomCheck = element('render-bloom-toggle', HTMLInputElement);
+  const shapeSelect = element('render-shape', HTMLSelectElement);
   const fixFocusCheck = element('render-fix-focus', HTMLInputElement);
   const focusInput = element('render-focus', HTMLInputElement);
   const iblRow = element('render-ibl-row', HTMLElement);
@@ -104,6 +106,7 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
     try {
       tracer = createPathTracer(container);
       tracer.setSettings(settings);
+      tracer.setOptions(options());
       return tracer;
     } catch (error) {
       editor.status(`Renderizador: ${errorMessage(error)}`, 'error');
@@ -137,10 +140,14 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
   new ResizeObserver(requestFrame).observe(container);
 
   toggleButton.addEventListener('click', toggle);
-  shadowsCheck.addEventListener('change', () => {
-    tracer?.setOptions({ shadows: shadowsCheck.checked });
-    requestFrame();
-  });
+  /** MagicaVoxel keeps these out of the file: they last for the session. */
+  const options = (): TraceOptions => ({ shadows: shadowsCheck.checked, shape: VOXEL_SHAPES.find((shape) => shape === shapeSelect.value) ?? 'cube', bloom: bloomCheck.checked });
+  for (const control of [shadowsCheck, bloomCheck, shapeSelect]) {
+    control.addEventListener('change', () => {
+      tracer?.setOptions(options());
+      requestFrame();
+    });
+  }
   for (const input of [fixFocusCheck, focusInput]) {
     input.addEventListener('change', () => {
       tracer?.reset();

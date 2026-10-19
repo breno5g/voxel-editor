@@ -352,9 +352,22 @@
         <label class="check" title="Mantém o foco numa profundidade: clique num voxel para focar nele"><input id="render-fix-focus" type="checkbox" /> Foco fixo (DOF)</label>
         <label class="control-row"><span class="label">Foco</span><input id="render-focus" type="number" min="0" max="9999.9" step="1" value="0" /></label>
         <div id="render-film" class="stack"></div>
+        <label class="check" title="Brilho em volta das partes mais claras (pt_bloom)"><input id="render-bloom-toggle" type="checkbox" /> Bloom</label>
+        <div id="render-bloom" class="stack"></div>
       </section>
       <section aria-labelledby="render-display-title" data-render-panel>
         <h2 id="render-display-title">Exibição</h2>
+        <label class="control-row" title="Como cada voxel é desenhado (pt_prim)">
+          <span class="label">Forma</span>
+          <select id="render-shape">
+            <option value="cube">Cubo</option>
+            <option value="lego">Lego</option>
+            <option value="mc">MC (como cubo)</option>
+            <option value="clay">Argila (como cubo)</option>
+            <option value="sphr">Esfera</option>
+            <option value="cyli">Cilindro</option>
+          </select>
+        </label>
         <div id="render-display" class="stack"></div>
       </section>
       <section aria-labelledby="render-sample-title" data-render-panel>

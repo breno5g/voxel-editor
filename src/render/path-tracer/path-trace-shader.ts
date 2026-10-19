@@ -80,6 +80,9 @@ uniform int u_specularBounces;
 uniform int u_scatterBounces;
 uniform float u_energy;
 uniform bool u_shadows;
+/* MagicaVoxel \`pt_prim\` (numbered as VOXEL_SHAPES) and \`pt_cell\`, the share of its cell a voxel fills. */
+uniform int u_shape;
+uniform float u_cell;
 
 out vec4 o_color;
 
@@ -147,6 +150,75 @@ bool brickFilled(ivec3 cell) {
 
 struct Hit { float t; vec3 normal; uint color; ivec3 cell; };
 
+/** Ray against the box [low, high]: entry t (or -1) and the face it enters through. */
+float boxHit(vec3 origin, vec3 inverse, vec3 low, vec3 high, out vec3 normal) {
+  vec3 t0 = (low - origin) * inverse;
+  vec3 t1 = (high - origin) * inverse;
+  vec3 tMin = min(t0, t1);
+  vec3 tMax = max(t0, t1);
+  float enter = max(max(tMin.x, tMin.y), tMin.z);
+  float exit = min(min(tMax.x, tMax.y), tMax.z);
+  normal = -sign(inverse) * vec3(equal(tMin, vec3(enter)));
+  return enter <= exit && enter >= 0.0 ? enter : -1.0;
+}
+
+float sphereHit(vec3 origin, vec3 direction, vec3 center, float radius, out vec3 normal) {
+  vec3 offset = origin - center;
+  float a = dot(direction, direction);
+  float b = dot(offset, direction);
+  float discriminant = b * b - a * (dot(offset, offset) - radius * radius);
+  if (discriminant < 0.0) return -1.0;
+  float t = (-b - sqrt(discriminant)) / a;
+  normal = normalize(offset + direction * t);
+  return t >= 0.0 ? t : -1.0;
+}
+
+/** A vertical cylinder from \`low\` to \`high\` in z, side and caps. */
+float cylinderHit(vec3 origin, vec3 direction, vec3 center, float radius, float low, float high, out vec3 normal) {
+  float best = -1.0;
+  vec2 offset = origin.xy - center.xy;
+  float a = dot(direction.xy, direction.xy);
+  float b = dot(offset, direction.xy);
+  float discriminant = b * b - a * (dot(offset, offset) - radius * radius);
+  if (a > 0.0 && discriminant >= 0.0) {
+    float t = (-b - sqrt(discriminant)) / a;
+    float z = origin.z + direction.z * t;
+    if (t >= 0.0 && z >= low && z <= high) {
+      best = t;
+      normal = vec3(normalize(offset + direction.xy * t), 0.0);
+    }
+  }
+  float capZ = direction.z < 0.0 ? high : low;
+  float t = (capZ - origin.z) / direction.z;
+  vec2 across = offset + direction.xy * t;
+  if (t >= 0.0 && dot(across, across) <= radius * radius && (best < 0.0 || t < best)) {
+    best = t;
+    normal = vec3(0.0, 0.0, -sign(direction.z));
+  }
+  return best;
+}
+
+/** The voxel's shape inside its cell: a box of side \`u_cell\`, a sphere, a cylinder, or a brick with a stud. */
+float primitiveHit(vec3 origin, vec3 direction, vec3 inverse, ivec3 cell, out vec3 normal) {
+  vec3 center = vec3(cell) + 0.5;
+  float extent = 0.5 * u_cell;
+  if (u_shape == 4) return sphereHit(origin, direction, center, extent, normal);
+  if (u_shape == 5) return cylinderHit(origin, direction, center, extent, center.z - extent, center.z + extent, normal);
+  if (u_shape == 1) {
+    float stud = solid(cell + ivec3(0, 0, 1)) ? 0.0 : 0.2 * u_cell;
+    vec3 studNormal;
+    float body = boxHit(origin, inverse, center - extent, center + vec3(extent, extent, extent - stud), normal);
+    float top = stud > 0.0 ? cylinderHit(origin, direction, center, 0.3 * u_cell, center.z + extent - stud, center.z + extent, studNormal) : -1.0;
+    if (top >= 0.0 && (body < 0.0 || top < body)) {
+      normal = studNormal;
+      return top;
+    }
+    return body;
+  }
+  // ponytail: marching-cubes (2) and clay (3) shapes render as boxes; smooth surfaces need a density field walk.
+  return boxHit(origin, inverse, center - extent, center + extent, normal);
+}
+
 /** The nearest voxel along the ray in volume coordinates (cells of size 1), or t < 0. */
 Hit traceVolume(vec3 origin, vec3 direction) {
   Hit hit;
@@ -162,6 +234,7 @@ Hit traceVolume(vec3 origin, vec3 direction) {
   float tExit = min(tFar.x, min(tFar.y, tFar.z));
   if (tEnter >= tExit) return hit;
 
+  bool fullCubes = u_shape == 0 && u_cell >= 1.0;
   ivec3 stepDirection = ivec3(sign(direction));
   vec3 tDelta = abs(inverse);
   float t = tEnter;
@@ -183,9 +256,11 @@ Hit traceVolume(vec3 origin, vec3 direction) {
       vec3 next = (vec3(cell) + max(vec3(stepDirection), vec3(0.0)) - origin) * inverse;
       for (int inner = 0; inner < BRICK * 3; inner++) {
         uint color = voxelAt(cell);
-        if (color != 0u) {
-          hit.t = t;
-          hit.normal = normal;
+        vec3 shapeNormal = normal;
+        float shapeT = color == 0u || fullCubes ? t : primitiveHit(origin, direction, inverse, cell, shapeNormal);
+        if (color != 0u && shapeT >= 0.0) {
+          hit.t = shapeT;
+          hit.normal = shapeNormal;
           hit.color = color;
           hit.cell = cell;
           return hit;
@@ -243,7 +318,7 @@ Surface traceScene(vec3 origin, vec3 direction) {
   if (voxel.t >= 0.0) {
     surface.hit = true;
     surface.t = voxel.t;
-    surface.normal = voxel.normal;
+    surface.normal = normalize(voxel.normal / u_scale);
     surface.color = voxel.color;
     surface.cell = voxel.cell;
   }
@@ -387,7 +462,8 @@ void main() {
       extra = texelFetch(u_materials, ivec2(int(surface.color), 1), 0);
     }
     vec3 world = surface.position / u_scale;
-    if (u_edges && !surface.ground && edgeDistance(surface.cell, normal, (surface.position - u_origin) / u_scale) < u_edgeWidth * 0.5) albedo = u_edgeColor;
+    bool fullCubes = u_shape == 0 && u_cell >= 1.0;
+    if (u_edges && fullCubes && !surface.ground && edgeDistance(surface.cell, normal, (surface.position - u_origin) / u_scale) < u_edgeWidth * 0.5) albedo = u_edgeColor;
     if (u_grid && (surface.ground || !u_gridGroundOnly)) {
       vec2 plane = abs(normal.x) > 0.5 ? world.yz : abs(normal.y) > 0.5 ? world.xz : world.xy;
       albedo = mix(albedo, u_gridColor, gridLine(plane, max(u_gridSpacing, 1.0), u_gridWidth));
@@ -457,14 +533,70 @@ void main() {
 }
 `;
 
+/** Bloom works at 1/BLOOM_DOWNSAMPLE of the image size. */
+export const BLOOM_DOWNSAMPLE = 4;
+
+/** Bloom's bright pass: each texel averages its block of the image, keeping what the exposure lifts above the threshold. */
+export const BLOOM_EXTRACT_FRAGMENT = `#version 300 es
+precision highp float;
+uniform sampler2D u_accumulation;
+uniform float u_exposure;
+uniform float u_threshold;
+out vec4 o_color;
+
+void main() {
+  ivec2 size = textureSize(u_accumulation, 0);
+  ivec2 base = ivec2(gl_FragCoord.xy) * ${BLOOM_DOWNSAMPLE};
+  vec3 sum = vec3(0.0);
+  for (int y = 0; y < ${BLOOM_DOWNSAMPLE}; y++) {
+    for (int x = 0; x < ${BLOOM_DOWNSAMPLE}; x++) {
+      vec3 color = texelFetch(u_accumulation, min(base + ivec2(x, y), size - 1), 0).rgb * u_exposure;
+      sum += max(color - u_threshold, 0.0);
+    }
+  }
+  o_color = vec4(sum / float(${BLOOM_DOWNSAMPLE * BLOOM_DOWNSAMPLE}), 1.0);
+}
+`;
+
+/** One direction of a separable Gaussian blur; past 64 taps the taps spread out. */
+export const BLOOM_BLUR_FRAGMENT = `#version 300 es
+precision highp float;
+uniform sampler2D u_source;
+uniform vec2 u_direction;
+uniform float u_radius;
+out vec4 o_color;
+
+void main() {
+  vec2 size = vec2(textureSize(u_source, 0));
+  vec2 uv = gl_FragCoord.xy / size;
+  float taps = min(ceil(u_radius), 64.0);
+  float stride = max(u_radius / 64.0, 1.0);
+  float sigma = max(u_radius / 2.5, 0.5);
+  vec3 sum = texture(u_source, uv).rgb;
+  float total = 1.0;
+  for (int index = 1; index <= 64; index++) {
+    float tap = float(index);
+    if (tap > taps) break;
+    float distance = tap * stride;
+    float weight = exp(-0.5 * distance * distance / (sigma * sigma));
+    vec2 offset = u_direction * distance / size;
+    sum += (texture(u_source, uv + offset).rgb + texture(u_source, uv - offset).rgb) * weight;
+    total += 2.0 * weight;
+  }
+  o_color = vec4(sum / total, 1.0);
+}
+`;
+
 /**
  * The accumulated mean to the screen (MagicaVoxel's film): exposure, ACES filmic tone mapping or plain
- * clamping, gamma and vignette. Pixels the scene does not cover show the flat background colour or stay
+ * clamping, gamma and vignette, after adding the bloom. Pixels the scene does not cover show the flat background colour or stay
  * transparent; the colour is premultiplied by coverage.
  */
 export const DISPLAY_FRAGMENT = `#version 300 es
 precision highp float;
 uniform sampler2D u_accumulation;
+uniform sampler2D u_bloom;
+uniform float u_bloomMix;
 uniform vec2 u_resolution;
 uniform float u_exposure;
 uniform bool u_aces;
@@ -482,6 +614,7 @@ void main() {
   vec4 sampled = texelFetch(u_accumulation, ivec2(gl_FragCoord.xy), 0);
   float coverage = sampled.a;
   vec3 color = coverage > 0.0 ? sampled.rgb / coverage * u_exposure : vec3(0.0);
+  color += texture(u_bloom, gl_FragCoord.xy / u_resolution).rgb * u_bloomMix;
   color = u_aces ? aces(color) : clamp(color, 0.0, 1.0);
   color = pow(color, vec3(1.0 / max(u_gamma, 0.1)));
   vec2 uv = gl_FragCoord.xy / u_resolution - 0.5;

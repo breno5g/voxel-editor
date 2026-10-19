@@ -6,14 +6,17 @@ import type { Vec3 } from '../../format/vox.ts';
 import { linkFullScreenProgram } from '../gl-program.ts';
 import type { HdrImage } from './hdr-image.ts';
 import { MATERIAL_ROWS } from './material-table.ts';
-import { DISPLAY_FRAGMENT, PATH_TRACE_FRAGMENT } from './path-trace-shader.ts';
+import { BLOOM_BLUR_FRAGMENT, BLOOM_DOWNSAMPLE, BLOOM_EXTRACT_FRAGMENT, DISPLAY_FRAGMENT, PATH_TRACE_FRAGMENT } from './path-trace-shader.ts';
 import type { SceneVolume } from './scene-volume.ts';
 
 export type PathTracer = ReturnType<typeof createPathTracer>;
 /** The camera to trace from and the distance along its view where the lens focuses. */
 export type TraceView = { camera: THREE.Camera; focusDistance: number };
 /** Options that only live while rendering (MagicaVoxel keeps them out of the file). */
-export type TraceOptions = { shadows: boolean };
+export type TraceOptions = { shadows: boolean; shape: VoxelShape; bloom: boolean };
+/** MagicaVoxel's `pt_prim`: how each voxel is drawn. */
+export const VOXEL_SHAPES = ['cube', 'lego', 'mc', 'clay', 'sphr', 'cyli'] as const;
+export type VoxelShape = (typeof VOXEL_SHAPES)[number];
 
 /** Samples per pixel after which the image is left as it is. */
 export const MAX_SAMPLES = 2048;
@@ -27,7 +30,8 @@ const EXTINCTION_SCALE = 0.01;
 /** `_lens _aperture`: lens radius as a fraction of the focus distance. */
 const APERTURE_SCALE = 0.02;
 
-const TEXTURE_UNITS = { volume: 0, bricks: 1, palette: 2, materials: 3, ibl: 4, previous: 5, accumulation: 0 } as const;
+/** Units for the trace pass, then for the bloom and display passes (which bind only 2D textures). */
+const TEXTURE_UNITS = { volume: 0, bricks: 1, palette: 2, materials: 3, ibl: 4, previous: 5, accumulation: 0, bloom: 1 } as const;
 
 const linear = (color: Vec3): Vec3 => [Math.pow(color[0] / 255, 2.2), Math.pow(color[1] / 255, 2.2), Math.pow(color[2] / 255, 2.2)];
 const scaled = (color: Vec3, factor: number): Vec3 => [color[0] * factor, color[1] * factor, color[2] * factor];
@@ -47,11 +51,14 @@ export function createPathTracer(container: HTMLElement) {
 
   const traceProgram = linkFullScreenProgram(gl, PATH_TRACE_FRAGMENT);
   const displayProgram = linkFullScreenProgram(gl, DISPLAY_FRAGMENT);
-  const locations = new Map<string, WebGLUniformLocation | null>();
+  const extractProgram = linkFullScreenProgram(gl, BLOOM_EXTRACT_FRAGMENT);
+  const blurProgram = linkFullScreenProgram(gl, BLOOM_BLUR_FRAGMENT);
+  const locations = new Map<WebGLProgram, Map<string, WebGLUniformLocation | null>>();
   const at = (program: WebGLProgram, name: string) => {
-    const key = `${program === traceProgram ? 't' : 'd'}${name}`;
-    if (!locations.has(key)) locations.set(key, gl.getUniformLocation(program, name));
-    return locations.get(key) ?? null;
+    const cache = locations.get(program) ?? new Map<string, WebGLUniformLocation | null>();
+    locations.set(program, cache);
+    if (!cache.has(name)) cache.set(name, gl.getUniformLocation(program, name));
+    return cache.get(name) ?? null;
   };
 
   const createTexture = (target: GLenum, filter: GLenum = gl.NEAREST) => {
@@ -86,8 +93,12 @@ export function createPathTracer(container: HTMLElement) {
 
   /** Two float buffers: each sample reads the running mean from one and writes the new mean into the other. */
   const accumulation = [0, 1].map(() => ({ texture: createTexture(gl.TEXTURE_2D), framebuffer: gl.createFramebuffer() }));
+  /** Bloom's bright pass and blur, ping-ponged at a quarter of the image size. */
+  const bloomTargets = [0, 1].map(() => ({ texture: createTexture(gl.TEXTURE_2D, gl.LINEAR), framebuffer: gl.createFramebuffer() }));
   let width = 0;
   let height = 0;
+  let bloomWidth = 0;
+  let bloomHeight = 0;
   const resize = (nextWidth: number, nextHeight: number) => {
     const limit = Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE), gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
     if (nextWidth > limit || nextHeight > limit) throw new Error(`A GPU renderiza até ${limit}×${limit} pixels`);
@@ -101,12 +112,20 @@ export function createPathTracer(container: HTMLElement) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
     });
+    bloomWidth = Math.ceil(width / BLOOM_DOWNSAMPLE);
+    bloomHeight = Math.ceil(height / BLOOM_DOWNSAMPLE);
+    bloomTargets.forEach(({ texture, framebuffer }) => {
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, bloomWidth, bloomHeight, 0, gl.RGBA, gl.HALF_FLOAT, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    });
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   };
 
   let volume: SceneVolume | null = null;
   let settings: RenderSettings | null = null;
-  let options: TraceOptions = { shadows: true };
+  let options: TraceOptions = { shadows: true, shape: 'cube', bloom: false };
   let hasIbl = false;
   let samples = 0;
   let current = 0;
@@ -193,11 +212,43 @@ export function createPathTracer(container: HTMLElement) {
     gl.bindTexture(target, texture);
   };
 
-  const display = (film: RenderSettings['film'], background: Vec3, transparent: boolean) => {
+  /** Blurs what the exposure lifts above the threshold into the first bloom target. */
+  const blurBloom = (exposure: number, { scale, aspect, threshold }: RenderSettings['bloom']) => {
+    const [first, second] = bloomTargets;
+    gl.viewport(0, 0, bloomWidth, bloomHeight);
+    gl.useProgram(extractProgram);
+    bind(TEXTURE_UNITS.accumulation, gl.TEXTURE_2D, accumulation[current].texture);
+    gl.uniform1i(at(extractProgram, 'u_accumulation'), TEXTURE_UNITS.accumulation);
+    gl.uniform1f(at(extractProgram, 'u_exposure'), exposure);
+    gl.uniform1f(at(extractProgram, 'u_threshold'), threshold);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, first.framebuffer);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.useProgram(blurProgram);
+    gl.uniform1i(at(blurProgram, 'u_source'), TEXTURE_UNITS.accumulation);
+    // ponytail: `_aspect` read as squashing the blur vertically (an anamorphic streak at 1); unconfirmed in the binary.
+    const passes: [typeof first, typeof first, [number, number], number][] = [
+      [first, second, [1, 0], scale * bloomHeight],
+      [second, first, [0, 1], scale * bloomHeight * (1 - 0.9 * aspect)],
+    ];
+    passes.forEach(([source, target, direction, radius]) => {
+      bind(TEXTURE_UNITS.accumulation, gl.TEXTURE_2D, source.texture);
+      gl.uniform2f(at(blurProgram, 'u_direction'), ...direction);
+      gl.uniform1f(at(blurProgram, 'u_radius'), radius);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    });
+  };
+
+  const display = (film: RenderSettings['film'], background: Vec3, transparent: boolean, bloom: RenderSettings['bloom'] | null) => {
+    if (bloom) blurBloom(film.exposure, bloom);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, width, height);
     gl.useProgram(displayProgram);
     bind(TEXTURE_UNITS.accumulation, gl.TEXTURE_2D, accumulation[current].texture);
+    bind(TEXTURE_UNITS.bloom, gl.TEXTURE_2D, bloomTargets[0].texture);
     gl.uniform1i(at(displayProgram, 'u_accumulation'), TEXTURE_UNITS.accumulation);
+    gl.uniform1i(at(displayProgram, 'u_bloom'), TEXTURE_UNITS.bloom);
+    gl.uniform1f(at(displayProgram, 'u_bloomMix'), bloom ? bloom.mix : 0);
     gl.uniform2f(at(displayProgram, 'u_resolution'), width, height);
     gl.uniform1f(at(displayProgram, 'u_exposure'), film.exposure);
     gl.uniform1i(at(displayProgram, 'u_aces'), Number(film.aces));
@@ -279,6 +330,8 @@ export function createPathTracer(container: HTMLElement) {
       if (samples >= MAX_SAMPLES) return;
       applySettings(settings);
       gl.uniform1i(at(traceProgram, 'u_shadows'), Number(options.shadows));
+      gl.uniform1i(at(traceProgram, 'u_shape'), VOXEL_SHAPES.indexOf(options.shape));
+      gl.uniform1f(at(traceProgram, 'u_cell'), Math.min(Math.max(settings.show.cell, 0.01), 1));
       const previous = current;
       current = 1 - current;
       bind(TEXTURE_UNITS.volume, gl.TEXTURE_3D, volumeTexture);
@@ -300,7 +353,7 @@ export function createPathTracer(container: HTMLElement) {
       gl.viewport(0, 0, width, height);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       samples++;
-      display(settings.film, settings.background.color, settings.show.transparent);
+      display(settings.film, settings.background.color, settings.show.transparent, options.bloom ? settings.bloom : null);
     },
   };
 }
