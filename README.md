@@ -95,3 +95,7 @@ src/editor/       estado e eventos, histórico, ferramentas, comandos de modelo,
 src/ui/           um módulo por painel
 tools/vox_anim.py implementação de referência em Python do parser e da avaliação de animação
 ```
+
+## Licença
+
+[MIT](LICENSE). MagicaVoxel é um software de [ephtracy](https://ephtracy.github.io/); este projeto só lê e grava o formato `.vox` para interoperabilidade.
