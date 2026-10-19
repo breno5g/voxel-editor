@@ -398,6 +398,10 @@ body {
   background: transparent;
 }
 
+.overlay .field .segmented {
+  border: 0;
+}
+
 /* Timeline */
 
 .timeline {

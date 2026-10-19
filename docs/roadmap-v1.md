@@ -21,6 +21,7 @@ Depois da v1 o editor diverge livremente; até lá, atalhos e semântica seguem 
 - [x] Modelo: objetos de fundo esmaecidos (`Ctrl+B`), grade (`Ctrl+G`), moldura (`Ctrl+F`), arestas (`Ctrl+E`)
 - [x] Espelho X/Y/Z do pincel (`1` `2` `3`); `full` (`U`), `fill` (`I`), `zero` (`Delete`)
 - [x] Câmera: recentralizar (`5`), vista de face (`Ctrl+5`), perspectiva/livre/ortogonal/isométrica, `Espaço`/`Z`/`K` + arrastar, slots `7`/`8`/numpad, captura `6`
+- [x] Zoom da roda como no MagicaVoxel (no foco) ou, como opção, no voxel sob o cursor
 - [x] Layout do MagicaVoxel: paleta e pincel à esquerda, objetos e edição à direita
 
 Pendências da v0.6:

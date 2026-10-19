@@ -214,6 +214,13 @@
           <button id="camera-save" type="button" title="Salvar a câmera no slot (7)">Salvar</button>
           <button id="camera-load" type="button" title="Carregar a câmera do slot (8)">Carregar</button>
         </div>
+        <div class="field" role="group" aria-labelledby="wheel-zoom-label">
+          <span id="wheel-zoom-label">Zoom</span>
+          <div id="wheel-zoom" class="segmented">
+            <button type="button" data-value="cursor" title="A roda aproxima do voxel sob o cursor">Cursor</button>
+            <button type="button" data-value="focus" title="Como no MagicaVoxel: a roda aproxima do centro de rotação (5 recentraliza)">Foco</button>
+          </div>
+        </div>
       </div>
     </main>
 
@@ -259,7 +266,7 @@
       <table>
         <tbody>
           <tr><th scope="row" colspan="2" class="group">Geral</th></tr>
-          <tr><th scope="row">Girar / mover câmera / zoom</th><td>botão direito / botão do meio / roda (aproxima do ponto sob o cursor)</td></tr>
+          <tr><th scope="row">Girar / mover câmera / zoom</th><td>botão direito / botão do meio / roda (no cursor ou no foco, em Zoom)</td></tr>
           <tr><th scope="row">Mover / zoom / girar com o botão esquerdo</th><td>segure <kbd>Espaço</kbd> / <kbd>Z</kbd> / <kbd>K</kbd> e arraste</td></tr>
           <tr><th scope="row">Alternar modo Modelo / Mundo</th><td><kbd>Tab</kbd> com o viewport focado (<kbd>Esc</kbd> sai dele)</td></tr>
           <tr><th scope="row">Recentralizar / vista de face</th><td><kbd>5</kbd> / <kbd>Ctrl+5</kbd></td></tr>

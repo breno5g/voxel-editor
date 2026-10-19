@@ -7,6 +7,11 @@ export const CAMERA_MODES = ['pers', 'free', 'orth', 'iso'] as const;
 export type CameraMode = (typeof CAMERA_MODES)[number];
 export const isCameraMode = (value: unknown): value is CameraMode => CAMERA_MODES.some((mode) => mode === value);
 
+/** What the wheel zooms toward: the voxel under the cursor, or the focus like MagicaVoxel. */
+export const WHEEL_ZOOMS = ['cursor', 'focus'] as const;
+export type WheelZoom = (typeof WHEEL_ZOOMS)[number];
+export const isWheelZoom = (value: unknown): value is WheelZoom => WHEEL_ZOOMS.some((zoom) => zoom === value);
+
 export type CameraState = { mode: CameraMode; target: Vec3; position: Vec3; zoom: number; height: number };
 export type CameraDrag = 'pan' | 'zoom' | 'rotate';
 
@@ -30,6 +35,21 @@ const FACE_DIRECTIONS = [
 
 const toVec3 = (vector: THREE.Vector3): Vec3 => [vector.x, vector.y, vector.z];
 
+/** MagicaVoxel's wheel step (`***REMOVED***`): 10 × the zoom speed, 0.01 for orbit cameras and 1 for the free one. */
+const FOCUS_ZOOM_STEP = 0.1;
+const FREE_ZOOM_STEP = 10;
+const MIN_ZOOM_EXTENT = 0.001;
+/** Wheel delta per notch for each `WheelEvent.deltaMode` (pixels, lines, pages), as OrbitControls reads it. */
+const WHEEL_NOTCH = [100, 3, 1];
+
+/**
+ * MagicaVoxel's perspective zoom (`***REMOVED***`): `radius + 1` scales by `e^-amount`, so unlike a
+ * plain `radius · factor` it reaches the focus in a few steps instead of slowing down forever.
+ */
+export const focusZoomRadius = (radius: number, amount: number) => Math.max((radius + 1) * Math.exp(-amount) - 1, MIN_ZOOM_EXTENT);
+/** Its orthographic and isometric zoom: the view extent scales linearly. */
+export const focusZoomExtent = (extent: number, amount: number) => Math.max(extent * (1 - amount), MIN_ZOOM_EXTENT);
+
 /**
  * Perspective and orthographic cameras orbiting one target (right button rotates,
  * middle pans, wheel zooms). Orthographic and isometric keep the visible height of
@@ -41,6 +61,18 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
   perspective.up.copy(UP);
   orthographic.up.copy(UP);
   perspective.position.set(60, -80, 60);
+  let wheelZoom: WheelZoom = 'cursor';
+  // Registered before OrbitControls, so the focus zoom can take the wheel away from it.
+  canvas.addEventListener(
+    'wheel',
+    (event) => {
+      if (wheelZoom !== 'focus') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      zoomToFocus(-event.deltaY / (WHEEL_NOTCH[event.deltaMode] ?? WHEEL_NOTCH[0]));
+    },
+    { passive: false },
+  );
   const controls = new OrbitControls<THREE.PerspectiveCamera | THREE.OrthographicCamera>(perspective, canvas);
   controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
   controls.zoomToCursor = true;
@@ -65,6 +97,22 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
     updateProjection();
     controls.update();
     onChange();
+  };
+
+  /** MagicaVoxel wheel zoom toward the focus, `notches` > 0 zooming in; the free camera flies instead. */
+  const zoomToFocus = (notches: number) => {
+    const view = offset();
+    if (mode === 'free') {
+      const move = view.normalize().multiplyScalar(-FREE_ZOOM_STEP * notches);
+      camera().position.add(move);
+      controls.target.add(move);
+    } else if (isOrthographic(mode)) {
+      orthographic.zoom = orthoHeight / focusZoomExtent(orthoHeight / orthographic.zoom, FOCUS_ZOOM_STEP * notches);
+    } else {
+      const radius = focusZoomRadius(view.length(), FOCUS_ZOOM_STEP * notches);
+      camera().position.copy(controls.target).addScaledVector(view.normalize(), radius);
+    }
+    settle();
   };
 
   const setMode = (next: CameraMode) => {
@@ -98,6 +146,10 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
       controls.zoomToCursor = drag !== 'zoom';
     },
     leftDrag: () => controls.mouseButtons.LEFT !== null,
+    wheelZoom: () => wheelZoom,
+    setWheelZoom(next: WheelZoom) {
+      wheelZoom = next;
+    },
     aspect: () => aspect,
 
     setAspect(next: number) {

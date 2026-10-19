@@ -1,10 +1,29 @@
 import type { Editor } from '../editor/editor.ts';
-import { isCameraMode } from '../render/camera-rig.ts';
+import { isCameraMode, isWheelZoom } from '../render/camera-rig.ts';
 import type { CameraState } from '../render/camera-rig.ts';
 import type { Viewport } from '../render/viewport.ts';
-import { element } from './dom.ts';
+import { bindButtonGroup, element } from './dom.ts';
 
 const SLOT_COUNT = 10;
+const WHEEL_ZOOM_KEY = 'voxel-editor:wheel-zoom';
+
+/** The wheel zoom choice is a per-browser preference; storage may be unavailable (private windows). */
+function storedWheelZoom() {
+  try {
+    const stored = localStorage.getItem(WHEEL_ZOOM_KEY);
+    return isWheelZoom(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeWheelZoom(value: string) {
+  try {
+    localStorage.setItem(WHEEL_ZOOM_KEY, value);
+  } catch {
+    // Not persisted; the choice still holds for this session.
+  }
+}
 
 export type CameraPanel = ReturnType<typeof bindCameraPanel>;
 
@@ -45,6 +64,14 @@ export function bindCameraPanel(editor: Editor, viewport: Viewport) {
   element('camera-save', HTMLButtonElement).addEventListener('click', save);
   element('camera-load', HTMLButtonElement).addEventListener('click', load);
   syncModes();
+
+  const showWheelZoom = bindButtonGroup('wheel-zoom', (raw) => (isWheelZoom(raw) ? raw : undefined), (zoom) => {
+    camera.setWheelZoom(zoom);
+    storeWheelZoom(zoom);
+    showWheelZoom(zoom);
+  });
+  camera.setWheelZoom(storedWheelZoom() ?? camera.wheelZoom());
+  showWheelZoom(camera.wheelZoom());
 
   return {
     save,

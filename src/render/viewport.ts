@@ -165,12 +165,13 @@ export function createViewport(container: HTMLElement) {
     return nearest;
   };
 
-  // Ahead of OrbitControls' wheel handler on the canvas: zoom closes in on the voxel under the cursor.
+  // Ahead of OrbitControls' wheel handler on the canvas: cursor zoom closes in on the voxel under the cursor.
   // Over empty space the target stays, as a far floor point would fling the camera away.
   // Poses are rigid, so model-space hit distances are world distances.
   container.addEventListener(
     'wheel',
     (event) => {
+      if (rig.wheelZoom() !== 'cursor') return;
       const nearest = pick(event.clientX, event.clientY);
       if (!nearest) return;
       aim(event.clientX, event.clientY);
