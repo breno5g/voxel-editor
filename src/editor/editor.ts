@@ -1,6 +1,7 @@
 import { createDocument } from '../format/defaults.ts';
 import type { Axis } from '../format/rotation.ts';
-import type { VoxDocument, VoxModel } from '../format/vox.ts';
+import { MAX_MODEL_SIZE } from '../format/vox.ts';
+import type { Vec3, VoxDocument, VoxModel } from '../format/vox.ts';
 import { clampFrame, DEFAULT_RANGE, formatRange, parseRange, RANGE_META_KEY } from '../scene/keyframes.ts';
 import type { FrameRange } from '../scene/keyframes.ts';
 import { evaluateScene } from '../scene/scene-graph.ts';
@@ -14,13 +15,17 @@ export const MODES = ['model', 'world'] as const;
 export type Mode = (typeof MODES)[number];
 /**
  * MagicaVoxel `b_type`: brush actions, one-click actions on a colour region (`pick` takes its colour),
- * then selection: `msel` marquee (M), `asel` region (N) and `xform`, which moves the selected voxels.
+ * then selection: `msel` marquee (M), `asel` region (N) and `xform`, which transforms the selected voxels;
+ * `resize` drags a face of the model frame to resize the volume.
  */
-export const BRUSH_TYPES = ['attach', 'erase', 'paint', 'pick', 'remove', 'replace', 'msel', 'asel', 'xform'] as const;
+export const BRUSH_TYPES = ['attach', 'erase', 'paint', 'pick', 'remove', 'replace', 'msel', 'asel', 'xform', 'resize'] as const;
 export type BrushType = (typeof BRUSH_TYPES)[number];
 /** MagicaVoxel `b_msel`: the marquee selects by screen rectangle, by brush stroke, or by box. */
 export const MARQUEE_MODES = ['rect', 'brush', 'box'] as const;
 export type MarqueeMode = (typeof MARQUEE_MODES)[number];
+/** MagicaVoxel `b_xform`: what dragging the selection does. */
+export const TRANSFORM_TOOLS = ['move', 'scale', 'wrap', 'rotate'] as const;
+export type TransformTool = (typeof TRANSFORM_TOOLS)[number];
 /**
  * MagicaVoxel `b_mode`: `vox` stamps under the pointer, `face` works on the flat face region
  * under it, `box` fills the cells between press and release, `geo` draws lines and shapes.
@@ -80,6 +85,9 @@ export type EditorState = {
   geoBrush: GeoBrush;
   regionBrush: RegionOptions;
   marquee: MarqueeMode;
+  transformTool: TransformTool;
+  /** MagicaVoxel `b_wrap_space_x/y/z`: empty cells between wrapped copies. */
+  wrapSpacing: Vec3;
   /** Selected voxels of the edited model; ignored once that model is no longer the one being edited. */
   voxelSelection: VoxelSelection | null;
   color: number;
@@ -136,6 +144,8 @@ export function createEditor() {
     geoBrush: { shape: 'line', project: false, fill: true, even: false },
     regionBrush: { connected: true, byColor: true, neighbors: 6 },
     marquee: 'rect',
+    transformTool: 'move',
+    wrapSpacing: [0, 0, 0],
     voxelSelection: null,
     color: DEFAULT_COLOR,
     onionSkin: false,
@@ -256,6 +266,18 @@ export function createEditor() {
 
     setMarquee(marquee: MarqueeMode) {
       state.marquee = marquee;
+      emit({ type: 'tool' });
+    },
+
+    setTransformTool(transformTool: TransformTool) {
+      state.transformTool = transformTool;
+      emit({ type: 'tool' });
+    },
+
+    setWrapSpacing(axis: Axis, spacing: number) {
+      const next: Vec3 = [...state.wrapSpacing];
+      next[axis] = Math.min(Math.max(Math.round(spacing) || 0, 0), MAX_MODEL_SIZE);
+      state.wrapSpacing = next;
       emit({ type: 'tool' });
     },
 

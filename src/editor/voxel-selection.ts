@@ -68,13 +68,17 @@ export function selectionBounds(size: Vec3, mask: Uint8Array): [Vec3, Vec3] | nu
   return low[0] === Infinity ? null : [low, high];
 }
 
+/** Where a transformed selection sits on an axis: kept at the box's low side, centred, or kept at its high side. */
+export type Anchor = 'low' | 'center' | 'high';
+const CENTERED: Anchor[] = ['center', 'center', 'center'];
+
 /**
  * Runs a whole-model operation on the selection only: its bounding box is cut out (selected voxels
- * alone), transformed, and written back centred on the same box, replacing the selected voxels. The
- * result's filled cells become the new selection. MagicaVoxel's `map()` passes do the same through
- * their `src_bound` / `dst_bound` uniforms.
+ * alone), transformed, and written back on the same box (centred unless `anchors` says otherwise),
+ * replacing the selected voxels. The result's filled cells become the new selection. MagicaVoxel's
+ * `map()` passes do the same through their `src_bound` / `dst_bound` uniforms.
  */
-export function transformSelection(model: VoxModel, mask: Uint8Array, operation: (part: VoxModel) => VoxModel): VoxelSelection {
+export function transformSelection(model: VoxModel, mask: Uint8Array, operation: (part: VoxModel) => VoxModel, anchors: readonly Anchor[] = CENTERED): VoxelSelection {
   const bounds = selectionBounds(model.size, mask);
   if (!bounds) return { model, mask };
   const [low, high] = bounds;
@@ -91,7 +95,11 @@ export function transformSelection(model: VoxModel, mask: Uint8Array, operation:
   const result = createModel(model.size);
   model.voxels.forEach((color, index) => (result.voxels[index] = mask[index] ? EMPTY_VOXEL : color));
   const nextMask = new Uint8Array(model.voxels.length);
-  const origin = [0, 1, 2].map((axis) => Math.floor((low[axis] + high[axis] + 1) / 2 - transformed.size[axis] / 2));
+  const origin = [0, 1, 2].map((axis) => {
+    if (anchors[axis] === 'low') return low[axis];
+    if (anchors[axis] === 'high') return high[axis] + 1 - transformed.size[axis];
+    return Math.floor((low[axis] + high[axis] + 1) / 2 - transformed.size[axis] / 2);
+  });
   transformed.voxels.forEach((color, partIndex) => {
     if (color === EMPTY_VOXEL) return;
     const [x, y, z] = cellOf(transformed.size, partIndex);

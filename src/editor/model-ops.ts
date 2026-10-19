@@ -372,3 +372,19 @@ export function maze(model: VoxModel, color: number, width = 1, random: () => nu
   }
   return result;
 }
+
+/**
+ * Wrap transform (`b_xform wrap`): copies of the model along `axis`, `spacing` empty cells apart,
+ * filling `length` cells; `phase` shifts where the first whole copy starts.
+ */
+export function tile(model: VoxModel, axis: Axis, length: number, spacing: number, phase = 0): VoxModel {
+  const size: Vec3 = [...model.size];
+  size[axis] = length;
+  const period = model.size[axis] + Math.max(0, spacing);
+  return mapCells(size, (cell) => {
+    const along = (((cell[axis] - phase) % period) + period) % period;
+    if (along >= model.size[axis]) return EMPTY_VOXEL;
+    cell[axis] = along;
+    return sampleAt(model, cell);
+  });
+}

@@ -55,7 +55,7 @@
   <div class="segmented">
             <button type="button" data-value="msel" title="Selecionar (M): Shift soma, Shift+Alt subtrai">Selecionar</button>
             <button type="button" data-value="asel" title="Selecionar região (N): Shift soma, Shift+Alt subtrai">Região</button>
-            <button type="button" data-value="xform" title="Mover a seleção arrastando, dando a volta no volume; Ctrl move em um eixo">Mover</button>
+            <button type="button" data-value="xform" title="Transformar a seleção: mover, escalar, wrap ou girar">Mover</button>
           </div>
         </div>
         <div class="control-row" id="marquee-options">
@@ -66,7 +66,22 @@
             <button type="button" data-value="box" title="Seleciona uma caixa arrastada no modelo">Caixa</button>
           </div>
         </div>
-        <p class="hint" id="transform-hint">Arraste a seleção para movê-la; ela dá a volta no volume. Ctrl limita a um eixo.</p>
+        <div class="stack" id="transform-options">
+          <div id="transform-tool" class="segmented columns-2" role="group" aria-label="Transformar">
+            <button type="button" data-value="move" title="Mover/loop: arraste a seleção; Ctrl limita a um eixo">Mover</button>
+            <button type="button" data-value="scale" title="Escalar: arraste uma face da seleção; Shift nos dois lados; Enter aplica, Esc cancela">Escalar</button>
+            <button type="button" data-value="wrap" title="Wrap: arraste uma face para repetir a seleção; Shift nos dois lados; Enter aplica, Esc cancela">Wrap</button>
+            <button type="button" data-value="rotate" title="Girar: arraste na horizontal em torno do eixo da face; Shift encaixa de 15 em 15°; Enter aplica, Esc cancela">Girar</button>
+          </div>
+          <div class="control-row" id="wrap-options">
+            <span class="label">Espaço</span>
+            <div class="size-fields">
+              <input id="wrap-x" type="number" min="0" max="256" aria-label="Espaço do wrap em X" />
+              <input id="wrap-y" type="number" min="0" max="256" aria-label="Espaço do wrap em Y" />
+              <input id="wrap-z" type="number" min="0" max="256" aria-label="Espaço do wrap em Z" />
+            </div>
+          </div>
+        </div>
         <div class="stack" data-region-options>
           <div class="control-row">
             <span class="label" id="region-scope-label">Região</span>
@@ -211,6 +226,7 @@
           <button type="button" data-command="rev" title="O espaço vazio vira voxel na cor atual e os voxels somem">Inverter</button>
           <button type="button" data-command="x2" title="Dobrar o tamanho do modelo">2×</button>
           <button type="button" data-command="xh" title="Reduzir o modelo à metade">½</button>
+          <button id="resize-tool" type="button" title="Redimensionar arrastando uma face da moldura; Shift muda os dois lados">Moldura</button>
         </div>
       </section>
       <section aria-labelledby="selection-title" data-only-mode="model">
@@ -412,6 +428,8 @@
           <tr><th scope="row">Selecionar / selecionar região</th><td><kbd>M</kbd> / <kbd>N</kbd> (<kbd>Shift</kbd> soma, <kbd>Shift+Alt</kbd> subtrai)</td></tr>
           <tr><th scope="row">Selecionar tudo / inverter / nada</th><td><kbd>Ctrl+A</kbd> / <kbd>Ctrl+I</kbd> / <kbd>Ctrl+D</kbd></td></tr>
           <tr><th scope="row">Copiar / recortar / colar voxels</th><td><kbd>Ctrl+C</kbd> / <kbd>Ctrl+X</kbd> / <kbd>Ctrl+V</kbd></td></tr>
+          <tr><th scope="row">Escalar / wrap / girar: aplicar / cancelar</th><td><kbd>Enter</kbd> / <kbd>Esc</kbd> (<kbd>Shift</kbd>: dos dois lados, ou de 15 em 15°)</td></tr>
+          <tr><th scope="row">Redimensionar o modelo</th><td>botão Moldura e arrastar uma face (<kbd>Shift</kbd>: dos dois lados)</td></tr>
           <tr><th scope="row">Espelhar o pincel em X / Y / Z</th><td><kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd></td></tr>
           <tr><th scope="row">Encher / pintar tudo / limpar</th><td><kbd>U</kbd> / <kbd>I</kbd> / <kbd>Delete</kbd></td></tr>
           <tr><th scope="row">Exibir moldura do modelo</th><td><kbd>Ctrl+F</kbd></td></tr>

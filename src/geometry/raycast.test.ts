@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createModel, voxelIndex } from '../format/vox.ts';
-import { raycastPlane, raycastVoxels } from './raycast.ts';
+import { raycastBoxFace, raycastPlane, raycastVoxels } from './raycast.ts';
 
 const model = createModel([8, 8, 8]);
 model.voxels[voxelIndex(model.size, 3, 4, 5)] = 1;
@@ -37,5 +37,14 @@ describe('raycastPlane', () => {
   it('ignores rays pointing away or landing outside the model', () => {
     expect(raycastPlane(model, [2.5, 6.5, 10], [0, 0, 1], 2, 0, 0)).toBeNull();
     expect(raycastPlane(model, [20.5, 6.5, 10], [0, 0, -1], 2, 0, 0)).toBeNull();
+  });
+});
+
+describe('raycastBoxFace', () => {
+  it('finds the face a ray enters the model box through', () => {
+    expect(raycastBoxFace([4, 4, 4], [2, 2, 10], [0, 0, -1])).toEqual({ axis: 2, side: 1 });
+    expect(raycastBoxFace([4, 4, 4], [-5, 2, 2], [1, 0, 0])).toEqual({ axis: 0, side: -1 });
+    expect(raycastBoxFace([4, 4, 4], [2, 2, 2], [1, 0, 0])).toBeNull();
+    expect(raycastBoxFace([4, 4, 4], [10, 10, 10], [1, 0, 0])).toBeNull();
   });
 });

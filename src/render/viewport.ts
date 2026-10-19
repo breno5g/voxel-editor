@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { modelPivot } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
 import type { Axis } from '../format/rotation.ts';
-import { raycastPlane, raycastVoxels } from '../geometry/raycast.ts';
+import { raycastBoxFace, raycastPlane, raycastVoxels } from '../geometry/raycast.ts';
 import type { VoxelHit } from '../geometry/raycast.ts';
 import type { Instance, Pose } from '../scene/scene-graph.ts';
 import { createCameraRig } from './camera-rig.ts';
@@ -382,6 +382,13 @@ export function createViewport(container: HTMLElement) {
 
     planeCell,
     project,
+
+    /** The face of object `transformId`'s model box under the pointer (the model frame), for resizing it. */
+    boxFace(clientX: number, clientY: number, transformId: number) {
+      const view = views.get(transformId);
+      const ray = view && modelRay(view, clientX, clientY);
+      return view?.model && ray ? raycastBoxFace(view.model.size, ray.origin, ray.direction) : null;
+    },
 
     floorCell: (clientX: number, clientY: number, transformId: number) => planeCell(clientX, clientY, transformId, 2, 0, 0),
 

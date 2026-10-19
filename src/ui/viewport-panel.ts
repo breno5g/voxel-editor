@@ -21,15 +21,21 @@ const CAMERA_DRAG_KEYS: Record<string, CameraDrag> = { Space: 'pan', KeyZ: 'zoom
  */
 export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: ObjectCommands) {
   const { state } = editor;
-  const voxelTools = createVoxelTools(editor, viewport);
+  const voxelTools = createVoxelTools(editor, viewport, commands.resizeDrag);
   const worldTools = createWorldTools(editor, commands, viewport);
   const tools = () => (state.mode === 'model' ? voxelTools : worldTools);
   const { canvas } = viewport;
 
   canvas.tabIndex = 0;
   canvas.setAttribute('aria-label', 'Viewport 3D. Tab alterna entre Modelo e Mundo, Esc sai do viewport');
+  /** MagicaVoxel transform sessions: Enter keeps the result, Esc reverts it (captured before Esc blurs the canvas). */
+  window.addEventListener('keydown', (event) => {
+    if (isEditingText(event) || state.mode !== 'model') return;
+    const handled = event.key === 'Enter' ? voxelTools.finishTransform() : event.key === 'Escape' && voxelTools.cancelTransform();
+    if (handled) event.preventDefault();
+  }, { capture: true });
   canvas.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') return canvas.blur();
+    if (event.key === 'Escape' && !event.defaultPrevented) return canvas.blur();
     if (event.key !== 'Tab') return;
     event.preventDefault();
     editor.setMode(event.shiftKey || state.mode === 'model' ? 'world' : 'model');

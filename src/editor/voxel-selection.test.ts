@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createModel, voxelIndex } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
-import { flip } from './model-ops.ts';
+import { flip, scale } from './model-ops.ts';
 import { countSelected, invertSelection, mergeMask, selectAll, selectCells, selectColor, selectedVoxels, selectionBounds, selectionMode, transformSelection } from './voxel-selection.ts';
 
 const modelWith = (size: Vec3, cells: [Vec3, number][]): VoxModel => {
@@ -9,6 +9,8 @@ const modelWith = (size: Vec3, cells: [Vec3, number][]): VoxModel => {
   cells.forEach(([[x, y, z], color]) => (model.voxels[voxelIndex(size, x, y, z)] = color));
   return model;
 };
+
+const filled = (model: VoxModel) => [...model.voxels].flatMap((color, index) => (color ? [index] : []));
 
 const row = () => modelWith([4, 1, 1], [[[0, 0, 0], 1], [[1, 0, 0], 2], [[3, 0, 0], 1]]);
 
@@ -52,5 +54,12 @@ describe('selection contents', () => {
     const result = transformSelection(model, new Uint8Array([0, 1, 0, 1]), (part) => flip(part, 0));
     expect([...result.model.voxels]).toEqual([1, 1, 0, 2]);
     expect([...result.mask]).toEqual([0, 1, 0, 1]);
+  });
+
+  it('anchors the transformed selection to one side of its box', () => {
+    const model = modelWith([6, 1, 1], [[[2, 0, 0], 4]]);
+    const grow = (part: VoxModel) => scale(part, [3, 1, 1]);
+    expect(filled(transformSelection(model, new Uint8Array([0, 0, 1, 0, 0, 0]), grow, ['low', 'center', 'center']).model)).toEqual([2, 3, 4]);
+    expect(filled(transformSelection(model, new Uint8Array([0, 0, 1, 0, 0, 0]), grow, ['high', 'center', 'center']).model)).toEqual([0, 1, 2]);
   });
 });

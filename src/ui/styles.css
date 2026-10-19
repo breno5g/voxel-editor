@@ -104,12 +104,6 @@ input[type='color'] {
   white-space: nowrap;
 }
 
-.hint {
-  margin: 0;
-  font-size: 12px;
-  color: var(--muted);
-}
-
 .check input {
   margin: 0;
 }

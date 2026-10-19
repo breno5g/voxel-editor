@@ -5,6 +5,8 @@ import { chunksTouching } from '../geometry/mesher.ts';
 import type { ClientRect, Viewport } from '../render/viewport.ts';
 import { addScaled, AXES, alongAxes, axisOf, cellsBetween, centeredShape, colorRegion, faceRegion, lineCells, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
 import type { BrushMode, BrushType, Editor } from './editor.ts';
+import type { ObjectCommands } from './object-commands.ts';
+import { createTransformTool } from './transform-tool.ts';
 import { mergeMask, selectionMode } from './voxel-selection.ts';
 import type { SelectionMode } from './voxel-selection.ts';
 
@@ -47,6 +49,7 @@ const EFFECTS: Record<BrushType, Effect | null> = {
   msel: 'select',
   asel: 'select',
   xform: null,
+  resize: null,
 };
 /** Actions that apply once to the region under the click, ignoring brush mode, mirror and axis mode. */
 const isRegionAction = (type: BrushType) => type === 'pick' || type === 'remove' || type === 'replace' || type === 'asel';
@@ -76,11 +79,43 @@ const regionBounds = (region: Vec3[]): [Vec3, Vec3] => [
  * Every stroke goes through axis mode and mirror, and is one undo step. Alt+click (or `pick`) takes
  * the colour under the pointer; `remove` and `replace` clear or recolour the region under the click.
  */
-export function createVoxelTools(editor: Editor, viewport: Viewport) {
+export function createVoxelTools(editor: Editor, viewport: Viewport, resizeDrag: ObjectCommands['resizeDrag']) {
   const { state } = editor;
   let stroke: Stroke | null = null;
   let marquee: Marquee | null = null;
   let move: Move | null = null;
+  const transform = createTransformTool(editor, viewport);
+  let transforming = false;
+  let resizing: { drag: NonNullable<ReturnType<typeof resizeDrag>>; axis: Axis; side: 1 | -1; start: [number, number]; screenNormal: [number, number]; twoSided: boolean; cells: number } | null = null;
+
+  /** `resize`: grabs a face of the model frame; dragging along its normal grows or shrinks the volume there (Shift: both sides). */
+  const beginResize = (object: { transformId: number; model: VoxModel }, clientX: number, clientY: number, twoSided: boolean) => {
+    const face = viewport.boxFace(clientX, clientY, object.transformId);
+    const drag = face && resizeDrag();
+    if (!face || !drag) return editor.status('Arraste uma face da moldura do modelo', 'error');
+    const { size } = object.model;
+    const center: Vec3 = [size[0] / 2, size[1] / 2, size[2] / 2];
+    center[face.axis] = face.side > 0 ? size[face.axis] : 0;
+    const normal: Vec3 = [0, 0, 0];
+    normal[face.axis] = face.side;
+    const from = viewport.project(object.transformId, center);
+    const to = viewport.project(object.transformId, addScaled(center, normal, 1));
+    const screenNormal: [number, number] = from && to ? [to[0] - from[0], to[1] - from[1]] : [1, 0];
+    resizing = { drag, axis: face.axis, side: face.side, start: [clientX, clientY], screenNormal, twoSided, cells: 0 };
+  };
+
+  const dragResize = (active: NonNullable<typeof resizing>, clientX: number, clientY: number) => {
+    const [sx, sy] = active.screenNormal;
+    const cells = Math.round(((clientX - active.start[0]) * sx + (clientY - active.start[1]) * sy) / Math.max(sx * sx + sy * sy, 1));
+    if (cells === active.cells) return;
+    active.cells = cells;
+    const below: Vec3 = [0, 0, 0];
+    const above: Vec3 = [0, 0, 0];
+    if (active.twoSided || active.side < 0) below[active.axis] = cells;
+    if (active.twoSided || active.side > 0) above[active.axis] = cells;
+    const size = active.drag.preview(below, above);
+    editor.status(`Tamanho ${size.join('×')}`);
+  };
 
   /** The box marquee is the box brush selecting; every other stroke follows `b_mode`. */
   const brushMode = (): BrushMode => (state.brushType === 'msel' && state.marquee === 'box' ? 'box' : state.brushMode);
@@ -368,11 +403,24 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
   };
 
   return {
+    /** Enter ends a scale, wrap or rotate session; Esc reverts it. Both report whether one was open. */
+    finishTransform: transform.finish,
+    cancelTransform: transform.cancel,
+
     begin(clientX: number, clientY: number, modifiers: PointerModifiers) {
       const { brushType } = state;
       if ((modifiers.altKey && !modifiers.shiftKey) || brushType === 'pick') return pickColor(clientX, clientY);
       const object = edited();
       if (!object) return;
+      if (brushType === 'resize') {
+        transform.finish();
+        return beginResize(object, clientX, clientY, modifiers.shiftKey);
+      }
+      if (brushType === 'xform' && state.transformTool !== 'move') {
+        transforming = true;
+        return transform.begin(object, clientX, clientY, modifiers);
+      }
+      transform.finish();
       if (brushType === 'xform') return beginMove(object, clientX, clientY, modifiers.ctrlKey);
       const mode = selectionMode(modifiers);
       const selection = EFFECTS[brushType] === 'select' ? { previous: editor.selectionOf(object.model), picked: new Set<number>(), mode } : null;
@@ -394,6 +442,9 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
         return viewport.showMarquee(marquee.rect);
       }
       if (move) return dragMove(move, clientX, clientY);
+      if (transforming) return transform.move(clientX, clientY);
+      if (resizing) return dragResize(resizing, clientX, clientY);
+      if (state.brushType === 'resize') return viewport.showHover(null);
       if (stroke?.face) {
         const layers = layersAt(stroke.face, clientX, clientY);
         if (layers !== stroke.face.layers) drawFace(stroke, { ...stroke.face, layers });
@@ -410,6 +461,10 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
     },
 
     end() {
+      if (transforming) transform.end();
+      transforming = false;
+      resizing?.drag.commit();
+      resizing = null;
       if (marquee) finishMarquee(marquee);
       marquee = null;
       const moved = move;

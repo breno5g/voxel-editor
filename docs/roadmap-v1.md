@@ -52,13 +52,13 @@ Pendências da v0.7:
 - [x] Seleção por região (`b_type asel`, `N`), reaproveitando a busca de região da v0.7
 - [x] Operações de modelo agem só na caixa da seleção, e a seleção acompanha o resultado
 - [x] Copiar/recortar/colar voxels (`Ctrl+C`/`X`/`V`); mover/loop arrastando (`Ctrl` trava um eixo)
-- [ ] Gizmo de escalar, wrap e girar com `Enter`/`Esc`
+- [x] Gizmo de escalar, wrap e girar com `Enter`/`Esc`
 - [x] `full`, `fill`, `zero`, `rev`, `x2`, `xh`, `rot90`, `flip`, `loop`, `mir`, `dia`
 - [x] Mover/escalar/cisalhar/girar/repetir com argumentos
 - [x] `prim elli|cyli|pyra|cone`, `maze`, `noise` (`fractal`, `mask` e `tex` usam padrões: v0.13)
 - [x] `flood 0` (remover invisíveis), `flood` (preencher vazios internos), dilatação, erosão
 - [x] `shrink` (ajustar ao conteúdo de todos os frames)
-- [ ] Redimensionar arrastando a moldura
+- [x] Redimensionar arrastando a moldura (`Shift`: dos dois lados)
 
 ## v0.9: editor de mundo
 

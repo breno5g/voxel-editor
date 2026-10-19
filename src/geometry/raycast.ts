@@ -74,3 +74,25 @@ export function raycastPlane(model: VoxModel, origin: Vec3, direction: Vec3, axi
   for (let i = 0; i < 3; i++) cell[i] = i === axis ? layer : Math.floor(origin[i] + direction[i] * distance);
   return cell.every((value, i) => value >= 0 && value < model.size[i]) ? cell : null;
 }
+
+/** The face of the model box [0, size) the ray enters through, as an axis and a side; null if it misses or starts inside. */
+export function raycastBoxFace(size: Vec3, origin: Vec3, direction: Vec3): { axis: Axis; side: 1 | -1 } | null {
+  let enter = -Infinity;
+  let exit = Infinity;
+  let face: { axis: Axis; side: 1 | -1 } | null = null;
+  for (const axis of [0, 1, 2] as const) {
+    if (Math.abs(direction[axis]) < EPSILON) {
+      if (origin[axis] < 0 || origin[axis] > size[axis]) return null;
+      continue;
+    }
+    const near = (0 - origin[axis]) / direction[axis];
+    const far = (size[axis] - origin[axis]) / direction[axis];
+    const [tMin, tMax] = near < far ? [near, far] : [far, near];
+    if (tMin > enter) {
+      enter = tMin;
+      face = { axis, side: direction[axis] > 0 ? -1 : 1 };
+    }
+    exit = Math.min(exit, tMax);
+  }
+  return enter > exit || enter < 0 ? null : face;
+}

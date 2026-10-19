@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cellOf, createModel, voxelIndex } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
-import { DEFAULT_NOISE, diagonal, dilate, double, erode, flip, flood, half, hull, loop, maze, mirror, neighborOffsets, noise, perlin, primitive, repeat, reverse, rotate, rotate90, scale, shear } from './model-ops.ts';
+import { tile, DEFAULT_NOISE, diagonal, dilate, double, erode, flip, flood, half, hull, loop, maze, mirror, neighborOffsets, noise, perlin, primitive, repeat, reverse, rotate, rotate90, scale, shear } from './model-ops.ts';
 
 const modelWith = (size: Vec3, cells: [Vec3, number][]): VoxModel => {
   const model = createModel(size);
@@ -187,5 +187,13 @@ describe('maze', () => {
     for (let y = 0; y < 13; y += 3) for (let x = 0; x < 13; x += 3) expect(result.voxels[voxelIndex(result.size, x, y, 0)]).toBe(2);
     // A spanning tree of 25 nodes has 24 corridors of 3 voxels each, plus the start node.
     expect(count(result)).toBe(24 * 3 + 1);
+  });
+});
+
+describe('tile', () => {
+  it('repeats along an axis with spacing and phase', () => {
+    const model = modelWith([2, 1, 1], [[[0, 0, 0], 1], [[1, 0, 0], 2]]);
+    expect(filled(tile(model, 0, 7, 1))).toEqual(['0,0,0=1', '1,0,0=2', '3,0,0=1', '4,0,0=2', '6,0,0=1']);
+    expect(filled(tile(model, 0, 4, 0, 1))).toEqual(['0,0,0=2', '1,0,0=1', '2,0,0=2', '3,0,0=1']);
   });
 });
