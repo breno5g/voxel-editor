@@ -20,6 +20,7 @@
         <button type="button" data-value="model" title="Editar os voxels do objeto selecionado (Tab)">Modelo</button>
         <button type="button" data-value="world" title="Organizar e animar objetos (Tab)">Mundo</button>
       </div>
+      <button id="render-toggle" type="button" aria-pressed="false" title="Renderizador: path tracing da cena (F2)">Render</button>
       <div class="segmented" role="group" aria-label="Cena">
         <button id="add-object" type="button" title="Novo objeto 32³ (Ctrl+N no modo Mundo)">Novo objeto</button>
         <button id="frame-camera" type="button" title="Recentralizar câmera (5)">Enquadrar</button>
@@ -33,7 +34,7 @@
     </header>
 
     <aside class="sidebar left" aria-label="Paleta e pincel">
-      <section aria-labelledby="palette-title">
+      <section aria-labelledby="palette-title" data-render-keep>
         <h2 id="palette-title">Paleta</h2>
         <div id="palette" class="palette" role="group" aria-label="Cores da paleta. Shift+clique seleciona um intervalo; arrastar copia a cor, Ctrl+arrastar troca, Ctrl+Alt+arrastar faz gradiente; Alt+clique pega uma cor da tela"></div>
         <div class="control-row color-row">
@@ -119,6 +120,17 @@
               <button type="button" data-palette="pasteRegion" title="Colar as cores a partir da cor atual">Colar região</button>
             </div>
         </div>
+      </section>
+      <section aria-labelledby="render-light-title" data-render-panel>
+        <h2 id="render-light-title">Luz</h2>
+        <div id="render-light" class="stack"></div>
+        <div id="render-ibl-row" class="control-row" title="Imagem HDR equiretangular (.hdr) que ilumina a cena">
+          <span class="label">Imagem</span>
+          <span id="render-ibl-name" class="hint"></span>
+          <button id="render-ibl-open" type="button">Abrir .hdr</button>
+          <input id="render-ibl-input" type="file" accept=".hdr" hidden />
+        </div>
+        <div id="render-fog" class="stack"></div>
       </section>
       <section aria-labelledby="brush-title" data-only-mode="model">
         <h2 id="brush-title">Pincel</h2>
@@ -334,6 +346,23 @@
     </aside>
 
     <aside class="sidebar right" aria-label="Objetos">
+      <section aria-labelledby="render-camera-title" data-render-panel>
+        <h2 id="render-camera-title">Câmera</h2>
+        <div id="render-lens" class="stack"></div>
+        <label class="check" title="Mantém o foco numa profundidade: clique num voxel para focar nele"><input id="render-fix-focus" type="checkbox" /> Foco fixo (DOF)</label>
+        <label class="control-row"><span class="label">Foco</span><input id="render-focus" type="number" min="0" max="9999.9" step="1" value="0" /></label>
+        <div id="render-film" class="stack"></div>
+      </section>
+      <section aria-labelledby="render-display-title" data-render-panel>
+        <h2 id="render-display-title">Exibição</h2>
+        <div id="render-display" class="stack"></div>
+      </section>
+      <section aria-labelledby="render-sample-title" data-render-panel>
+        <h2 id="render-sample-title">Amostragem</h2>
+        <div id="render-sample" class="stack"></div>
+        <label class="check" title="Sombras do sol (Ctrl+W)"><input id="render-shadows" type="checkbox" checked /> Sombras</label>
+        <output id="render-samples" class="hint" aria-live="off">0 amostras</output>
+      </section>
       <section aria-labelledby="objects-title">
         <h2 id="objects-title">Objetos</h2>
         <ul id="object-list" class="object-list"></ul>
@@ -770,6 +799,11 @@
           <tr><th scope="row">Exibir grade / arestas / objetos de fundo / contornos / sombra</th><td><kbd>Ctrl+G</kbd> / <kbd>Ctrl+E</kbd> / <kbd>Ctrl+B</kbd> / <kbd>Ctrl+M</kbd> / <kbd>Ctrl+W</kbd> (numa janela própria)</td></tr>
           <tr><th scope="row">Desfazer / refazer</th><td><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></td></tr>
           <tr><th scope="row">Novo / abrir / salvar / salvar como</th><td><kbd>Ctrl+P</kbd> / <kbd>Ctrl+O</kbd> / <kbd>Ctrl+S</kbd> / <kbd>Ctrl+Shift+S</kbd></td></tr>
+          <tr><th scope="row" colspan="2" class="group">Renderizador</th></tr>
+          <tr><th scope="row">Entrar / sair do renderizador</th><td><kbd>F2</kbd></td></tr>
+          <tr><th scope="row">Arestas / grade / chão / cor de fundo / sombras no render</th><td><kbd>Ctrl+E</kbd> / <kbd>Ctrl+G</kbd> / <kbd>Ctrl+U</kbd> / <kbd>Ctrl+B</kbd> / <kbd>Ctrl+W</kbd></td></tr>
+          <tr><th scope="row">Material: resetar / copiar / colar (render)</th><td><kbd>Ctrl+R</kbd> / <kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd></td></tr>
+          <tr><th scope="row">Focar a lente / pegar a cor (render)</th><td>clique num voxel com Foco fixo / <kbd>Alt</kbd>+clique</td></tr>
           <tr><th scope="row" colspan="2" class="group">Animação</th></tr>
           <tr><th scope="row">Key: adicionar / remover</th><td><kbd>F5</kbd> / <kbd>F6</kbd> (frame de modelo no modo Modelo, posição no modo Mundo)</td></tr>
           <tr><th scope="row">Frame anterior / próximo</th><td><kbd>,</kbd> <kbd>.</kbd></td></tr>

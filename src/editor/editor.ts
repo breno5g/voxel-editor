@@ -3,7 +3,7 @@ import type { Component } from '../format/components.ts';
 import { createDocument } from '../format/defaults.ts';
 import type { Axis } from '../format/rotation.ts';
 import { MAX_MODEL_SIZE } from '../format/vox.ts';
-import type { TransformKey, TransformNode, Vec3, VoxDocument, VoxModel } from '../format/vox.ts';
+import type { Dict, TransformKey, TransformNode, Vec3, VoxDocument, VoxModel } from '../format/vox.ts';
 import { clampFrame, DEFAULT_RANGE, formatRange, parseRange, RANGE_META_KEY } from '../scene/keyframes.ts';
 import type { FrameRange } from '../scene/keyframes.ts';
 import { evaluateScene, ROOT_ID } from '../scene/scene-graph.ts';
@@ -87,6 +87,7 @@ export type EditorEvent =
   | { type: 'mode' }
   | { type: 'display' }
   | { type: 'playback' }
+  | { type: 'render' }
   | { type: 'voxels'; model: VoxModel; chunks: Set<number> }
   | { type: 'status'; message: string; tone: StatusTone };
 
@@ -150,6 +151,8 @@ export type EditorState = {
   /** Shows the previous model frame translucent while editing frame-by-frame animation. */
   onionSkin: boolean;
   display: Display;
+  /** MagicaVoxel's renderer (`pt_mode`, F2): the path-traced view replaces editing. */
+  rendering: boolean;
 };
 
 export type Editor = ReturnType<typeof createEditor>;
@@ -226,6 +229,7 @@ export function createEditor() {
     pendingKeys: new Map(),
     onionSkin: false,
     display: DEFAULT_DISPLAY,
+    rendering: false,
   };
 
   const emit = (event: EditorEvent) => listeners.forEach((listener) => listener(event));
@@ -458,6 +462,18 @@ export function createEditor() {
       const next = { ...state.display, ...changes, colors: { ...state.display.colors, ...changes.colors } };
       state.display = { ...next, frameSpacing: Math.min(Math.max(Math.round(next.frameSpacing) || 1, 1), MAX_FRAME_SPACING) };
       emit({ type: 'display' });
+    },
+
+    setRendering(rendering: boolean) {
+      state.rendering = rendering;
+      emit({ type: 'render' });
+    },
+
+    /** The document's renderer settings (`rOBJ`); like MagicaVoxel, outside the undo history. */
+    setRenderObjects(objects: Dict[]) {
+      state.vox.renderObjects = objects;
+      state.dirty = true;
+      emit({ type: 'render' });
     },
 
     setOnionSkin(enabled: boolean) {

@@ -7,6 +7,7 @@ import type { Axis } from '../format/rotation.ts';
 import type { Vec3 } from '../format/vox.ts';
 import { isEditingText } from './dom.ts';
 import type { FileActions } from './file-actions.ts';
+import type { RenderShortcuts } from './render-panel.ts';
 
 type Keymap = Map<string, () => void>;
 
@@ -46,10 +47,10 @@ export type ShortcutActions = {
 
 /**
  * MagicaVoxel's `config/hotkey.txt`: a global map plus one per editor (`model-editor`, `world-editor`);
- * the editor's map wins. Tab (switch editor) is handled by the viewport, which owns its focus.
+ * the editor's map wins (the `renderer` map while rendering). Tab (switch editor) is handled by the viewport, which owns its focus.
  * Browsers reserve Ctrl+N/T/W, so those MagicaVoxel keys only reach the page in a standalone window.
  */
-export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: ModelCommands, files: FileActions, actions: ShortcutActions, keys: KeyCommands, patterns: PatternCommands): void {
+export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: ModelCommands, files: FileActions, actions: ShortcutActions, keys: KeyCommands, patterns: PatternCommands, renderer: RenderShortcuts): void {
   const { state } = editor;
   const undo = () => {
     if (!editor.history.undo()) editor.status('Nada para desfazer');
@@ -110,7 +111,10 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
     ['?', actions.openHelp],
     ['shift+?', actions.openHelp],
     ['F1', actions.openHelp],
+    ['F2', renderer.toggle],
   ]);
+  /** MagicaVoxel's `renderer` map: while rendering it replaces the editor's, so nothing edits voxels. */
+  const rendering: Keymap = new Map(renderer.keys);
 
   const byMode: Record<Mode, Keymap> = {
     model: new Map([
@@ -186,7 +190,7 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
   window.addEventListener('keydown', (event) => {
     if (isEditingText(event) || isActivatingButton(event)) return;
     const combo = comboOf(event);
-    const action = byMode[state.mode].get(combo) ?? global.get(combo);
+    const action = (state.rendering ? rendering : byMode[state.mode]).get(combo) ?? global.get(combo);
     if (!action) return;
     event.preventDefault();
     action();

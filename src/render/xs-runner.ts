@@ -1,4 +1,5 @@
 import { xsFragmentSource } from '../editor/xs-shader.ts';
+import { linkFullScreenProgram } from './gl-program.ts';
 import type { XsShader } from '../editor/xs-shader.ts';
 import { PALETTE_BYTES, voxelIndex } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
@@ -17,13 +18,6 @@ export type XsInputs = {
   random: () => number;
 };
 
-/** A full-screen triangle; `main` in the fragment shader does the work. */
-const VERTEX_SOURCE = `#version 300 es
-void main() {
-  vec2 corner = vec2(float((gl_VertexID & 1) << 2), float((gl_VertexID & 2) << 1)) - 1.0;
-  gl_Position = vec4(corner, 0.0, 1.0);
-}`;
-
 /** Slices per row of the packed volume: a near-square grid of z slices. */
 const columnsFor = ([, , sz]: Vec3) => Math.ceil(Math.sqrt(sz));
 
@@ -36,24 +30,9 @@ export function createXsRunner() {
   const gl = canvas.getContext('webgl2');
   const programs = new Map<string, WebGLProgram>();
 
-  const compile = (type: GLenum, source: string, context: WebGL2RenderingContext) => {
-    const shader = context.createShader(type);
-    if (!shader) throw new Error('WebGL: não foi possível criar o shader');
-    context.shaderSource(shader, source);
-    context.compileShader(shader);
-    if (!context.getShaderParameter(shader, context.COMPILE_STATUS)) throw new Error(`Erro no shader: ${context.getShaderInfoLog(shader)?.trim() ?? ''}`);
-    return shader;
-  };
-
   const programFor = (shader: XsShader, context: WebGL2RenderingContext) => {
     const source = xsFragmentSource(shader);
-    const cached = programs.get(source);
-    if (cached) return cached;
-    const program = context.createProgram();
-    context.attachShader(program, compile(context.VERTEX_SHADER, VERTEX_SOURCE, context));
-    context.attachShader(program, compile(context.FRAGMENT_SHADER, source, context));
-    context.linkProgram(program);
-    if (!context.getProgramParameter(program, context.LINK_STATUS)) throw new Error(`Erro ao ligar o shader: ${context.getProgramInfoLog(program) ?? ''}`);
+    const program = programs.get(source) ?? linkFullScreenProgram(context, source);
     programs.set(source, program);
     return program;
   };

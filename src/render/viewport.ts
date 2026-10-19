@@ -433,6 +433,14 @@ export function createViewport(container: HTMLElement) {
 
     pick,
 
+    /** How far ahead of the camera, along its view, the voxel under the pointer is (the render's focus depth). */
+    depthAt(clientX: number, clientY: number): number | null {
+      const nearest = pick(clientX, clientY);
+      if (!nearest) return null;
+      aim(clientX, clientY);
+      return nearest.hit.distance * raycaster.ray.direction.dot(rig.camera().getWorldDirection(new THREE.Vector3()));
+    },
+
     /** Recentres the orbit on the voxel surface under the pointer; false over empty space. */
     focusAt(clientX: number, clientY: number): boolean {
       const nearest = pick(clientX, clientY);
