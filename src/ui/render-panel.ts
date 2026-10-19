@@ -19,6 +19,8 @@ export type RenderSession = {
   prepare: () => PathTracer | null;
   /** The live view: the editor camera and the lens focus. */
   view: () => TraceView;
+  /** Samples per pixel (`pt_spp`): the live view stops there and final images take as many. */
+  samples: () => number;
   /** While a final image renders, the live view stops tracing. */
   setBusy: (busy: boolean) => void;
 };
@@ -35,6 +37,7 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
   const container = element('viewport', HTMLElement);
   const toggleButton = element('render-toggle', HTMLButtonElement);
   const samplesLabel = element('render-samples', HTMLOutputElement);
+  const samplesInput = element('render-spp', HTMLInputElement);
   const shadowsCheck = element('render-shadows', HTMLInputElement);
   const bloomCheck = element('render-bloom-toggle', HTMLInputElement);
   const translucentCheck = element('render-translucent-shadows', HTMLInputElement);
@@ -75,6 +78,7 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
     editor.status(`Renderizador: ${errorMessage(error)}`, 'error');
     editor.setRendering(false);
   };
+  const targetSamples = () => Math.min(Math.max(Math.round(Number(samplesInput.value)) || 1, 1), MAX_SAMPLES);
   const focusDistance = () => (fixFocusCheck.checked ? Number(focusInput.value) || 0 : viewport.camera.distance());
 
   const view = (): TraceView => ({ camera: viewport.camera.camera(), focusDistance: focusDistance() });
@@ -98,8 +102,9 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
     } catch (error) {
       return fail(error);
     }
-    samplesLabel.value = `${tracer.samples} amostra${tracer.samples === 1 ? '' : 's'}`;
-    if (tracer.samples < MAX_SAMPLES) requestFrame();
+    const target = targetSamples();
+    samplesLabel.value = tracer.samples >= target ? `${tracer.samples} amostras: pronta` : `${tracer.samples} de ${target} amostras`;
+    if (tracer.samples < target) requestFrame();
   };
   const requestFrame = () => {
     if (frameQueued || !state.rendering) return;
@@ -166,6 +171,7 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
       requestFrame();
     });
   }
+  samplesInput.addEventListener('change', requestFrame);
   for (const input of [fixFocusCheck, focusInput]) {
     input.addEventListener('change', () => {
       tracer?.reset();
@@ -227,6 +233,7 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
       return target;
     },
     view,
+    samples: targetSamples,
     setBusy(next) {
       busy = next;
       tracer?.reset();

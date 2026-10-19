@@ -36,8 +36,8 @@ export type TraceOptions = {
 export const VOXEL_SHAPES = ['cube', 'lego', 'mc', 'clay', 'sphr', 'cyli'] as const;
 export type VoxelShape = (typeof VOXEL_SHAPES)[number];
 
-/** Samples per pixel after which the image is left as it is. */
-export const MAX_SAMPLES = 2048;
+/** The most samples per pixel an image takes, as MagicaVoxel's `pt_spp` range allows. */
+export const MAX_SAMPLES = 100000;
 /** How far behind an orthographic camera its rays start, so nothing in front of the scene is cut. */
 const ORTHOGRAPHIC_PULLBACK = 10000;
 /* MagicaVoxel's scales, as its uniform setup computes them (docs/magicavoxel-re.md §8). */

@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import type { Editor } from '../editor/editor.ts';
 import { zipStore } from '../format/zip.ts';
 import type { ZipEntry } from '../format/zip.ts';
-import { MAX_SAMPLES } from '../render/path-tracer/path-tracer.ts';
 import type { PathTracer, TraceView } from '../render/path-tracer/path-tracer.ts';
 import type { Viewport } from '../render/viewport.ts';
 import { bindButtonGroup, downloadBlob, element } from './dom.ts';
@@ -36,7 +35,6 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
   const inputs = {
     width: number('render-width'),
     height: number('render-height'),
-    samples: number('render-spp'),
     spinFrames: number('render-spin-frames'),
     spinAngle: number('render-spin-angle'),
     spinBlur: number('render-spin-blur'),
@@ -76,7 +74,7 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
     const tracer = session.prepare();
     if (!tracer) return;
     const size = { width: read(inputs.width), height: read(inputs.height) };
-    const samples = Math.min(read(inputs.samples), MAX_SAMPLES);
+    const samples = session.samples();
     const live = session.view();
     /* A copy: orbiting the editor camera mid-render must not move the image. */
     const base = { ...live, camera: live.camera.clone() };
@@ -113,7 +111,7 @@ export function bindRenderImage(editor: Editor, viewport: Viewport, session: Ren
         }
         downloadBlob(new Blob([zipStore(entries)], { type: 'application/zip' }), `${baseName()}-anim.zip`);
       }
-      editor.status('Render final salvo');
+      editor.status(`Render final salvo: ${size.width}×${size.height}, ${samples} amostras por pixel`);
     } catch (error) {
       if (error instanceof Cancelled) editor.status('Render final cancelado');
       else editor.status(`Render final: ${error instanceof Error ? error.message : String(error)}`, 'error');
