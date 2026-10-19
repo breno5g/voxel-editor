@@ -144,6 +144,7 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
     }
     if (event.type === 'render') {
       document.body.toggleAttribute('data-rendering', state.rendering);
+      viewport.setSuspended(state.rendering);
       toggleButton.setAttribute('aria-pressed', String(state.rendering));
       if (tracer) tracer.canvas.hidden = !state.rendering;
     }

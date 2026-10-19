@@ -83,6 +83,8 @@ export function createViewport(container: HTMLElement) {
   let display = DEFAULT_DISPLAY;
   let exporting = false;
   let renderQueued = false;
+  /** While the path tracer covers the view, drawing the editor's scene under it is wasted. */
+  let suspended = false;
 
   /** Fits the sun's orthographic view around every shown object and renders their depth from it. */
   const renderShadows = () => {
@@ -115,7 +117,7 @@ export function createViewport(container: HTMLElement) {
     renderer.render(scene, rig.camera());
   };
   const requestRender = () => {
-    if (renderQueued) return;
+    if (renderQueued || suspended) return;
     renderQueued = true;
     requestAnimationFrame(() => {
       renderQueued = false;
@@ -125,7 +127,7 @@ export function createViewport(container: HTMLElement) {
   new ResizeObserver(() => {
     renderer.setSize(container.clientWidth, container.clientHeight);
     rig.setAspect(container.clientWidth / Math.max(container.clientHeight, 1));
-    render();
+    if (!suspended) render();
   }).observe(container);
 
   const fillGroup = (group: THREE.Group, model: VoxModel, meshMaterial: THREE.Material, cache = modelCache) => {
@@ -258,6 +260,12 @@ export function createViewport(container: HTMLElement) {
   return {
     canvas: renderer.domElement,
     requestRender,
+
+    /** Stops drawing the editor's scene (picking still works), and draws it again once resumed. */
+    setSuspended(next: boolean) {
+      suspended = next;
+      requestRender();
+    },
 
     setPalette(palette: Uint8Array) {
       materials.setPalette(palette);
