@@ -1,3 +1,4 @@
+import type { Axis } from '../format/rotation.ts';
 import { cellOf, EMPTY_VOXEL, isInside, voxelIndex } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
 import { chunksTouching } from '../geometry/mesher.ts';
@@ -17,6 +18,21 @@ function* cellsBetween(from: Vec3, to: Vec3): Generator<Vec3> {
     for (let y = low[1]; y <= high[1]; y++) {
       for (let x = low[0]; x <= high[0]; x++) yield [x, y, z];
     }
+  }
+}
+
+const AXES: readonly Axis[] = [0, 1, 2];
+
+const reflect = (cell: Vec3, axis: Axis, size: Vec3): Vec3 => {
+  const reflected: Vec3 = [cell[0], cell[1], cell[2]];
+  reflected[axis] = size[axis] - 1 - cell[axis];
+  return reflected;
+};
+
+/** Each cell plus its reflections across the model centre on every enabled mirror axis. */
+export function* withMirrors(cells: Iterable<Vec3>, size: Vec3, mirror: readonly boolean[]): Generator<Vec3> {
+  for (const cell of cells) {
+    yield* AXES.reduce((variants: Vec3[], axis) => (mirror[axis] ? variants.flatMap((variant) => [variant, reflect(variant, axis, size)]) : variants), [cell]);
   }
 }
 
@@ -59,7 +75,7 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
     const chunks = new Set<number>();
     stroke ??= new Map();
     const changes = stroke.get(model) ?? new Map<number, [number, number]>();
-    for (const cell of cells) {
+    for (const cell of withMirrors(cells, model.size, state.mirror)) {
       const index = voxelIndex(model.size, cell[0], cell[1], cell[2]);
       const before = model.voxels[index];
       const skips = before === after || (brushType === 'paint' && before === EMPTY_VOXEL) || (brushType === 'attach' && before !== EMPTY_VOXEL);

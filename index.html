@@ -16,15 +16,6 @@
         <button type="button" data-mode="model" title="Editar os voxels do objeto selecionado (Tab)">Modelo</button>
         <button type="button" data-mode="world" title="Organizar e animar objetos (Tab)">Mundo</button>
       </div>
-      <div id="brush-modes" class="tools" role="group" aria-label="Pincel" data-only-mode="model">
-        <button type="button" data-brush-mode="vox" title="Voxel: um por clique; Apagar e Pintar seguem o arrasto (V)">Voxel</button>
-        <button type="button" data-brush-mode="box" title="Caixa: arraste para aplicar numa caixa (B)">Caixa</button>
-      </div>
-      <div id="brush-types" class="tools" role="group" aria-label="Ação do pincel" data-only-mode="model">
-        <button type="button" data-brush-type="attach" title="Adicionar voxels (T)">Adicionar</button>
-        <button type="button" data-brush-type="erase" title="Apagar voxels (R)">Apagar</button>
-        <button type="button" data-brush-type="paint" title="Pintar voxels (G)">Pintar</button>
-      </div>
       <span class="separator" aria-hidden="true"></span>
       <button id="add-object" type="button" title="Novo objeto 32³ (Ctrl+N no modo Mundo)">Novo objeto</button>
       <button id="frame-camera" type="button" title="Recentralizar câmera (5)">Enquadrar</button>
@@ -34,7 +25,32 @@
       <span id="app-version" class="version"></span>
     </header>
 
-    <aside class="sidebar">
+    <aside class="sidebar left" aria-label="Paleta e pincel">
+      <section aria-labelledby="palette-title">
+        <h2 id="palette-title">Paleta</h2>
+        <div id="palette" class="palette" role="group" aria-label="Cores da paleta"></div>
+        <label class="field">Editar cor <input id="palette-color" type="color" /></label>
+      </section>
+      <section aria-labelledby="brush-title" data-only-mode="model">
+        <h2 id="brush-title">Pincel</h2>
+        <div id="brush-modes" class="tools" role="group" aria-label="Pincel">
+          <button type="button" data-brush-mode="vox" title="Voxel: um por clique; Apagar e Pintar seguem o arrasto (V)">Voxel</button>
+          <button type="button" data-brush-mode="box" title="Caixa: arraste para aplicar numa caixa (B)">Caixa</button>
+        </div>
+        <div id="brush-types" class="tools" role="group" aria-label="Ação do pincel">
+          <button type="button" data-brush-type="attach" title="Adicionar voxels (T)">Adicionar</button>
+          <button type="button" data-brush-type="erase" title="Apagar voxels (R)">Apagar</button>
+          <button type="button" data-brush-type="paint" title="Pintar voxels (G)">Pintar</button>
+        </div>
+        <div id="mirror" class="tools" role="group" aria-label="Espelho do pincel">
+          <button type="button" data-axis="0" title="Espelhar o pincel em X (1)">↔X</button>
+          <button type="button" data-axis="1" title="Espelhar o pincel em Y (2)">↔Y</button>
+          <button type="button" data-axis="2" title="Espelhar o pincel em Z (3)">↔Z</button>
+        </div>
+      </section>
+    </aside>
+
+    <aside class="sidebar right" aria-label="Objetos">
       <section aria-labelledby="objects-title">
         <h2 id="objects-title">Objetos</h2>
         <ul id="object-list" class="object-list"></ul>
@@ -68,10 +84,13 @@
           </div>
         </fieldset>
       </section>
-      <section aria-labelledby="palette-title">
-        <h2 id="palette-title">Paleta</h2>
-        <div id="palette" class="palette" role="group" aria-label="Cores da paleta"></div>
-        <label class="field">Editar cor <input id="palette-color" type="color" /></label>
+      <section aria-labelledby="model-title" data-only-mode="model">
+        <h2 id="model-title">Modelo</h2>
+        <div class="row" role="group" aria-label="Volume inteiro">
+          <button id="model-full" type="button" title="Encher o volume com a cor atual (U)">Encher</button>
+          <button id="model-fill" type="button" title="Pintar todos os voxels com a cor atual (I)">Pintar tudo</button>
+          <button id="model-zero" type="button" title="Apagar todos os voxels (Delete)">Limpar</button>
+        </div>
       </section>
     </aside>
 
@@ -130,6 +149,8 @@
           <tr><th scope="row">Pincel voxel / caixa</th><td><kbd>V</kbd> / <kbd>B</kbd></td></tr>
           <tr><th scope="row">Adicionar / apagar / pintar</th><td><kbd>T</kbd> / <kbd>R</kbd> / <kbd>G</kbd></td></tr>
           <tr><th scope="row">Pegar cor do voxel</th><td><kbd>Alt</kbd> + clique</td></tr>
+          <tr><th scope="row">Espelhar o pincel em X / Y / Z</th><td><kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd></td></tr>
+          <tr><th scope="row">Encher / pintar tudo / limpar</th><td><kbd>U</kbd> / <kbd>I</kbd> / <kbd>Delete</kbd></td></tr>
           <tr><th scope="row">Exibir moldura do modelo</th><td><kbd>Ctrl+F</kbd></td></tr>
           <tr><th scope="row" colspan="2" class="group">Modo Mundo</th></tr>
           <tr><th scope="row">Selecionar / desmarcar</th><td>clique / <kbd>Ctrl+D</kbd></td></tr>

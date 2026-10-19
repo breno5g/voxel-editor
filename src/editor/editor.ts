@@ -1,4 +1,5 @@
 import { createDocument } from '../format/defaults.ts';
+import type { Axis } from '../format/rotation.ts';
 import type { VoxDocument, VoxModel } from '../format/vox.ts';
 import { clampFrame, DEFAULT_RANGE, formatRange, parseRange, RANGE_META_KEY } from '../scene/keyframes.ts';
 import type { FrameRange } from '../scene/keyframes.ts';
@@ -51,6 +52,8 @@ export type EditorState = {
   selected: number | null;
   brushType: BrushType;
   brushMode: BrushMode;
+  /** MagicaVoxel `b_mirror_x/y/z`: strokes are repeated across the model's centre on each enabled axis. */
+  mirror: [boolean, boolean, boolean];
   color: number;
   /** Shows the previous model frame translucent while editing frame-by-frame animation. */
   onionSkin: boolean;
@@ -95,6 +98,7 @@ export function createEditor() {
     selected: null,
     brushType: 'attach',
     brushMode: 'vox',
+    mirror: [false, false, false],
     color: DEFAULT_COLOR,
     onionSkin: false,
     display: { grid: true, frame: true, edges: false, backgroundObjects: true },
@@ -199,6 +203,12 @@ export function createEditor() {
 
     setBrushMode(brushMode: BrushMode) {
       state.brushMode = brushMode;
+      emit({ type: 'tool' });
+    },
+
+    toggleMirror(axis: Axis) {
+      const [x, y, z] = state.mirror;
+      state.mirror = [axis === 0 ? !x : x, axis === 1 ? !y : y, axis === 2 ? !z : z];
       emit({ type: 'tool' });
     },
 

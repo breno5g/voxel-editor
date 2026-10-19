@@ -25,12 +25,12 @@ body {
   margin: 0;
   height: 100vh;
   display: grid;
-  grid-template: auto 1fr auto auto / 250px 1fr;
+  grid-template: auto 1fr auto auto / 220px 1fr 250px;
   grid-template-areas:
-    'toolbar toolbar'
-    'sidebar viewport'
-    'timeline timeline'
-    'status status';
+    'toolbar toolbar toolbar'
+    'left viewport right'
+    'timeline timeline timeline'
+    'status status status';
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
@@ -100,8 +100,22 @@ input[type='number'] {
   color: var(--muted);
 }
 
+.sidebar.left {
+  grid-area: left;
+}
+
+.sidebar.right {
+  grid-area: right;
+  border-right: 0;
+  border-left: 1px solid var(--border);
+}
+
+.sidebar .tools {
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
 .sidebar {
-  grid-area: sidebar;
   overflow-y: auto;
   padding: 8px 10px;
   background: var(--panel);
@@ -251,9 +265,10 @@ label.track-shape {
   opacity: 0.45;
 }
 
-.inspector .row {
+.sidebar .row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
@@ -345,4 +360,15 @@ label.track-shape {
   padding: 2px 8px;
   font-size: 12px;
   background: rgba(46, 49, 56, 0.85);
+}
+
+.inspector input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.inspector input[type='number']::-webkit-inner-spin-button,
+.inspector input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }

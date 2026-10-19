@@ -2,6 +2,7 @@ import { version } from '../../package.json';
 import { isBrushMode, isBrushType, isMode } from '../editor/editor.ts';
 import type { Editor } from '../editor/editor.ts';
 import type { ObjectCommands } from '../editor/object-commands.ts';
+import { isAxis } from '../format/rotation.ts';
 import { element } from './dom.ts';
 import type { FileActions } from './file-actions.ts';
 
@@ -35,6 +36,13 @@ export function bindToolbar(editor: Editor, files: FileActions, commands: Object
   const showMode = bindChoice('modes', 'mode', isMode, editor.setMode);
   const showBrushMode = bindChoice('brush-modes', 'brushMode', isBrushMode, editor.setBrushMode);
   const showBrushType = bindChoice('brush-types', 'brushType', isBrushType, editor.setBrushType);
+  const mirrorButtons = [...element('mirror', HTMLDivElement).querySelectorAll('button')];
+  mirrorButtons.forEach((button) =>
+    button.addEventListener('click', () => {
+      const axis = Number(button.dataset.axis);
+      if (isAxis(axis)) editor.toggleMirror(axis);
+    }),
+  );
   const modeOnly = [...document.querySelectorAll<HTMLElement>('[data-only-mode]')];
 
   element('app-version', HTMLSpanElement).textContent = `v${version}`;
@@ -43,6 +51,7 @@ export function bindToolbar(editor: Editor, files: FileActions, commands: Object
     showMode(state.mode);
     showBrushMode(state.brushMode);
     showBrushType(state.brushType);
+    mirrorButtons.forEach((button) => button.setAttribute('aria-pressed', String(state.mirror[Number(button.dataset.axis)] ?? false)));
     modeOnly.forEach((group) => (group.hidden = group.dataset.onlyMode !== state.mode));
     fileName.textContent = `${state.fileName}${state.dirty ? ' (não salvo)' : ''}`;
   });

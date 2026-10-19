@@ -1,4 +1,5 @@
 import type { BrushMode, BrushType, DisplayOption, Editor, Mode } from '../editor/editor.ts';
+import type { ModelCommands } from '../editor/model-commands.ts';
 import type { ObjectCommands } from '../editor/object-commands.ts';
 import type { Axis } from '../format/rotation.ts';
 import type { Vec3 } from '../format/vox.ts';
@@ -25,7 +26,7 @@ export type ShortcutActions = { focusCamera: () => void; openHelp: () => void };
  * the editor's map wins. Tab (switch editor) is handled by the viewport, which owns its focus.
  * Browsers reserve Ctrl+N/T/W, so those MagicaVoxel keys only reach the page in a standalone window.
  */
-export function bindShortcuts(editor: Editor, commands: ObjectCommands, files: FileActions, actions: ShortcutActions): void {
+export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: ModelCommands, files: FileActions, actions: ShortcutActions): void {
   const { state } = editor;
   const undo = () => {
     if (!editor.history.undo()) editor.status('Nada para desfazer');
@@ -38,6 +39,7 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, files: F
   const move = (delta: Vec3) => () => commands.moveSelected(delta);
   const rotate = (axis: Axis, direction: 1 | -1) => () => commands.rotateSelected(axis, direction);
   const toggle = (option: DisplayOption) => () => editor.toggleDisplay(option);
+  const mirror = (axis: Axis) => () => editor.toggleMirror(axis);
 
   const global: Keymap = new Map([
     ['ctrl+z', undo],
@@ -72,6 +74,13 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, files: F
       ['t', brushType('attach')],
       ['r', brushType('erase')],
       ['g', brushType('paint')],
+      ['Digit1', mirror(0)],
+      ['Digit2', mirror(1)],
+      ['Digit3', mirror(2)],
+      ['u', models.full],
+      ['i', models.fill],
+      ['Delete', models.zero],
+      ['Backspace', models.zero],
       ['ctrl+f', toggle('frame')],
     ]),
     world: new Map([
