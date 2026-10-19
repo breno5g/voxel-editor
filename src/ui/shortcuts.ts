@@ -134,6 +134,8 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
       ['ctrl+d', commands.selectNone],
       ['ctrl+h', () => commands.hideSelected()],
       ['m', () => editor.setObjectTool(state.objectTool === 'msel' ? 'move' : 'msel')],
+      ['ctrl+r', commands.groupSelected],
+      ['ctrl+shift+r', commands.ungroupSelected],
       ['g', commands.groundSelected],
       ['ArrowLeft', move([-1, 0, 0])],
       ['ArrowRight', move([1, 0, 0])],

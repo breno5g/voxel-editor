@@ -4,9 +4,9 @@ import { MAX_MODEL_SIZE } from '../format/vox.ts';
 import type { Vec3, VoxDocument, VoxModel } from '../format/vox.ts';
 import { clampFrame, DEFAULT_RANGE, formatRange, parseRange, RANGE_META_KEY } from '../scene/keyframes.ts';
 import type { FrameRange } from '../scene/keyframes.ts';
-import { evaluateScene } from '../scene/scene-graph.ts';
+import { evaluateScene, ROOT_ID } from '../scene/scene-graph.ts';
 import type { Instance } from '../scene/scene-graph.ts';
-import { childOfGroup, parentMap, rootLevel } from '../scene/scene-tree.ts';
+import { ancestorsOf, childOfGroup, parentMap, rootLevel } from '../scene/scene-tree.ts';
 import type { CenterOptions, FaceConnectivity, GeoShape, RegionOptions, StampShape } from './brush-shapes.ts';
 import { createHistory } from './history.ts';
 import type { VoxelSelection } from './voxel-selection.ts';
@@ -241,6 +241,7 @@ export function createEditor() {
 
     sceneChanged() {
       state.dirty = true;
+      if (state.level !== null && !ancestorsOf(parentMap(state.vox), state.level).includes(ROOT_ID)) state.level = null;
       evaluate();
       emit({ type: 'scene' });
     },
@@ -274,7 +275,7 @@ export function createEditor() {
       setSelection(selection, true);
     },
 
-    /** Selects object `transformId` wherever it sits, entering the group that holds it. */
+    /** Selects object or group `transformId` wherever it sits, entering the group that holds it. */
     focusObject(transformId: number) {
       const parent = parentMap(state.vox).get(transformId);
       if (parent === undefined) return;

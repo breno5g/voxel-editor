@@ -13,7 +13,7 @@
         <button id="save-file" type="button" title="Salvar .vox (Ctrl+S; salvar como: Ctrl+Shift+S)">Salvar</button>
       </div>
       <input id="file-input" type="file" accept=".vox" hidden />
-      <div id="modes" class="segmented" role="group" aria-label="Editor (Tab no viewport ou duplo clique alterna)">
+      <div id="modes" class="segmented" role="group" aria-label="Editor (Tab/Shift+Tab no viewport ou duplo clique alterna)">
         <button type="button" data-value="model" title="Editar os voxels do objeto selecionado (Tab)">Modelo</button>
         <button type="button" data-value="world" title="Organizar e animar objetos (Tab)">Mundo</button>
       </div>
@@ -210,6 +210,18 @@
               <button type="button" data-align="1 -1">−Y</button>
               <button type="button" data-align="2 -1">−Z</button>
             </div>
+          </div>
+          <div class="segmented" role="group" aria-label="Grupos">
+            <button type="button" data-world="group" title="Agrupar a seleção (Ctrl+R)">Agrupar</button>
+            <button type="button" data-world="ungroup" title="Desfazer os grupos selecionados (Ctrl+Shift+R)">Desagrupar</button>
+          </div>
+          <div class="segmented" role="group" aria-label="Níveis do grupo">
+            <button type="button" data-world="enter" title="Entrar no grupo ou objeto selecionado (Tab)">Entrar</button>
+            <button type="button" data-world="exit" title="Subir um nível (Shift+Tab)">Sair</button>
+          </div>
+          <div class="segmented" role="group" aria-label="Ordem de render">
+            <button type="button" data-world="first" title="Trazer para o primeiro lugar (order +2)">Primeiro</button>
+            <button type="button" data-world="last" title="Levar para o último lugar (order -2)">Último</button>
           </div>
           <div class="segmented" role="group" aria-label="Visibilidade">
             <button type="button" data-world="hide" title="Ocultar a seleção (Ctrl+H alterna)">Ocultar</button>
@@ -452,7 +464,8 @@
           <tr><th scope="row" colspan="2" class="group">Geral</th></tr>
           <tr><th scope="row">Girar / mover câmera / zoom</th><td>botão direito / botão do meio / roda (no cursor ou no foco, em Zoom)</td></tr>
           <tr><th scope="row">Mover / zoom / girar com o botão esquerdo</th><td>segure <kbd>Espaço</kbd> / <kbd>Z</kbd> / <kbd>K</kbd> e arraste</td></tr>
-          <tr><th scope="row">Alternar modo Modelo / Mundo</th><td><kbd>Tab</kbd> com o viewport focado (<kbd>Esc</kbd> sai dele)</td></tr>
+          <tr><th scope="row">Entrar no grupo ou objeto / subir um nível</th><td><kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> com o viewport focado (<kbd>Esc</kbd> sai dele)</td></tr>
+          <tr><th scope="row">Agrupar / desagrupar</th><td><kbd>Ctrl+R</kbd> / <kbd>Ctrl+Shift+R</kbd> no modo Mundo</td></tr>
           <tr><th scope="row">Recentralizar / vista de face</th><td><kbd>5</kbd> / <kbd>Ctrl+5</kbd></td></tr>
           <tr><th scope="row">Salvar imagem da vista</th><td><kbd>6</kbd></td></tr>
           <tr><th scope="row">Câmera: salvar / carregar / escolher slot</th><td><kbd>7</kbd> / <kbd>8</kbd> / teclado numérico</td></tr>

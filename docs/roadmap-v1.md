@@ -63,12 +63,12 @@ Pendências da v0.7:
 ## v0.9: editor de mundo
 
 - [x] Multisseleção (`Shift`), seleção por retângulo (`M`), `osel_all`/`osel_inv`/`osel_none`; mover, girar, espelhar, apoiar, ocultar, apagar e duplicar a seleção inteira (`Ctrl` move na vertical, `Ctrl+Shift` duplica arrastando)
-- [ ] Grupos: agrupar/desagrupar (`Ctrl+R`), entrar/sair (`TAB`), contorno da cena com expandir/recolher, ordenar
+- [x] Grupos: agrupar/desagrupar (`Ctrl+R`), entrar/sair (`TAB`), contorno da cena com expandir/recolher, ordenar
 - [ ] Referências: copiar como referência, `oref2obj`, `Shift+arrastar`
 - [ ] Copiar/colar objetos e transformações (`m_copy`, `m_paste`), copiar no frame atual
 - [ ] Booleanas: união, interseção, subtração, substituição
 - [x] Alinhar (mín/centro/máx), espelhar objetos
-- [ ] Ordem de render (`order`)
+- [x] Ordem de render (`order`)
 - [ ] Camadas: 8 camadas com nome, cor, visibilidade, selecionar objetos da camada
 - [ ] Wrap e padrões no mundo
 

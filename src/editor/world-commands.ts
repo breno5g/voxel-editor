@@ -2,16 +2,28 @@ import { DEFAULT_MODEL_SIZE, objectTransform } from '../format/defaults.ts';
 import { applyRows, encodeRotation, mirrorRotation, multiplyRows, rotationRows, transposeRows, turnRotation } from '../format/rotation.ts';
 import type { Axis } from '../format/rotation.ts';
 import { createModel, IDENTITY_ROTATION } from '../format/vox.ts';
-import type { Matrix3, ShapeNode, TransformKey, TransformNode, Vec3 } from '../format/vox.ts';
+import type { GroupNode, Matrix3, ShapeNode, TransformKey, TransformNode, Vec3 } from '../format/vox.ts';
 import { evaluateTransform, isLooping, setTransformAt } from '../scene/keyframes.ts';
-import { compose, isHidden } from '../scene/scene-graph.ts';
+import { compose, IDENTITY_POSE, isHidden } from '../scene/scene-graph.ts';
 import type { Pose } from '../scene/scene-graph.ts';
-import { cloneSubtree, groupNode, instanceBounds, instancesUnder, parentMap, parentPose, rootLevel, unionBounds } from '../scene/scene-tree.ts';
+import { cloneSubtree, groupNode, groupOf, instanceBounds, instancesUnder, parentMap, parentPose, rootLevel, unionBounds } from '../scene/scene-tree.ts';
 import type { Bounds } from '../scene/scene-tree.ts';
 import type { Editor } from './editor.ts';
 import { sceneChange } from './scene-change.ts';
 
 type Picked = { id: number; node: TransformNode };
+
+/**
+ * Keys of a child moved out of its group: its own keys composed with the group's transform, with a
+ * key at every frame either of them had one.
+ */
+function mergeKeys(holder: TransformKey[], child: TransformKey[]): TransformKey[] {
+  const frames = [...new Set([...holder, ...child].map((key) => key.frame))].sort((a, b) => a - b);
+  return frames.map((frame) => {
+    const pose = compose(compose(IDENTITY_POSE, evaluateTransform(holder, frame, false)), evaluateTransform(child, frame, false));
+    return { frame, translation: pose.translation, rotation: encodeRotation(pose.rows) };
+  });
+}
 
 const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const subtract = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -142,8 +154,115 @@ export function createWorldCommands(editor: Editor) {
     );
   };
 
+  /** The level above the current group: its holder becomes the selection. */
+  const exitLevel = () => {
+    if (state.mode === 'model') return editor.setMode('world');
+    if (state.level === null) return;
+    const parents = parentMap(state.vox);
+    const holder = parents.get(state.level);
+    const above = holder === undefined ? undefined : parents.get(holder);
+    if (holder === undefined || above === undefined) return editor.setLevel(null);
+    editor.setLevel(above, [holder]);
+  };
+
   return {
     setHidden,
+    exitLevel,
+
+    /** MagicaVoxel `olevel` (Tab): enters the selected group or object; from a model, or with nothing selected, climbs a level. */
+    enterLevel() {
+      if (state.mode === 'model' || state.selected === null) return exitLevel();
+      const group = groupOf(state.vox, state.selected);
+      if (group === null) return editor.setMode('model');
+      editor.setLevel(group, groupNode(state.vox, group)?.children.slice(0, 1) ?? []);
+    },
+
+    /**
+     * MagicaVoxel `ogroup` (Ctrl+R): the selection moves into a new group in its place, whose
+     * transform sits on the selection's centre; children keep their world position.
+     */
+    groupSelected() {
+      const nodes = requireSelection();
+      const level = levelGroup();
+      const bounds = boundsOf(nodes);
+      if (nodes.length === 0 || !level) return;
+      const center: Vec3 = bounds ? [...floorCenter(bounds)] : [0, 0, 0];
+      if (bounds) center[2] = bounds.low[2];
+      const transformId = state.vox.nodes.length;
+      const ids = nodes.map(({ id }) => id);
+      const holder: TransformNode = { kind: 'transform', attrs: new Map(), child: transformId + 1, layer: nodes[0].node.layer, keys: [{ frame: 0, translation: center, rotation: IDENTITY_ROTATION }] };
+      const group: GroupNode = { kind: 'group', attrs: new Map(), children: ids };
+      const beforeChildren = level.children;
+      const position = Math.min(...ids.map((id) => level.children.indexOf(id)));
+      const afterChildren = level.children.filter((id) => !ids.includes(id));
+      afterChildren.splice(position, 0, transformId);
+      const shifted = nodes.map(({ node }) => node.keys.map((key) => ({ ...key, translation: subtract(key.translation, center) })));
+      const before = nodes.map(({ node }) => node.keys);
+      const previous = state.selection;
+      change(
+        () => {
+          state.vox.nodes.push(holder, group);
+          level.children = afterChildren;
+          nodes.forEach(({ node }, index) => (node.keys = shifted[index]));
+          editor.setSelection([transformId]);
+        },
+        () => {
+          nodes.forEach(({ node }, index) => (node.keys = before[index]));
+          level.children = beforeChildren;
+          state.vox.nodes.splice(transformId, 2);
+          editor.setSelection(previous);
+        },
+        'Grupo criado',
+      );
+    },
+
+    /** MagicaVoxel `oungroup` (Ctrl+Shift+R): the selected groups' members take their place, keeping their world poses. */
+    ungroupSelected() {
+      const level = levelGroup();
+      const groups = requireSelection().flatMap(({ id, node }) => {
+        const groupId = groupOf(state.vox, id);
+        const group = groupId === null ? undefined : groupNode(state.vox, groupId);
+        return group ? [{ id, node, group }] : [];
+      });
+      if (!level || groups.length === 0) return editor.status('Selecione um grupo para desagrupar', 'error');
+      const members = groups.flatMap(({ node: holder, group }) =>
+        group.children.flatMap((childId) => {
+          const child = state.vox.nodes[childId];
+          return child?.kind === 'transform' ? [{ id: childId, node: child, keys: mergeKeys(holder.keys, child.keys) }] : [];
+        }),
+      );
+      const beforeChildren = level.children;
+      const afterChildren = level.children.flatMap((id) => groups.find((entry) => entry.id === id)?.group.children ?? [id]);
+      const before = members.map(({ node }) => node.keys);
+      const previous = state.selection;
+      change(
+        () => {
+          members.forEach(({ node, keys }) => (node.keys = keys));
+          level.children = afterChildren;
+          editor.setSelection(members.map(({ id }) => id));
+        },
+        () => {
+          members.forEach(({ node }, index) => (node.keys = before[index]));
+          level.children = beforeChildren;
+          editor.setSelection(previous);
+        },
+        'Grupo desfeito',
+      );
+    },
+
+    /** MagicaVoxel `order`: render order among siblings; ±2 brings to the first or last place, ±1 moves one place. */
+    orderSelected(step: -2 | -1 | 1 | 2) {
+      const level = levelGroup();
+      const ids = requireSelection().map(({ id }) => id);
+      if (!level || ids.length === 0) return;
+      const before = level.children;
+      const kept = before.filter((id) => !ids.includes(id));
+      const chosen = before.filter((id) => ids.includes(id));
+      const first = before.findIndex((id) => ids.includes(id));
+      const place = step === 2 ? 0 : step === -2 ? kept.length : Math.min(Math.max(first - step, 0), kept.length);
+      const after = [...kept.slice(0, place), ...chosen, ...kept.slice(place)];
+      change(() => (level.children = after), () => (level.children = before), 'Ordem alterada');
+    },
 
     selectAll() {
       editor.setSelection(levelGroup()?.children ?? []);

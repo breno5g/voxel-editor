@@ -93,3 +93,48 @@ describe('world commands on several objects', () => {
     expect(editor.state.instances).toHaveLength(2);
   });
 });
+
+describe('groups', () => {
+  it('groups the selection in place and ungroups it back, keeping world poses', () => {
+    const { editor, commands } = setup();
+    const before = boxes(editor);
+    commands.groupSelected();
+    const [holder] = editor.state.selection;
+    expect(editor.state.vox.nodes[holder]?.kind).toBe('transform');
+    expect(boxes(editor)).toEqual(before);
+    const moved = before.map((box) => box.low[1] + 3);
+    commands.moveSelected([0, 3, 0]);
+    expect(boxes(editor).map((box) => box.low[1])).toEqual(moved);
+    commands.ungroupSelected();
+    expect(editor.state.selection).toEqual([2, 4]);
+    expect(boxes(editor).map((box) => box.low[1])).toEqual(moved);
+    editor.history.undo();
+    editor.history.undo();
+    editor.history.undo();
+    expect(boxes(editor)).toEqual(before);
+    expect(editor.state.selection).toEqual([2, 4]);
+  });
+
+  it('enters a group with Tab and climbs out with Shift+Tab', () => {
+    const { editor, commands } = setup();
+    commands.groupSelected();
+    const [holder] = editor.state.selection;
+    commands.enterLevel();
+    expect(editor.state.level).not.toBeNull();
+    expect(editor.state.selection).toEqual([2]);
+    commands.selectAll();
+    expect(editor.state.selection).toEqual([2, 4]);
+    commands.exitLevel();
+    expect(editor.state.level).toBeNull();
+    expect(editor.state.selection).toEqual([holder]);
+  });
+
+  it('brings the selection to the first or last render place', () => {
+    const { editor, commands } = setup();
+    editor.setSelection([4]);
+    commands.orderSelected(2);
+    expect(editor.state.instances.map((instance) => instance.transformId)).toEqual([4, 2]);
+    commands.orderSelected(-2);
+    expect(editor.state.instances.map((instance) => instance.transformId)).toEqual([2, 4]);
+  });
+});

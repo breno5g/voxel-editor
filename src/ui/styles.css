@@ -335,8 +335,13 @@ body {
   border-color: var(--accent);
 }
 
-.object-list .visibility {
+.object-list .visibility,
+.object-list .expand {
   padding: 3px 6px;
+}
+
+.object-list .object-name[data-group='true'] {
+  font-weight: 600;
 }
 
 .object-list .badge {

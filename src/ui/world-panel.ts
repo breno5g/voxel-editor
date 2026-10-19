@@ -18,6 +18,12 @@ export function bindWorldPanel(editor: Editor, commands: ObjectCommands): void {
     hide: () => commands.hideSelected(true),
     show: () => commands.hideSelected(false),
     ground: commands.groundSelected,
+    group: commands.groupSelected,
+    ungroup: commands.ungroupSelected,
+    enter: commands.enterLevel,
+    exit: commands.exitLevel,
+    first: () => commands.orderSelected(2),
+    last: () => commands.orderSelected(-2),
   };
   document.querySelectorAll<HTMLButtonElement>('[data-world]').forEach((button) =>
     button.addEventListener('click', () => actions[button.dataset.world ?? '']?.()),

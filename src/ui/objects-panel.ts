@@ -1,29 +1,57 @@
 import type { Editor } from '../editor/editor.ts';
 import type { ObjectCommands } from '../editor/object-commands.ts';
-import { listObjects } from '../scene/scene-graph.ts';
-import { isUnder, parentMap, rootLevel } from '../scene/scene-tree.ts';
+import { isHidden } from '../scene/scene-graph.ts';
+import { groupNode, groupOf, isUnder, parentMap, rootLevel } from '../scene/scene-tree.ts';
 import { element } from './dom.ts';
 
-/** Every object in the scene (hidden ones too), with selection (Shift or Ctrl adds) and a visibility toggle. */
+/** Indentation per group level, in pixels. */
+const INDENT = 12;
+
+/**
+ * MagicaVoxel's scene outline: every object and group (hidden ones too) as a tree with collapsible
+ * groups (`oexpand`), selection (Shift or Ctrl adds) and a visibility toggle per row.
+ */
 export function bindObjectsPanel(editor: Editor, commands: ObjectCommands): void {
   const list = element('object-list', HTMLUListElement);
+  const collapsed = new Set<number>();
 
   const render = () => {
-    const { vox, selection } = editor.state;
+    const { vox, selection, level } = editor.state;
     const parents = parentMap(vox);
-    const items = listObjects(vox).map(({ transformId, shapeId, hidden }) => {
+    const items: HTMLLIElement[] = [];
+
+    const row = (transformId: number, depth: number, hiddenAbove: boolean) => {
       const transform = vox.nodes[transformId];
-      const shape = vox.nodes[shapeId];
-      const label = transform.attrs.get('_name') ?? `Objeto ${transformId}`;
-      const isAnimated = (transform.kind === 'transform' && transform.keys.length > 1) || (shape.kind === 'shape' && shape.keys.length > 1);
+      if (transform?.kind !== 'transform') return;
+      const group = groupOf(vox, transformId);
+      const shape = vox.nodes[transform.child];
+      const hidden = hiddenAbove || isHidden(transform.attrs);
+      const label = transform.attrs.get('_name') ?? `${group === null ? 'Objeto' : 'Grupo'} ${transformId}`;
+      const isAnimated = transform.keys.length > 1 || (shape?.kind === 'shape' && shape.keys.length > 1);
+
+      const item = document.createElement('li');
+      item.style.paddingLeft = `${depth * INDENT}px`;
+      if (group !== null) {
+        const open = !collapsed.has(transformId);
+        const expand = Object.assign(document.createElement('button'), { type: 'button', className: 'expand', textContent: open ? '▾' : '▸' });
+        expand.setAttribute('aria-expanded', String(open));
+        expand.title = open ? `Recolher ${label}` : `Expandir ${label}`;
+        expand.addEventListener('click', () => {
+          if (open) collapsed.add(transformId);
+          else collapsed.delete(transformId);
+          render();
+        });
+        item.append(expand);
+      }
 
       const name = Object.assign(document.createElement('button'), { type: 'button', className: 'object-name', textContent: label });
       name.setAttribute('aria-current', String(selection.some((id) => isUnder(parents, transformId, id))));
       name.dataset.hidden = String(hidden);
+      name.dataset.group = String(group !== null);
       name.addEventListener('click', (event) => {
-        if (!event.shiftKey && !event.ctrlKey) return editor.focusObject(transformId);
-        const { selection: current } = editor.state;
-        if (parents.get(transformId) !== (editor.state.level ?? rootLevel(vox))) return editor.focusObject(transformId);
+        const atLevel = parents.get(transformId) === (level ?? rootLevel(vox));
+        if (!atLevel || (!event.shiftKey && !event.ctrlKey)) return editor.focusObject(transformId);
+        const current = editor.state.selection;
         editor.setSelection(current.includes(transformId) ? current.filter((id) => id !== transformId) : [...current, transformId]);
       });
       if (isAnimated) name.append(Object.assign(document.createElement('span'), { className: 'badge', textContent: '◆', title: 'Animado' }));
@@ -33,10 +61,13 @@ export function bindObjectsPanel(editor: Editor, commands: ObjectCommands): void
       visibility.setAttribute('aria-pressed', String(!hidden));
       visibility.addEventListener('click', () => commands.toggleHidden(transformId));
 
-      const item = document.createElement('li');
       item.append(name, visibility);
-      return item;
-    });
+      items.push(item);
+      if (group !== null && !collapsed.has(transformId)) groupNode(vox, group)?.children.forEach((child) => row(child, depth + 1, hidden));
+    };
+
+    const root = rootLevel(vox);
+    if (root !== null) groupNode(vox, root)?.children.forEach((child) => row(child, 0, false));
     list.replaceChildren(...items);
   };
 

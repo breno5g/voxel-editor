@@ -17,7 +17,7 @@ const CAMERA_DRAG_KEYS: Record<string, CameraDrag> = { Space: 'pan', KeyZ: 'zoom
 /**
  * Keeps the viewport in step with editor events and routes left-button input by editor:
  * brush strokes in model mode, object selection in world mode (right/middle buttons
- * belong to the camera). Tab switches editors while the canvas has focus, so it still
+ * belong to the camera). Tab and Shift+Tab move between levels (`olevel`) while the canvas has focus, so they still
  * moves focus everywhere else; Esc hands focus back to the page.
  */
 export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: ObjectCommands) {
@@ -28,7 +28,7 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
   const { canvas } = viewport;
 
   canvas.tabIndex = 0;
-  canvas.setAttribute('aria-label', 'Viewport 3D. Tab alterna entre Modelo e Mundo, Esc sai do viewport');
+  canvas.setAttribute('aria-label', 'Viewport 3D. Tab entra no grupo ou objeto selecionado, Shift+Tab sobe um nível, Esc sai do viewport');
   /** MagicaVoxel transform sessions: Enter keeps the result, Esc reverts it (captured before Esc blurs the canvas). */
   window.addEventListener('keydown', (event) => {
     if (isEditingText(event) || state.mode !== 'model') return;
@@ -39,7 +39,8 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
     if (event.key === 'Escape' && !event.defaultPrevented) return canvas.blur();
     if (event.key !== 'Tab') return;
     event.preventDefault();
-    editor.setMode(event.shiftKey || state.mode === 'model' ? 'world' : 'model');
+    if (event.shiftKey) commands.exitLevel();
+    else commands.enterLevel();
   });
 
   window.addEventListener('keydown', (event) => {
