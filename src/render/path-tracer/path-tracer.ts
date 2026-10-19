@@ -26,8 +26,10 @@ const ORTHOGRAPHIC_PULLBACK = 10000;
 // ponytail: the scales below are inferred from MagicaVoxel's slider ranges, not read from its binary.
 /** `_area` as a fraction of a right angle: the sun's angular radius. */
 const SUN_AREA_ANGLE = Math.PI / 2;
-/** `_fog_uni _d` and `_ground _hor`: extinction per 100 voxels. */
-const EXTINCTION_SCALE = 0.01;
+/** `_fog_uni _d`: extinction per 1000 voxels. */
+const FOG_SCALE = 0.001;
+/** `_ground _hor`: how fast the ground fades, per 100 voxels. */
+const HORIZON_SCALE = 0.01;
 /** `_lens _aperture`: lens radius as a fraction of the focus distance. */
 const APERTURE_SCALE = 0.02;
 
@@ -197,16 +199,17 @@ export function createPathTracer(container: HTMLElement) {
     uniform1('u_iblIntensity', ibl.intensity);
     gl.uniformMatrix3fv(at(traceProgram, 'u_iblRotation'), false, new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationZ(-radians(ibl.yaw))).elements);
     uniformInt('u_hasIbl', hasIbl);
-    uniform3('u_rayleigh', scaled(linear(atmosphere.rayleighColor), atmosphere.rayleigh));
-    uniform3('u_mie', scaled(linear(atmosphere.mieColor), atmosphere.mie));
+    /* Scattering colours are coefficients, not sRGB: the default Rayleigh 45 104 255 is the physical β ratio. */
+    uniform3('u_rayleigh', scaled(atmosphere.rayleighColor, atmosphere.rayleigh / 255));
+    uniform3('u_mie', scaled(atmosphere.mieColor, atmosphere.mie / 255));
     uniform1('u_miePhase', atmosphere.miePhase);
-    uniform3('u_ozone', scaled(linear(atmosphere.ozoneColor), atmosphere.ozone));
-    uniform1('u_fogDensity', fog.density * EXTINCTION_SCALE);
+    uniform3('u_ozone', scaled(atmosphere.ozoneColor, atmosphere.ozone / 255));
+    uniform1('u_fogDensity', fog.density * FOG_SCALE);
     uniform3('u_fogColor', linear(fog.color));
     uniform1('u_fogPhase', fog.phase);
     uniformInt('u_ground', show.ground);
     uniform3('u_groundColor', linear(ground.color));
-    uniform1('u_horizon', ground.horizon * EXTINCTION_SCALE);
+    uniform1('u_horizon', ground.horizon * HORIZON_SCALE);
     uniformInt('u_flatBackground', show.backgroundColor || show.transparent);
     uniformInt('u_edges', show.edge);
     uniform3('u_edgeColor', linear(edge.color));

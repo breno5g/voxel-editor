@@ -340,15 +340,34 @@ vec3 iblSample(vec3 direction) {
   return texture(u_ibl, uv).rgb * u_iblIntensity;
 }
 
-/** A cheap sky: Rayleigh blue toward the zenith, Mie glow around the sun, ozone tint near the horizon. */
+/** Air between the eye and the edge of the atmosphere, in atmospheres: 1 straight up, growing toward the horizon. */
+float airMass(vec3 direction) {
+  return 1.0 / (max(direction.z, 0.0) + 0.1);
+}
+
+/** Atmosphere extinction per air mass: Rayleigh and Mie scatter, ozone only absorbs. */
+vec3 extinction() {
+  return u_rayleigh * 2.0 + u_mie * 0.2 + u_ozone * 0.1;
+}
+
+/** The sun's light after crossing \`depth\` of the air toward it: redder and dimmer as it sets. */
+vec3 sunlightAt(float depth) {
+  return u_environment == 1 ? u_sunRadiance * exp(-extinction() * airMass(u_sunDirection) * depth) : u_sunRadiance;
+}
+
+vec3 sunlight() {
+  return sunlightAt(0.5);
+}
+
+// ponytail: single scattering with a uniform-density sky, tuned by eye; not MagicaVoxel's atmosphere model.
+/** Rayleigh blue overhead, a white Mie glow around the sun, both washing out toward the horizon. */
 vec3 atmosphere(vec3 direction) {
-  float height = max(direction.z, 0.0);
   float cosSun = dot(direction, u_sunDirection);
-  float airMass = 1.0 / (height + 0.15);
-  vec3 rayleigh = u_rayleigh * (0.75 * (1.0 + cosSun * cosSun)) * (1.0 - exp(-airMass * 0.25));
-  vec3 mie = u_mie * phaseHG(cosSun, u_miePhase) * 0.4 * PI;
-  vec3 ozone = u_ozone * (1.0 - height) * 0.3;
-  return (rayleigh + mie + ozone) * dot(u_sunRadiance, vec3(0.3333)) * PI;
+  vec3 total = extinction();
+  vec3 scattered = u_rayleigh * 2.0 * 0.75 * (1.0 + cosSun * cosSun) + u_mie * 0.2 * phaseHG(cosSun, u_miePhase) * 4.0 * PI;
+  /* Air seen higher up is lit by sunlight that crossed less of the atmosphere: blue zenith over an orange sunset. */
+  vec3 light = sunlightAt(0.5 * (1.0 - 0.8 * max(direction.z, 0.0)));
+  return light * PI * scattered / max(total, vec3(1e-4)) * (1.0 - exp(-total * airMass(direction)));
 }
 
 vec3 sky(vec3 direction) {
@@ -360,7 +379,7 @@ vec3 sky(vec3 direction) {
 /** What a ray leaving the scene sees; the sun disk only where it was not already sampled directly. */
 vec3 escape(vec3 direction, bool showSun) {
   vec3 color = sky(direction);
-  if (showSun && u_sunDisk && dot(direction, u_sunDirection) > u_sunCos) color += u_sunRadiance * PI / max(2.0 * PI * (1.0 - u_sunCos), 1e-4);
+  if (showSun && u_sunDisk && dot(direction, u_sunDirection) > u_sunCos) color += sunlight() * PI / max(2.0 * PI * (1.0 - u_sunCos), 1e-4);
   return color;
 }
 
@@ -505,7 +524,7 @@ void main() {
         scatter++;
         origin += direction * fogDistance;
         throughput *= u_fogColor;
-        radiance += throughput * sunlightThrough(origin, u_sunDirection) * u_sunRadiance * PI * phaseHG(dot(direction, u_sunDirection), u_fogPhase) * 4.0 * PI;
+        radiance += throughput * sunlightThrough(origin, u_sunDirection) * sunlight() * PI * phaseHG(dot(direction, u_sunDirection), u_fogPhase);
         direction = henyeyGreenstein(direction, u_fogPhase);
         showSun = false;
         continue;
@@ -591,7 +610,7 @@ void main() {
     origin = surface.position + facing * bias;
     vec3 toSun = cone(u_sunDirection, u_sunCos);
     float cosSun = dot(toSun, facing);
-    if (cosSun > 0.0) radiance += throughput * albedo * sunlightThrough(origin, toSun) * u_sunRadiance * cosSun;
+    if (cosSun > 0.0) radiance += throughput * albedo * sunlightThrough(origin, toSun) * sunlight() * cosSun;
     if (diffuse >= u_diffuseBounces) break;
     diffuse++;
     throughput *= albedo;
