@@ -62,7 +62,7 @@ const faceArea = (face: number, [x, y, z]: Vec3) => [y * z, x * z, x * y][face >
 
 /**
  * Each group's share of the total power, running (faces · brightest channel of its radiance · face
- * area, as MagicaVoxel's ***REMOVED*** sums it), and the total; `radiance` is linear RGB per palette index.
+ * area, as MagicaVoxel sums it), and the total; `radiance` is linear RGB per palette index.
  * A pixel picks a group where the running share first exceeds a uniform draw, then a face within it.
  */
 export function emitterPower({ offsets }: EmitterFaces, radiance: Float32Array, scale: Vec3): { cumulative: Float32Array; total: number } {

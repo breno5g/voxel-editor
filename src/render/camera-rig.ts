@@ -39,7 +39,7 @@ const FACE_DIRECTIONS = [
 
 const toVec3 = (vector: THREE.Vector3): Vec3 => [vector.x, vector.y, vector.z];
 
-/** MagicaVoxel's wheel step (`***REMOVED***`): 10 × the zoom speed, 0.01 for orbit cameras and 1 for the free one. */
+/** MagicaVoxel's wheel step: 10 × the zoom speed, 0.01 for orbit cameras and 1 for the free one. */
 const FOCUS_ZOOM_STEP = 0.1;
 const FREE_ZOOM_STEP = 10;
 const MIN_ZOOM_EXTENT = 0.001;
@@ -51,7 +51,7 @@ const RIGHT_BUTTON = 2;
 const WHEEL_NOTCH = [100, 3, 1];
 
 /**
- * MagicaVoxel's perspective zoom (`***REMOVED***`): `radius + 1` scales by `e^-amount`, so unlike a
+ * MagicaVoxel's perspective zoom: `radius + 1` scales by `e^-amount`, so unlike a
  * plain `radius · factor` it reaches the focus in a few steps instead of slowing down forever.
  */
 export const focusZoomRadius = (radius: number, amount: number) => Math.max((radius + 1) * Math.exp(-amount) - 1, MIN_ZOOM_EXTENT);

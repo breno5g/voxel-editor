@@ -177,7 +177,7 @@ export type AxisReach = 'both' | 'positive' | 'negative' | 'none';
 const REACH_RANGE: Record<AxisReach, [number, number]> = { both: [-1, 1], positive: [0, 1], negative: [-1, 0], none: [0, 0] };
 export const ALL_NEIGHBORS: [AxisReach, AxisReach, AxisReach] = ['both', 'both', 'both'];
 
-/** Every neighbour offset within the per-axis reach, the zero offset excluded (26 by default), like `***REMOVED***`. */
+/** Every neighbour offset within the per-axis reach, the zero offset excluded (26 by default), as in MagicaVoxel. */
 export function neighborOffsets(reach: readonly AxisReach[]): Vec3[] {
   const [[x0, x1], [y0, y1], [z0, z1]] = AXES.map((axis) => REACH_RANGE[reach[axis]]);
   const offsets: Vec3[] = [];
@@ -278,7 +278,7 @@ export const primitive = (model: VoxModel, shape: Primitive, color: number) =>
     return PRIMITIVE_TESTS[shape](u, v, w) ? color : EMPTY_VOXEL;
   });
 
-/** Ken Perlin's reference permutation, which MagicaVoxel's noise (`***REMOVED***`) uses. */
+/** Ken Perlin's reference permutation, which MagicaVoxel's noise uses. */
 const PERMUTATION = [
   151, 160, 137, 91, 90, 15, 131, 13, 201, 95, 96, 53, 194, 233, 7, 225, 140, 36, 103, 30, 69, 142, 8, 99, 37, 240, 21, 10, 23, 190, 6, 148, 247, 120, 234,
   75, 0, 26, 197, 62, 94, 252, 219, 203, 117, 35, 11, 32, 57, 177, 33, 88, 237, 149, 56, 87, 174, 20, 125, 136, 171, 168, 68, 175, 74, 165, 71, 134, 139,
@@ -289,7 +289,7 @@ const PERMUTATION = [
   210, 144, 12, 191, 179, 162, 241, 81, 51, 145, 235, 249, 14, 239, 107, 49, 192, 214, 31, 181, 199, 106, 157, 184, 84, 204, 176, 115, 121, 50, 45, 127, 4,
   150, 254, 138, 236, 205, 93, 222, 114, 67, 29, 24, 72, 243, 141, 128, 195, 78, 66, 215, 61, 156, 180,
 ];
-/** The binary's gradient table (`***REMOVED***`), indexed by the low four bits of the hash. */
+/** MagicaVoxel's gradient table, indexed by the low four bits of the hash. */
 const GRADIENTS: Vec3[] = [
   [0, 1, 1], [0, 1, -1], [0, -1, -1], [0, -1, 1], [1, 0, 1], [1, 0, -1], [-1, 0, -1], [-1, 0, 1],
   [1, 1, 0], [-1, 1, 0], [-1, -1, 0], [1, -1, 0], [0, 1, 1], [0, 1, -1], [0, -1, -1], [0, -1, 1],
@@ -329,7 +329,7 @@ export const noise = (model: VoxModel, color: number, { seed, frequency, low, hi
 const randomInt = (random: () => number) => Math.floor(random() * 32768);
 
 /**
- * `maze width` (`***REMOVED***`): a growing-tree maze of one-voxel corridors on a lattice with
+ * `maze width`: a growing-tree maze of one-voxel corridors on a lattice with
  * `width + 2` cells between nodes, in 3D when the volume is deep enough. Each step continues from the
  * newest node or a random one, preferring the -x/-y/-z neighbours four times in five, like the binary.
  */

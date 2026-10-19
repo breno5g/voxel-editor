@@ -35,7 +35,7 @@ export function parseAxisArgs(args: string[]): { axes: Axis[]; values: number[] 
   return { axes, values };
 }
 
-/** `dil`/`ero` arguments (`***REMOVED***`): `x`, `+y` or `-z` limit the neighbourhood to the named axes and directions. */
+/** `dil`/`ero` arguments: `x`, `+y` or `-z` limit the neighbourhood to the named axes and directions. */
 export function parseReach(args: string[]): AxisReach[] | null {
   if (args.length === 0) return [...ops.ALL_NEIGHBORS];
   const reach: AxisReach[] = ['none', 'none', 'none'];

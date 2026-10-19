@@ -15,7 +15,7 @@ Depois da v1 o editor diverge livremente; até lá, atalhos e semântica seguem 
 ## v0.6: modos e mapa de atalhos (feito)
 
 - [x] Modo Modelo e modo Mundo (`olevel -2`, `Tab` com o viewport focado, duplo clique)
-- [x] F5/F6 e `Ctrl+,`/`Ctrl+.` agem no frame de modelo (modo Modelo) ou na key de transformação (modo Mundo), como `***REMOVED***`
+- [x] F5/F6 e `Ctrl+,`/`Ctrl+.` agem no frame de modelo (modo Modelo) ou na key de transformação (modo Mundo), como no MagicaVoxel
 - [x] Mapa de atalhos do `hotkey.txt` (global, model-editor, world-editor, camera-control)
 - [x] Mundo: clicar seleciona, arrastar move no plano, `G` assenta no chão (`omove g`), `+`/`-` e `9`/`0` giram (`orot`), `Ctrl+H` oculta
 - [x] Modelo: objetos de fundo esmaecidos (`Ctrl+B`), grade (`Ctrl+G`), moldura (`Ctrl+F`), arestas (`Ctrl+E`)
@@ -121,7 +121,7 @@ Pendências da v1.0:
 - [x] MIS no espalhamento (`pt_mis_cloud`): névoa e meios amostram o sol no disco e pela fase Henyey–Greenstein, pesados pela heurística da potência; "MIS no reflexo" e "MIS no espalhamento" no painel Amostragem (desligados, o sol vem só da amostra direta, ou só do reflexo em lobos estreitos)
 - [x] Escalas do path tracer lidas do setup de uniforms do MagicaVoxel ([RE §8](magicavoxel-re.md)): sol (raio `_area·20°`, força `5·_i`, ×2 na atmosfera, direção), gama do filme em todas as cores, IBL normalizada, coeficientes da atmosfera `10^(1,5·d) − 1`, névoa, horizonte, abertura, emissão `1 + 3·_emit·10^_flux`, ACES ×0,6 e bloom ×0,7; seguem inferidos a profundidade da atmosfera e a convenção da abertura
 - [x] Luz de área nas faces emissivas (`_emit` com `_flux` > 0): cada pixel sorteia uma face pela potência (o MagicaVoxel sorteia uma por passada, o que pisca), amostrada direto a partir das superfícies difusas com MIS; `_ldr` controla o brilho visto sem mudar o que o emissor ilumina
-- [x] Amostragem estocástica (`pt_jit`, o `jitter_mult` de ***REMOVED***): desligada, todos os pixels usam o mesmo sorteio a cada amostra. O volume esparso (`OPT_SPARSE`) corresponde ao traçado por bricks 8³, sempre ativo
+- [x] Amostragem estocástica (`pt_jit`, o `jitter_mult` do MagicaVoxel): desligada, todos os pixels usam o mesmo sorteio a cada amostra. O volume esparso (`OPT_SPARSE`) corresponde ao traçado por bricks 8³, sempre ativo
 - [x] Vista do render na resolução da tela (`devicePixelRatio`, até 2×), como a viewport do editor; antes, telas HiDPI mostravam o render esticado
 - [x] Amostras da prévia e da imagem exportada (`pt_spp`, até 100000) separadas e descritas: a prévia diz quantas amostras tem, quando fica pronta e quando mostra a exportação em andamento; o painel Exportar imagem diz que a imagem é calculada do zero, em que tamanho e com quantas amostras, e acompanha frame e amostra durante o render
 - [x] Custo do render: enquanto a vista ou um ajuste muda, a prévia traça com metade da resolução e volta à cheia ao parar; o denoise da prévia roda em 1, 2, 4, 8, 16 amostras e depois a cada 16 (e sempre no fim); a cena do editor não é desenhada por baixo do render

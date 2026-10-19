@@ -414,7 +414,7 @@ export function createPathTracer(container: HTMLElement) {
   };
 
   /**
-   * MagicaVoxel's area lights (***REMOVED***): the faces of `_emit` voxels with `_flux` above 0, each
+   * MagicaVoxel's area lights: the faces of `_emit` voxels with `_flux` above 0, each
    * group (palette index, direction) weighed by its faces' power under the current colours and scale.
    */
   const weighEmitters = (active: RenderSettings) => {

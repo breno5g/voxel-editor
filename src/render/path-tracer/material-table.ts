@@ -13,16 +13,16 @@ export const MATERIAL_KIND: Record<MaterialType, number> = { _diffuse: 0, _metal
 export const MATERIAL_ROWS = 2;
 
 /**
- * MagicaVoxel's emitter strength (***REMOVED***): an `_emit` voxel shines at `1 + 3·_emit·10^_flux` times
+ * MagicaVoxel's emitter strength: an `_emit` voxel shines at `1 + 3·_emit·10^_flux` times
  * its colour, so it glows at its own colour even at zero emission. Blends and emitting media have no
  * such floor (inferred: the binary only shows the `_emit` branch).
  */
 const emitterGain = (emit: number, flux: number) => 3 * emit * Math.pow(10, flux);
 
 /**
- * How bright an emitter looks, against how much it lights (***REMOVED***): `_ldr` above 0 shows it at
+ * How bright an emitter looks, against how much it lights: `_ldr` above 0 shows it at
  * `1 + 3·_ldr` times its colour so it need not blow out. Only `_emit` voxels with `_flux` above 0 are
- * sampled as area lights, as MagicaVoxel's emitter list (***REMOVED***) keeps.
+ * sampled as area lights, as MagicaVoxel's emitter list keeps.
  */
 const seenEmission = (ldr: number, emission: number) => (ldr > 0 ? 1 + 3 * ldr : emission);
 

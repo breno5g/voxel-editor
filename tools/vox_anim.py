@@ -1,8 +1,7 @@
 """Reference port of MagicaVoxel 0.99.7.2 animation semantics (.vox v200).
 
-Ported from the decompiled binary (see docs/magicavoxel-re.md):
-  ***REMOVED***  scene reader (nTRN / nSHP / nGRP / META)
-  ***REMOVED***  per-frame evaluator (keyframe search, lerp, rounding)
+Covers the scene reader (nTRN / nSHP / nGRP / META) and the per-frame
+evaluator (keyframe search, lerp, rounding); see docs/magicavoxel-re.md.
 
 Usage:
   python3 tools/vox_anim.py               # run self-check

@@ -9,7 +9,7 @@ export const MEDIA_TYPES = ['_absorb', '_scatter', '_emit', '_sss'] as const;
 export type MediaType = (typeof MEDIA_TYPES)[number];
 
 /**
- * The MATL parameters MagicaVoxel 0.99.7 reads and writes (its key table at ***REMOVED***), with the
+ * The MATL parameters MagicaVoxel 0.99.7 reads and writes, with the
  * slider range and default its material panel uses, and the types that show them.
  */
 export const MATERIAL_PARAMS = {

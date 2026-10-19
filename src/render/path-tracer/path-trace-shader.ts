@@ -53,7 +53,7 @@ uniform float u_bladeRotation;
 
 uniform vec3 u_sunDirection;
 uniform vec3 u_sunRadiance;
-/* Area lights, as MagicaVoxel lists them (***REMOVED***): every emitter face (\`cell·8 + face\`) grouped by palette
+/* Area lights, as MagicaVoxel lists them: every emitter face (\`cell·8 + face\`) grouped by palette
    index and direction, where each group starts, and each group's running share of the total power. */
 uniform highp usampler2D u_emitterFaces;
 uniform highp usampler2D u_emitterOffsets;
@@ -639,7 +639,7 @@ vec3 emitterRadiance(uint color) {
 
 /**
  * Light a diffuse surface at \`origin\` gets from one area-light face, MIS-weighted against its cosine bounce.
- * Each pixel picks its own face as MagicaVoxel picks one per pass (***REMOVED***): a group by its share of
+ * Each pixel picks its own face as MagicaVoxel picks one per pass: a group by its share of
  * the power, a face of the group uniformly, a point on the face uniformly.
  */
 vec3 areaLight(vec3 origin, vec3 normal) {
