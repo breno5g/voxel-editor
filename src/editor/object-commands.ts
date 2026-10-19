@@ -4,6 +4,7 @@ import type { ShapeNode, TransformNode, Vec3, VoxModel } from '../format/vox.ts'
 import { adjacentKeyFrame, evaluateShape, evaluateTransform, isLooping, removeKeyAt, upsertKey } from '../scene/keyframes.ts';
 import type { Editor } from './editor.ts';
 import { sceneChange } from './scene-change.ts';
+import { createLayerCommands } from './layer-commands.ts';
 import { createObjectBooleans } from './object-booleans.ts';
 import { createObjectClipboard } from './object-clipboard.ts';
 import { createWorldCommands } from './world-commands.ts';
@@ -113,6 +114,7 @@ export function createObjectCommands(editor: Editor) {
     ...createWorldCommands(editor),
     ...createObjectClipboard(editor),
     ...createObjectBooleans(editor),
+    ...createLayerCommands(editor),
     addTransformKey,
     addModelFrame,
     removeTransformKey,

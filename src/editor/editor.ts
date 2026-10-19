@@ -82,6 +82,8 @@ export type EditorState = {
   selection: number[];
   /** MagicaVoxel `olevel`: the group whose children the world editor picks; null is the scene's root group. */
   level: number | null;
+  /** MagicaVoxel's current layer: new objects go on it. */
+  layer: number;
   brushType: BrushType;
   brushMode: BrushMode;
   /** MagicaVoxel `b_mirror_x/y/z`: strokes are repeated across the model's centre on each enabled axis. */
@@ -152,6 +154,7 @@ export function createEditor() {
     selected: null,
     selection: [],
     level: null,
+    layer: 0,
     brushType: 'attach',
     brushMode: 'vox',
     mirror: [false, false, false],
@@ -313,6 +316,11 @@ export function createEditor() {
 
     setMarquee(marquee: MarqueeMode) {
       state.marquee = marquee;
+      emit({ type: 'tool' });
+    },
+
+    setCurrentLayer(layer: number) {
+      state.layer = layer;
       emit({ type: 'tool' });
     },
 

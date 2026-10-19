@@ -194,6 +194,21 @@
           <button type="button" data-world="refToObject" title="Converter referência em cópia própria (Ctrl+T; Ctrl+Shift+T na cena toda)">Separar</button>
         </div>
       </section>
+      <section aria-labelledby="layers-title" data-only-mode="world">
+        <h2 id="layers-title">Camadas</h2>
+        <div class="stack">
+          <div id="layer-list" class="segmented layer-list" role="group" aria-label="Camada atual: clique também move a seleção para ela"></div>
+          <div class="control-row">
+            <input id="layer-color" type="color" aria-label="Cor da camada" title="Cor da camada (lay_col)" />
+            <input id="layer-name" type="text" aria-label="Nome da camada" title="Nome da camada (lay_name); Enter aplica" />
+          </div>
+          <div class="segmented" role="group" aria-label="Ações da camada">
+            <button id="layer-visible" type="button" title="Mostrar/ocultar a camada (lay_vis)">Ocultar</button>
+            <button id="layer-select" type="button" title="Selecionar os objetos da camada (osel_layer)">Selecionar</button>
+            <button id="layer-sort" type="button" title="Ordenar as camadas pelo nome (lay_sort)">Ordenar</button>
+          </div>
+        </div>
+      </section>
       <section aria-labelledby="world-transform-title" data-only-mode="world">
         <h2 id="world-transform-title">Transformar</h2>
         <div class="stack">

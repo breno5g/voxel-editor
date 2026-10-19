@@ -69,7 +69,7 @@ Pendências da v0.7:
 - [x] Booleanas: união, interseção, operandos (`ooper`), subtração, substituição
 - [x] Alinhar (mín/centro/máx), espelhar objetos
 - [x] Ordem de render (`order`)
-- [ ] Camadas: 8 camadas com nome, cor, visibilidade, selecionar objetos da camada
+- [x] Camadas: 8 camadas com nome, cor, visibilidade, selecionar objetos da camada, mover a seleção para a camada, ordenar por nome
 - [ ] Wrap e padrões no mundo
 
 ## v0.10: paleta e materiais

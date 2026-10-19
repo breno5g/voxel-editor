@@ -402,7 +402,7 @@ export function createWorldCommands(editor: Editor) {
       if (!group) return editor.status('A cena não tem um grupo raiz para receber objetos', 'error');
       const transformId = state.vox.nodes.length;
       const nodes: [TransformNode, ShapeNode] = [
-        objectTransform(transformId + 1, DEFAULT_MODEL_SIZE),
+        { ...objectTransform(transformId + 1, DEFAULT_MODEL_SIZE), layer: state.layer },
         { kind: 'shape', attrs: new Map(), keys: [{ frame: 0, model: state.vox.models.length }] },
       ];
       const previous = state.selection;

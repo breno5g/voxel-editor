@@ -1,4 +1,5 @@
 import type { Editor } from '../editor/editor.ts';
+import { isLayerHidden } from '../editor/layer-commands.ts';
 import type { ObjectCommands } from '../editor/object-commands.ts';
 import { isHidden } from '../scene/scene-graph.ts';
 import { groupNode, groupOf, isUnder, parentMap, rootLevel } from '../scene/scene-tree.ts';
@@ -25,7 +26,7 @@ export function bindObjectsPanel(editor: Editor, commands: ObjectCommands): void
       if (transform?.kind !== 'transform') return;
       const group = groupOf(vox, transformId);
       const shape = vox.nodes[transform.child];
-      const hidden = hiddenAbove || isHidden(transform.attrs);
+      const hidden = hiddenAbove || isHidden(transform.attrs) || isLayerHidden(vox, transform.layer);
       const label = transform.attrs.get('_name') ?? `${group === null ? 'Objeto' : 'Grupo'} ${transformId}`;
       const isAnimated = transform.keys.length > 1 || (shape?.kind === 'shape' && shape.keys.length > 1);
 

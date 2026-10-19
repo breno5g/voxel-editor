@@ -303,6 +303,22 @@ body {
   outline: 1px solid #000;
 }
 
+/* Layers */
+
+.layer-list button {
+  border-bottom: 3px solid transparent;
+  padding-inline: 0;
+}
+
+.layer-list button[data-hidden='true'] {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.control-row input[type='color'] {
+  width: 100%;
+}
+
 /* Objects */
 
 .object-list {

@@ -87,7 +87,7 @@ export function createObjectBooleans(editor: Editor) {
     const transformId = state.vox.nodes.length;
     const modelId = state.vox.models.length;
     const nodes: [TransformNode, ShapeNode] = [
-      { kind: 'transform', attrs: new Map(), child: transformId + 1, layer: 0, keys: [{ frame: 0, translation: local, rotation: IDENTITY_ROTATION }] },
+      { kind: 'transform', attrs: new Map(), child: transformId + 1, layer: state.layer, keys: [{ frame: 0, translation: local, rotation: IDENTITY_ROTATION }] },
       { kind: 'shape', attrs: new Map(), keys: [{ frame: 0, model: modelId }] },
     ];
     const before = level.children;
