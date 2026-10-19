@@ -106,7 +106,15 @@ Pendências da v0.7:
 
 ## v1.0: renderizador
 
-- [ ] Path tracer WebGL2 progressivo com materiais, sol, céu uniforme/atmosférico/IBL `.hdr`, névoa
-- [ ] Câmera: FOV, projeções, profundidade de campo, exposição, vinheta, ACES, bloom
-- [ ] Display: chão, grade, arestas, fundo transparente, escala do voxel, primitivas (cubo, lego, MC, argila, esfera, cilindro)
-- [ ] Imagem final, turntable e animação; amostragem (`pt_bounce_*`, `pt_spp`, ...)
+- [x] Path tracer WebGL2 progressivo (`F2`, `pt_mode`) com materiais, sol (área, disco), céu uniforme/atmosférico/IBL `.hdr`, névoa; configurações lidas e gravadas no `rOBJ`
+- [x] Câmera: FOV próprio do render, perspectiva/estereográfica/panorama, profundidade de campo (lâminas, foco fixo por clique), exposição, vinheta, ACES, gama, bloom
+- [x] Display: chão, horizonte, grade, arestas, cor de fundo, fundo transparente, escala do voxel, célula, formas (cubo, lego, MC, argila, esfera, cilindro)
+- [x] Imagem final (foto PNG, giro e animação em zip de PNGs, desfoque de movimento no giro); rebatimentos e limite de energia, sombras, sombra translúcida, anti-aliasing
+- [x] Mapa de atalhos `renderer` (`Ctrl+E/G/U/B/W`, `Ctrl+R/C/V` de material), `Alt`+clique pega a cor
+
+Pendências da v1.0:
+
+- [ ] Denoise da imagem final (o MagicaVoxel carrega o OIDN da Intel)
+- [ ] Opções de amostragem sem efeito visível isolado: estocástico, MIS (reflexo e espalhamento), iluminação pixelada, volume esparso
+- [ ] Meios (`_media`: absorver, espalhar, emitir, SSS) com caminhada volumétrica de verdade; hoje deixam a luz passar com probabilidade `1 − densidade`
+- [ ] Escalas inferidas do path tracer (área do sol, névoa, abertura, emissão, atmosfera; ver [RE §8](magicavoxel-re.md)) conferidas contra renders do MagicaVoxel
