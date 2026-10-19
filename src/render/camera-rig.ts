@@ -43,6 +43,7 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
   perspective.position.set(60, -80, 60);
   const controls = new OrbitControls<THREE.PerspectiveCamera | THREE.OrthographicCamera>(perspective, canvas);
   controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
+  controls.zoomToCursor = true;
   controls.addEventListener('change', onChange);
   let mode: CameraMode = 'pers';
   let aspect = 1;
@@ -93,6 +94,8 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
     /** MagicaVoxel `camera-control`: while a key is held, the left button drives the camera. */
     setLeftDrag(drag: CameraDrag | null) {
       controls.mouseButtons = { ...controls.mouseButtons, LEFT: drag ? DRAG_ACTIONS[drag] : null };
+      // three's drag dolly reads the cursor's x for both axes, so drag zoom heads for the target instead.
+      controls.zoomToCursor = drag !== 'zoom';
     },
     leftDrag: () => controls.mouseButtons.LEFT !== null,
     aspect: () => aspect,
@@ -113,6 +116,17 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
       orthoHeight = distance * HALF_TAN;
       orthographic.zoom = 1;
       settle();
+    },
+
+    /**
+     * Slides the orbit target along the view axis to the depth of `point`, without moving the view.
+     * Wheel zoom shrinks the distance to the target by a factor per step, so with the surface under
+     * the cursor as target it closes in on that surface instead of stalling at an empty centre.
+     */
+    focusDepth(point: THREE.Vector3) {
+      const view = camera().getWorldDirection(new THREE.Vector3());
+      const depth = point.clone().sub(camera().position).dot(view);
+      if (depth > 0) controls.target.copy(camera().position).addScaledVector(view, depth);
     },
 
     /** Snaps the view to the nearest axis, keeping target and distance (MagicaVoxel `cam face`). */

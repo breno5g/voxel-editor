@@ -153,6 +153,32 @@ export function createViewport(container: HTMLElement) {
     return [bounds.left + ((ndc.x + 1) / 2) * bounds.width, bounds.top + ((1 - ndc.y) / 2) * bounds.height];
   };
 
+  /** Nearest voxel under the pointer across every visible object, or only object `only`. */
+  const pick = (clientX: number, clientY: number, only?: number): ViewportPick | null => {
+    let nearest: ViewportPick | null = null;
+    for (const [transformId, view] of views) {
+      if ((only !== undefined && transformId !== only) || !view.group.visible) continue;
+      const ray = view.model && modelRay(view, clientX, clientY);
+      const hit = ray && view.model ? raycastVoxels(view.model, ray.origin, ray.direction) : null;
+      if (hit && (!nearest || hit.distance < nearest.hit.distance)) nearest = { transformId, hit };
+    }
+    return nearest;
+  };
+
+  // Ahead of OrbitControls' wheel handler on the canvas: zoom closes in on the voxel under the cursor.
+  // Over empty space the target stays, as a far floor point would fling the camera away.
+  // Poses are rigid, so model-space hit distances are world distances.
+  container.addEventListener(
+    'wheel',
+    (event) => {
+      const nearest = pick(event.clientX, event.clientY);
+      if (!nearest) return;
+      aim(event.clientX, event.clientY);
+      rig.focusDepth(raycaster.ray.at(nearest.hit.distance, new THREE.Vector3()));
+    },
+    { capture: true, passive: true },
+  );
+
   /** The model cell of `layer` under the pointer, on the model-space plane `axis = plane`. */
   const planeCell = (clientX: number, clientY: number, transformId: number, axis: Axis, plane: number, layer: number): Vec3 | null => {
     const view = views.get(transformId);
@@ -267,17 +293,7 @@ export function createViewport(container: HTMLElement) {
       requestRender();
     },
 
-    /** Nearest voxel under the pointer across every visible object, or only object `only`. */
-    pick(clientX: number, clientY: number, only?: number): ViewportPick | null {
-      let nearest: ViewportPick | null = null;
-      for (const [transformId, view] of views) {
-        if ((only !== undefined && transformId !== only) || !view.group.visible) continue;
-        const ray = view.model && modelRay(view, clientX, clientY);
-        const hit = ray && view.model ? raycastVoxels(view.model, ray.origin, ray.direction) : null;
-        if (hit && (!nearest || hit.distance < nearest.hit.distance)) nearest = { transformId, hit };
-      }
-      return nearest;
-    },
+    pick,
 
     /** Where the pointer ray crosses the horizontal plane at height `z`, in world space. */
     planePoint(clientX: number, clientY: number, z: number): Vec3 | null {
