@@ -20,7 +20,7 @@ export function cameraToDict(camera: CameraState): Dict {
   return new Map([
     ['_mode', camera.mode],
     ['_focus', formatVec3(camera.target)],
-    ['_angle', formatVec3([...cameraAngles(offset), 0])],
+    ['_angle', formatVec3([...cameraAngles(offset), camera.roll])],
     ['_radius', formatNumber(Math.hypot(...offset))],
     ['_frustum', formatNumber(orthographic ? camera.height / camera.zoom : halfTan(camera.fov))],
     ['_fov', formatNumber(camera.fov)],
@@ -45,5 +45,6 @@ export function cameraFromDict(attrs: Dict): CameraState | null {
     zoom: 1,
     height: orthographic && frustum > 0 ? frustum : radius * halfTan(fov),
     fov,
+    roll: angle[2],
   };
 }

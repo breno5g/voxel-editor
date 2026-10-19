@@ -46,6 +46,7 @@ function bindCameraDetails(camera: Viewport['camera']) {
     distance: () => finite(field('distance')) && camera.setDistance(field('distance')),
     pitch: () => applyOrientation(),
     yaw: () => applyOrientation(),
+    roll: () => finite(field('roll')) && camera.setRoll(field('roll')),
     fov: () => finite(field('fov')) && camera.setFov(field('fov')),
     move: () => applySpeeds(),
     mouse: () => applySpeeds(),
@@ -69,7 +70,7 @@ function bindCameraDetails(camera: Viewport['camera']) {
     const { target } = camera.state();
     const [pitch, yaw] = camera.orientation();
     const { move, mouse } = camera.speeds();
-    const values: Record<string, string> = { x: round(target[0]), y: round(target[1]), z: round(target[2]), distance: round(camera.distance()), pitch: round(pitch), yaw: round(yaw), fov: round(camera.fov(), 0), move: round(move, 2), mouse: round(mouse, 2) };
+    const values: Record<string, string> = { x: round(target[0]), y: round(target[1]), z: round(target[2]), distance: round(camera.distance()), pitch: round(pitch), yaw: round(yaw), roll: round(camera.roll()), fov: round(camera.fov(), 0), move: round(move, 2), mouse: round(mouse, 2) };
     fields.forEach((input, name) => {
       if (input !== document.activeElement && values[name] !== undefined) input.value = values[name];
     });

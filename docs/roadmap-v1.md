@@ -31,7 +31,8 @@ Pendências da v0.6:
 - [x] Sombra (`Ctrl+W`), contornos dos objetos (`Ctrl+M`), AO, sombreamento constante, esmaecer o fundo, cores de fundo/grade/aresta/seleção e grade do chão do modelo (`rm_space`), com os padrões do MagicaVoxel
 - [x] Painel da câmera (`cam.ui`): centro, distância, pitch, yaw, FOV, velocidade da câmera livre e sensibilidade do mouse
 - [x] Cubo de vista (`ui/scene.cube`, clique numa face) e régua da câmera (`ui/scene.ruler`, arrastar gira; aparência inferida)
-- [ ] Rolagem da câmera (`cam rz`): o controle de órbita mantém `+z` para cima
+- [x] Rolagem da câmera (`cam rz`, `_angle` z no `rCAM`)
+- [x] Desfazer/refazer do gizmo (`undo_brush`): cada arrasto da sessão já é um passo do `Ctrl+Z`
 - [ ] `Ctrl+N`, `Ctrl+T` e `Ctrl+W` são reservados pelo navegador: só chegam ao editor numa janela própria (PWA ou app desktop)
 
 ## v0.7: pincéis (feito)

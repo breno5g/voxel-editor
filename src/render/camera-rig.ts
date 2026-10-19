@@ -12,7 +12,8 @@ export const WHEEL_ZOOMS = ['cursor', 'focus'] as const;
 export type WheelZoom = (typeof WHEEL_ZOOMS)[number];
 export const isWheelZoom = (value: unknown): value is WheelZoom => WHEEL_ZOOMS.some((zoom) => zoom === value);
 
-export type CameraState = { mode: CameraMode; target: Vec3; position: Vec3; zoom: number; height: number; fov: number };
+/** `roll` is MagicaVoxel's `_angle` z in degrees: a turn of the view about its own axis. */
+export type CameraState = { mode: CameraMode; target: Vec3; position: Vec3; zoom: number; height: number; fov: number; roll: number };
 export type CameraDrag = 'pan' | 'zoom' | 'rotate';
 
 const DRAG_ACTIONS: Record<CameraDrag, THREE.MOUSE> = { pan: THREE.MOUSE.PAN, zoom: THREE.MOUSE.DOLLY, rotate: THREE.MOUSE.ROTATE };
@@ -135,7 +136,15 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
   controls.zoomToCursor = true;
   const listeners = new Set<() => void>();
   let moveSpeed = 1;
+  let roll = 0;
+  /** OrbitControls aims the camera with `+z` up; the roll turns it about the view axis afterwards (idempotent). */
+  const applyRoll = () => {
+    if (roll === 0) return;
+    camera().lookAt(controls.target);
+    camera().rotateZ(THREE.MathUtils.degToRad(roll));
+  };
   controls.addEventListener('change', () => {
+    applyRoll();
     onChange();
     listeners.forEach((listener) => listener());
   });
@@ -158,6 +167,7 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
   const settle = () => {
     updateProjection();
     controls.update();
+    applyRoll();
     onChange();
     listeners.forEach((listener) => listener());
   };
@@ -281,12 +291,13 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
     },
 
     state(): CameraState {
-      return { mode, target: toVec3(controls.target), position: toVec3(camera().position), zoom: orthographic.zoom, height: orthoHeight, fov: perspective.fov };
+      return { mode, target: toVec3(controls.target), position: toVec3(camera().position), zoom: orthographic.zoom, height: orthoHeight, fov: perspective.fov, roll };
     },
 
     restore(state: CameraState) {
       setMode(state.mode);
       perspective.fov = clampFov(state.fov);
+      roll = state.roll;
       controls.target.set(...state.target);
       camera().position.set(...state.position);
       orthographic.zoom = state.zoom;
@@ -301,6 +312,13 @@ export function createCameraRig(canvas: HTMLCanvasElement, onChange: () => void)
       settle();
     },
     orientation: () => cameraAngles(toVec3(offset())),
+    roll: () => roll,
+    /** MagicaVoxel `cam rz`; 0 puts `+z` back up. */
+    setRoll(degrees: number) {
+      roll = ((((degrees + 180) % 360) + 360) % 360) - 180;
+      camera().lookAt(controls.target);
+      settle();
+    },
 
     /** The eye's distance to the centre, or the visible half height for `orth` and `iso` (MagicaVoxel `cam_zoom`). */
     distance: () => (isOrthographic(mode) ? orthoHeight / orthographic.zoom : offset().length()),

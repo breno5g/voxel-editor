@@ -6,7 +6,7 @@ import { cameraAngles, eyeDirection } from './camera-rig.ts';
 const ISO_SLOT = new Map([
   ['_mode', 'iso'],
   ['_focus', '120.339 -317.145 281.52'],
-  ['_angle', '-35.2644 18.1314 0'],
+  ['_angle', '-35.2644 18.1314 12.5'],
   ['_radius', '2778.8'],
   ['_frustum', '75.5621'],
   ['_fov', '45'],
@@ -42,7 +42,7 @@ describe('rCAM slots', () => {
   it('writes back what it reads', () => {
     const camera = cameraFromDict(ISO_SLOT);
     const written = camera && cameraToDict(camera);
-    expect(written?.get('_angle')).toBe('-35.2644 18.1314 0');
+    expect(written?.get('_angle')).toBe('-35.2644 18.1314 12.5');
     expect(written?.get('_radius')).toBe('2778.8');
     expect(written?.get('_frustum')).toBe('75.5621');
     expect(written?.get('_focus')).toBe('120.339 -317.145 281.52');
