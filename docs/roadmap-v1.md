@@ -66,7 +66,7 @@ Pendências da v0.7:
 - [x] Grupos: agrupar/desagrupar (`Ctrl+R`), entrar/sair (`TAB`), contorno da cena com expandir/recolher, ordenar
 - [x] Referências: copiar como referência (`Ctrl+Shift+C`), recortar como referência, `oref2obj` (`Ctrl+T`)
 - [x] Copiar/colar objetos e transformações (`m_copy`, `m_paste`), copiar no frame atual, posição (`opos`) e `omove` por texto
-- [ ] Booleanas: união, interseção, subtração, substituição
+- [x] Booleanas: união, interseção, operandos (`ooper`), subtração, substituição
 - [x] Alinhar (mín/centro/máx), espelhar objetos
 - [x] Ordem de render (`order`)
 - [ ] Camadas: 8 camadas com nome, cor, visibilidade, selecionar objetos da camada

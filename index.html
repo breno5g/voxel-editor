@@ -287,6 +287,15 @@
               <button type="button" data-align="2 -1">−Z</button>
             </div>
           </div>
+          <div class="segmented" role="group" aria-label="Booleanas">
+            <button type="button" data-world="union" title="Unir os objetos selecionados num só (ounion)">União</button>
+            <button type="button" data-world="intersect" title="Só os voxels que todos os selecionados têm (ointer)">Interseção</button>
+          </div>
+          <div class="segmented" role="group" aria-label="Booleanas com operandos">
+            <button type="button" data-world="operands" title="A seleção vira operando da subtração ou substituição (ooper)">Operandos</button>
+            <button type="button" data-world="subtract" title="Tirar dos selecionados os voxels dos operandos (osub)">Subtrair</button>
+            <button type="button" data-world="replace" title="Pintar os selecionados com as cores dos operandos onde se tocam (orep)">Substituir</button>
+          </div>
           <div class="segmented" role="group" aria-label="Grupos">
             <button type="button" data-world="group" title="Agrupar a seleção (Ctrl+R)">Agrupar</button>
             <button type="button" data-world="ungroup" title="Desfazer os grupos selecionados (Ctrl+Shift+R)">Desagrupar</button>
