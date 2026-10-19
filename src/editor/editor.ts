@@ -37,10 +37,29 @@ export type TransformTool = (typeof TRANSFORM_TOOLS)[number];
  */
 export const BRUSH_MODES = ['vox', 'face', 'box', 'geo', 'code', 'pattern'] as const;
 export type BrushMode = (typeof BRUSH_MODES)[number];
-/** MagicaVoxel `rm_b_grid`, `rm_b_frame`, `rm_b_edge`, `rm_b_bo`. */
-export const DISPLAY_OPTIONS = ['grid', 'frame', 'edges', 'backgroundObjects'] as const;
+/** MagicaVoxel `rm_b_grid`, `rm_b_frame`, `rm_b_edge`, `rm_b_bo`, `rm_b_wire`, `rm_b_sw` (shadow), `rm_b_ao`, `rm_b_const`, `rm_b_fade`. */
+export const DISPLAY_OPTIONS = ['grid', 'frame', 'edges', 'backgroundObjects', 'wire', 'shadow', 'ao', 'constant', 'fade'] as const;
 export type DisplayOption = (typeof DISPLAY_OPTIONS)[number];
-export type Display = Record<DisplayOption, boolean>;
+/** MagicaVoxel `rm_bg_col`, `rm_grid_col`, `rm_edge_col`, `rm_sel_col`, as `#rrggbb`. */
+export const DISPLAY_COLORS = ['background', 'grid', 'edge', 'selection'] as const;
+export type DisplayColor = (typeof DISPLAY_COLORS)[number];
+/** Plus `rm_space`: the model frame's floor grid spacing. */
+export type Display = Record<DisplayOption, boolean> & { colors: Record<DisplayColor, string>; frameSpacing: number };
+export const MAX_FRAME_SPACING = 1024;
+/** MagicaVoxel's defaults (flags `0x6218`, `rm_space` 10 and its colours), except grid and frame, which start on. */
+export const DEFAULT_DISPLAY: Display = {
+  grid: true,
+  frame: true,
+  edges: false,
+  backgroundObjects: true,
+  wire: true,
+  shadow: false,
+  ao: true,
+  constant: false,
+  fade: true,
+  colors: { background: '#262626', grid: '#111111', edge: '#111111', selection: '#ffffff' },
+  frameSpacing: 10,
+};
 /** Voxel brush options: MagicaVoxel `b_vox_size` (1..64), `b_vox_cube`, `b_vox_vol` (false is 2D). */
 export type VoxBrush = { size: number; shape: StampShape; volume: boolean };
 /** Face brush options: MagicaVoxel `b_face_pal` (new voxels take the palette colour, else the face's), plus connectivity. */
@@ -201,7 +220,7 @@ export function createEditor() {
     autoKey: true,
     pendingKeys: new Map(),
     onionSkin: false,
-    display: { grid: true, frame: true, edges: false, backgroundObjects: true },
+    display: DEFAULT_DISPLAY,
   };
 
   const emit = (event: EditorEvent) => listeners.forEach((listener) => listener(event));
@@ -427,6 +446,12 @@ export function createEditor() {
 
     toggleDisplay(option: DisplayOption) {
       state.display = { ...state.display, [option]: !state.display[option] };
+      emit({ type: 'display' });
+    },
+
+    setDisplay(changes: Partial<Display>) {
+      const next = { ...state.display, ...changes, colors: { ...state.display.colors, ...changes.colors } };
+      state.display = { ...next, frameSpacing: Math.min(Math.max(Math.round(next.frameSpacing) || 1, 1), MAX_FRAME_SPACING) };
       emit({ type: 'display' });
     },
 

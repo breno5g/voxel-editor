@@ -34,9 +34,19 @@ describe('meshChunk', () => {
 
   it('tags every vertex with its face id and palette index', () => {
     const { voxels } = meshChunk(modelWith([2, 2, 2], [[0, 0, 0]]), [0, 0, 0]);
-    const faces = new Set(voxels.filter((_value, i) => i % 2 === 0));
+    const faces = new Set(voxels.filter((_value, i) => i % 3 === 0));
     expect([...faces].sort()).toEqual([0, 1, 2, 3, 4, 5]);
-    expect(voxels.filter((_value, i) => i % 2 === 1).every((color) => color === 7)).toBe(true);
+    expect(voxels.filter((_value, i) => i % 3 === 1).every((color) => color === 7)).toBe(true);
+  });
+
+  it('occludes the corners of a floor next to a wall', () => {
+    const model = modelWith([3, 3, 2], [[0, 0, 0], [1, 0, 0], [2, 0, 0], [0, 1, 0], [1, 1, 0], [2, 1, 0], [0, 2, 0], [1, 2, 0], [2, 2, 0], [1, 2, 1]]);
+    const { positions, voxels, quadCount } = meshChunk(model, [0, 0, 0]);
+    const topOf = (x: number, y: number) =>
+      Array.from({ length: quadCount }, (_unused, quad) => quad).find((quad) => voxels[quad * 12] === 4 && positions[quad * 12] >= x && positions[quad * 12] <= x + 1 && positions[quad * 12 + 1] >= y && positions[quad * 12 + 1] <= y + 1 && positions[quad * 12 + 2] === 1);
+    const occlusionOf = (quad: number | undefined) => (quad === undefined ? [] : [0, 1, 2, 3].map((corner) => voxels[quad * 12 + corner * 3 + 2]));
+    expect(occlusionOf(topOf(0, 0))).toEqual([0, 0, 0, 0]);
+    expect(Math.max(...occlusionOf(topOf(1, 1)))).toBe(1);
   });
 });
 
@@ -45,7 +55,7 @@ describe('chunksTouching', () => {
     const size: Vec3 = [64, 64, 32];
     expect(chunksTouching(size, [10, 10, 10])).toEqual([0]);
     expect(chunksTouching(size, [31, 10, 10])).toEqual([0, 1]);
-    // Chunk (1,1,0) = 3, plus its -X neighbour (0,1,0) = 2 and -Y neighbour (1,0,0) = 1.
-    expect(chunksTouching(size, [32, 32, 10]).sort()).toEqual([1, 2, 3]);
+    // Chunk (1,1,0) = 3, its -X neighbour (0,1,0) = 2, -Y neighbour (1,0,0) = 1 and the diagonal (0,0,0) = 0.
+    expect(chunksTouching(size, [32, 32, 10]).sort()).toEqual([0, 1, 2, 3]);
   });
 });

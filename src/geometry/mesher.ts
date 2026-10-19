@@ -4,9 +4,10 @@ export const CHUNK_SIZE = 32;
 export const MAX_CHUNK_QUADS = CHUNK_SIZE ** 3 * 6;
 
 /**
- * Per quad: 4 vertices of `position` (u8 x3, chunk-local 0..32) and
- * `voxel` (u8 x2: face id 0..5 = +X -X +Y -Y +Z -Z, palette index).
- * Indices follow the fixed pattern 0,1,2 0,2,3 and are shared by every chunk.
+ * Per quad: 4 vertices of `position` (u8 x3, chunk-local 0..32) and `voxel` (u8 x3: face id
+ * 0..5 = +X -X +Y -Y +Z -Z, palette index, ambient occlusion 0..3 = how many of the vertex's
+ * three outer neighbours are filled). Indices follow the fixed pattern 0,1,2 0,2,3 and are shared
+ * by every chunk; quads whose occlusion would shade across that diagonal start one corner later.
  */
 export type ChunkMesh = { positions: Uint8Array; voxels: Uint8Array; quadCount: number };
 
@@ -21,7 +22,8 @@ const FACE_CORNERS: readonly (readonly Vec3[])[] = [
 ];
 
 const scratchPositions = new Uint8Array(MAX_CHUNK_QUADS * 12);
-const scratchVoxels = new Uint8Array(MAX_CHUNK_QUADS * 8);
+const VOXEL_STRIDE = 3;
+const scratchVoxels = new Uint8Array(MAX_CHUNK_QUADS * 4 * VOXEL_STRIDE);
 
 export function chunkCounts(size: Vec3): Vec3 {
   return [Math.ceil(size[0] / CHUNK_SIZE), Math.ceil(size[1] / CHUNK_SIZE), Math.ceil(size[2] / CHUNK_SIZE)];
@@ -38,19 +40,19 @@ export function chunkOrigin(size: Vec3, chunk: number): Vec3 {
   return [(chunk % cx) * CHUNK_SIZE, (Math.floor(chunk / cx) % cy) * CHUNK_SIZE, Math.floor(chunk / (cx * cy)) * CHUNK_SIZE];
 }
 
-/** Chunks whose meshes change when voxel (x, y, z) changes: its own plus face-neighbours across a border. */
+/**
+ * Chunks whose meshes change when voxel (x, y, z) changes: its own plus every neighbour (also across
+ * edges and corners, which ambient occlusion reads) when the voxel sits on a shared border.
+ */
 export function chunksTouching(size: Vec3, voxel: Vec3): number[] {
   const counts = chunkCounts(size);
-  const home = voxel.map((axis) => Math.floor(axis / CHUNK_SIZE));
-  const toIndex = (cell: number[]) => cell[0] + counts[0] * (cell[1] + counts[1] * cell[2]);
-  const touched = [toIndex(home)];
-  for (let axis = 0; axis < 3; axis++) {
+  const along = [0, 1, 2].map((axis) => {
+    const home = Math.floor(voxel[axis] / CHUNK_SIZE);
     const local = voxel[axis] % CHUNK_SIZE;
-    const neighbour = local === 0 ? home[axis] - 1 : local === CHUNK_SIZE - 1 ? home[axis] + 1 : null;
-    if (neighbour === null || neighbour < 0 || neighbour >= counts[axis]) continue;
-    touched.push(toIndex(home.map((value, i) => (i === axis ? neighbour : value))));
-  }
-  return touched;
+    const neighbour = local === 0 ? home - 1 : local === CHUNK_SIZE - 1 ? home + 1 : null;
+    return neighbour === null || neighbour < 0 || neighbour >= counts[axis] ? [home] : [home, neighbour];
+  });
+  return along[2].flatMap((z) => along[1].flatMap((y) => along[0].map((x) => x + counts[0] * (y + counts[1] * z))));
 }
 
 /**
@@ -70,16 +72,45 @@ export function meshChunk(model: VoxModel, origin: Vec3): ChunkMesh {
   const endZ = Math.min(oz + CHUNK_SIZE, sz);
   let quads = 0;
 
+  const filled = (x: number, y: number, z: number) => x >= 0 && y >= 0 && z >= 0 && x < sx && y < sy && z < sz && voxels[x + strideY * y + strideZ * z] !== 0;
+  const occlusion = new Uint8Array(4);
+
+  /** Classic voxel AO: the two side neighbours and the diagonal one in the layer the face looks into. */
+  const occlude = (face: number, x: number, y: number, z: number) => {
+    const axis = face >> 1;
+    const outward = face & 1 ? -1 : 1;
+    const [u, v] = [(axis + 1) % 3, (axis + 2) % 3];
+    FACE_CORNERS[face].forEach((corner, index) => {
+      const cell = [x, y, z];
+      cell[axis] += outward;
+      const du = corner[u] * 2 - 1;
+      const dv = corner[v] * 2 - 1;
+      const side = (offsetU: number, offsetV: number) => {
+        const probe = [...cell];
+        probe[u] += offsetU;
+        probe[v] += offsetV;
+        return filled(probe[0], probe[1], probe[2]) ? 1 : 0;
+      };
+      const [first, second] = [side(du, 0), side(0, dv)];
+      occlusion[index] = first && second ? 3 : first + second + side(du, dv);
+    });
+  };
+
   const emit = (face: number, x: number, y: number, z: number, color: number) => {
+    occlude(face, x + ox, y + oy, z + oz);
     const corners = FACE_CORNERS[face];
+    const start = occlusion[0] + occlusion[2] < occlusion[1] + occlusion[3] ? 1 : 0;
     let position = quads * 12;
-    let attribute = quads * 8;
-    for (const [cx, cy, cz] of corners) {
+    let attribute = quads * 4 * VOXEL_STRIDE;
+    for (let step = 0; step < 4; step++) {
+      const index = (start + step) % 4;
+      const [cx, cy, cz] = corners[index];
       scratchPositions[position++] = x + cx;
       scratchPositions[position++] = y + cy;
       scratchPositions[position++] = z + cz;
       scratchVoxels[attribute++] = face;
       scratchVoxels[attribute++] = color;
+      scratchVoxels[attribute++] = occlusion[index];
     }
     quads++;
   };
@@ -103,5 +134,5 @@ export function meshChunk(model: VoxModel, origin: Vec3): ChunkMesh {
     }
   }
 
-  return { positions: scratchPositions.slice(0, quads * 12), voxels: scratchVoxels.slice(0, quads * 8), quadCount: quads };
+  return { positions: scratchPositions.slice(0, quads * 12), voxels: scratchVoxels.slice(0, quads * 4 * VOXEL_STRIDE), quadCount: quads };
 }

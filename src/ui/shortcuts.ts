@@ -104,6 +104,8 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
     ['ctrl+e', toggle('edges')],
     ['ctrl+g', toggle('grid')],
     ['ctrl+b', toggle('backgroundObjects')],
+    ['ctrl+m', toggle('wire')],
+    ['ctrl+w', toggle('shadow')],
     ['o', () => editor.setOnionSkin(!state.onionSkin)],
     ['?', actions.openHelp],
     ['shift+?', actions.openHelp],

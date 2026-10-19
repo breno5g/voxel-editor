@@ -597,6 +597,20 @@
         <button type="button" data-display="frame" title="Moldura do modelo no modo Modelo (Ctrl+F)">Moldura</button>
         <button type="button" data-display="edges" title="Arestas dos voxels (Ctrl+E)">Arestas</button>
         <button type="button" data-display="backgroundObjects" title="Outros objetos, esmaecidos, no modo Modelo (Ctrl+B)">Fundo</button>
+        <button type="button" data-display="wire" title="Contorno de todos os objetos no modo Mundo (Ctrl+M)">Contorno</button>
+        <button type="button" data-display="shadow" title="Sombra do sol nos objetos e no chão (Ctrl+W numa janela própria)">Sombra</button>
+        <button type="button" id="display-more" aria-expanded="false" aria-controls="display-settings" title="Mais opções de exibição" aria-label="Mais opções de exibição">⋯</button>
+      </div>
+      <div id="display-settings" class="overlay display-settings stack" role="group" aria-label="Opções de exibição" hidden>
+        <label class="check" title="Escurece cantos e frestas entre voxels"><input type="checkbox" data-display-check="ao" /> Oclusão (AO)</label>
+        <label class="check" title="Cores da paleta sem luz nem sombra"><input type="checkbox" data-display-check="constant" /> Sombreamento constante</label>
+        <label class="check" title="No modo Modelo, os outros objetos aparecem esmaecidos"><input type="checkbox" data-display-check="fade" /> Esmaecer o fundo</label>
+        <label class="control-row"><span class="label">Fundo</span><input type="color" data-display-color="background" /></label>
+        <label class="control-row"><span class="label">Grade</span><input type="color" data-display-color="grid" /></label>
+        <label class="control-row"><span class="label">Arestas</span><input type="color" data-display-color="edge" /></label>
+        <label class="control-row"><span class="label">Seleção</span><input type="color" data-display-color="selection" /></label>
+        <label class="control-row" title="Espaço entre as linhas da grade no chão do modelo editado"><span class="label">Grade a cada</span><input id="frame-spacing" type="number" min="1" max="1024" /></label>
+        <button id="display-reset" type="button" title="Voltar às opções de exibição do MagicaVoxel">Restaurar padrão</button>
       </div>
       <div id="camera-options" class="overlay bottom" role="group" aria-label="Câmera">
         <div class="segmented">
@@ -726,7 +740,7 @@
           <tr><th scope="row">Salvar imagem da vista</th><td><kbd>6</kbd></td></tr>
           <tr><th scope="row">Câmera: salvar / carregar / escolher slot</th><td><kbd>7</kbd> / <kbd>8</kbd> / teclado numérico</td></tr>
           <tr><th scope="row">Câmera livre: mover</th><td><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>, <kbd>Q</kbd> / <kbd>E</kbd></td></tr>
-          <tr><th scope="row">Exibir grade / arestas / objetos de fundo</th><td><kbd>Ctrl+G</kbd> / <kbd>Ctrl+E</kbd> / <kbd>Ctrl+B</kbd></td></tr>
+          <tr><th scope="row">Exibir grade / arestas / objetos de fundo / contornos / sombra</th><td><kbd>Ctrl+G</kbd> / <kbd>Ctrl+E</kbd> / <kbd>Ctrl+B</kbd> / <kbd>Ctrl+M</kbd> / <kbd>Ctrl+W</kbd> (numa janela própria)</td></tr>
           <tr><th scope="row">Desfazer / refazer</th><td><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></td></tr>
           <tr><th scope="row">Novo / abrir / salvar / salvar como</th><td><kbd>Ctrl+P</kbd> / <kbd>Ctrl+O</kbd> / <kbd>Ctrl+S</kbd> / <kbd>Ctrl+Shift+S</kbd></td></tr>
           <tr><th scope="row" colspan="2" class="group">Animação</th></tr>

@@ -39,7 +39,7 @@ export function createModelCache() {
     quadIndex ??= createQuadIndex();
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Uint8BufferAttribute(mesh.positions, 3));
-    geometry.setAttribute('voxel', new THREE.Uint8BufferAttribute(mesh.voxels, 2));
+    geometry.setAttribute('voxel', new THREE.Uint8BufferAttribute(mesh.voxels, 3));
     geometry.setIndex(quadIndex);
     geometry.setDrawRange(0, mesh.quadCount * 6);
     geometry.boundingSphere = new THREE.Sphere(CHUNK_CENTER.clone(), CHUNK_RADIUS);

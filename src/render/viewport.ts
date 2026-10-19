@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { DEFAULT_DISPLAY } from '../editor/editor.ts';
+import type { Display } from '../editor/editor.ts';
 import { modelPivot } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
 import type { Axis } from '../format/rotation.ts';
@@ -9,19 +11,21 @@ import { createCameraRig } from './camera-rig.ts';
 import type { ImageTarget } from './image-export.ts';
 import { createModelCache } from './model-cache.ts';
 import { createOverlays } from './overlays.ts';
-import { createVoxelMaterial } from './voxel-material.ts';
+import { createVoxelMaterial, SUN_DIRECTION } from './voxel-material.ts';
 
 export type Viewport = ReturnType<typeof createViewport>;
 export type ViewportPick = { transformId: number; hit: VoxelHit };
 
 type ObjectView = { group: THREE.Group; model: VoxModel | null };
-export type ViewportDisplay = { grid: boolean; frame: boolean; edges: boolean; backgroundObjects: boolean };
 type Ghost = { transformId: number; model: VoxModel };
 type ModelRay = { origin: Vec3; direction: Vec3 };
 /** A screen rectangle from a press (`x0`, `y0`) to the pointer (`x1`, `y1`), in client coordinates. */
 export type ClientRect = { x0: number; y0: number; x1: number; y1: number };
 
-const BACKGROUND = 0x2b2d33;
+/** Shadow casters render on this layer for the sun's depth pass, which skips overlays and ghosts. */
+const SHADOW_LAYER = 1;
+const SHADOW_MAP_SIZE = 2048;
+const GROUND_EXTENT = 1024;
 
 function poseMatrix({ rows, translation }: Pose): THREE.Matrix4 {
   return new THREE.Matrix4().set(
@@ -44,13 +48,18 @@ export function createViewport(container: HTMLElement) {
   container.append(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(BACKGROUND);
   const rig = createCameraRig(renderer.domElement, () => requestRender());
 
-  // Raw sRGB components: the shader writes its output without colour management, like the clear colour appears.
-  const { material, backgroundMaterial, ghostMaterial, selectionMaterial, setPalette, setEdges } = createVoxelMaterial(
-    new THREE.Color().setHex(BACKGROUND, THREE.LinearSRGBColorSpace),
-  );
+  const materials = createVoxelMaterial();
+  const { material, backgroundMaterial, ghostMaterial, selectionMaterial } = materials;
+  /** MagicaVoxel `rm_b_sw`: the sun's depth map, and a transparent ground that only shows the shadows on it. */
+  const shadowTarget = new THREE.WebGLRenderTarget(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, { depthTexture: new THREE.DepthTexture(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE) });
+  const sun = new THREE.OrthographicCamera();
+  sun.layers.set(SHADOW_LAYER);
+  const depthMaterial = new THREE.MeshDepthMaterial();
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(GROUND_EXTENT, GROUND_EXTENT), materials.shadowCatcherMaterial);
+  ground.visible = false;
+  scene.add(ground);
   const modelCache = createModelCache();
   const overlays = createOverlays(scene);
   const views = new Map<number, ObjectView>();
@@ -71,11 +80,40 @@ export function createViewport(container: HTMLElement) {
   let selectedIds: number[] = [];
   /** The object being edited in model mode; every other object is background. */
   let focusId: number | null = null;
-  let display: ViewportDisplay = { grid: true, frame: true, edges: false, backgroundObjects: true };
+  let display = DEFAULT_DISPLAY;
   let exporting = false;
   let renderQueued = false;
 
-  const render = () => renderer.render(scene, rig.camera());
+  /** Fits the sun's orthographic view around every shown object and renders their depth from it. */
+  const renderShadows = () => {
+    const bounds = new THREE.Box3();
+    views.forEach((view) => {
+      if (view.model && view.group.visible) bounds.union(new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(), new THREE.Vector3(...view.model.size)).applyMatrix4(view.group.matrix));
+    });
+    if (bounds.isEmpty()) return materials.setShadow(null, sun.matrixWorldInverse, SHADOW_MAP_SIZE);
+    const { center, radius } = bounds.getBoundingSphere(new THREE.Sphere());
+    sun.position.copy(center).addScaledVector(SUN_DIRECTION, radius * 2);
+    sun.up.set(0, 0, 1);
+    sun.lookAt(center);
+    Object.assign(sun, { left: -radius, right: radius, top: radius, bottom: -radius, near: radius * 0.5, far: radius * 4 });
+    sun.updateProjectionMatrix();
+    sun.updateMatrixWorld();
+    scene.overrideMaterial = depthMaterial;
+    renderer.setRenderTarget(shadowTarget);
+    renderer.clear();
+    renderer.render(scene, sun);
+    renderer.setRenderTarget(null);
+    scene.overrideMaterial = null;
+    materials.setShadow(shadowTarget.depthTexture, new THREE.Matrix4().multiplyMatrices(sun.projectionMatrix, sun.matrixWorldInverse), SHADOW_MAP_SIZE);
+  };
+
+  const render = () => {
+    const shadows = display.shadow && !exporting;
+    ground.visible = shadows;
+    if (shadows) renderShadows();
+    else materials.setShadow(null, sun.matrixWorldInverse, SHADOW_MAP_SIZE);
+    renderer.render(scene, rig.camera());
+  };
   const requestRender = () => {
     if (renderQueued) return;
     renderQueued = true;
@@ -95,16 +133,17 @@ export function createViewport(container: HTMLElement) {
     for (const { geometry, offset } of cache.chunks(model)) {
       const mesh = new THREE.Mesh(geometry, meshMaterial);
       mesh.position.set(...offset);
+      if (meshMaterial === material) mesh.layers.enable(SHADOW_LAYER);
       group.add(mesh);
     }
   };
 
-  /** Background objects are faded, or hidden when `backgroundObjects` is off; exports draw everything plainly. */
+  /** Background objects are faded (`fade`), or hidden when `backgroundObjects` is off; exports draw everything plainly. */
   const styleView = (transformId: number, view: ObjectView) => {
     const isBackground = !exporting && focusId !== null && transformId !== focusId;
     view.group.visible = !isBackground || display.backgroundObjects;
     view.group.children.forEach((child) => {
-      if (child instanceof THREE.Mesh) child.material = isBackground ? backgroundMaterial : material;
+      if (child instanceof THREE.Mesh) child.material = isBackground && display.fade ? backgroundMaterial : material;
     });
   };
 
@@ -131,15 +170,21 @@ export function createViewport(container: HTMLElement) {
     selectionGroup.matrixWorldNeedsUpdate = true;
   };
 
-  /** The selection box doubles as the model frame in model mode, where `frame` toggles it. */
+  const boxed = (transformId: number) => {
+    const view = views.get(transformId);
+    return view?.model && view.group.visible ? [{ matrix: view.group.matrix, size: view.model.size }] : [];
+  };
+
+  /**
+   * The selection box doubles as the model frame in model mode, where `frame` toggles it and the
+   * floor grid of the edited model replaces the ground grid. The world editor outlines every object with `wire`.
+   */
   const updateSelection = () => {
     const shown = focusId !== null && !display.frame ? [] : selectedIds;
-    overlays.showSelection(
-      shown.flatMap((transformId) => {
-        const view = views.get(transformId);
-        return view?.model && view.group.visible ? [{ matrix: view.group.matrix, size: view.model.size }] : [];
-      }),
-    );
+    overlays.showSelection(shown.flatMap(boxed));
+    overlays.showWires(focusId === null && display.wire ? [...views.keys()].flatMap(boxed) : []);
+    overlays.showFrameGrid(focusId !== null && display.grid ? (boxed(focusId)[0] ?? null) : null, display.frameSpacing);
+    overlays.setGridVisible(focusId === null && display.grid);
   };
 
   const restyle = () => {
@@ -215,7 +260,7 @@ export function createViewport(container: HTMLElement) {
     requestRender,
 
     setPalette(palette: Uint8Array) {
-      setPalette(palette);
+      materials.setPalette(palette);
       requestRender();
     },
 
@@ -330,10 +375,12 @@ export function createViewport(container: HTMLElement) {
       restyle();
     },
 
-    setDisplay(next: ViewportDisplay) {
-      display = { ...next };
-      overlays.setGridVisible(display.grid);
-      setEdges(display.edges);
+    setDisplay(next: Display) {
+      display = { ...next, colors: { ...next.colors } };
+      const { colors } = display;
+      scene.background = new THREE.Color(colors.background);
+      materials.setStyle({ edges: display.edges, ao: display.ao, constant: display.constant, background: colors.background, edge: colors.edge, selection: colors.selection });
+      overlays.setColors(colors.grid, colors.selection);
       restyle();
     },
 

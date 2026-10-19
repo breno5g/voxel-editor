@@ -476,6 +476,16 @@ body {
   background: var(--overlay);
 }
 
+.display-settings {
+  top: 40px;
+  right: 8px;
+  width: 220px;
+  padding: 8px;
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
 .overlay .field {
   padding: 1px 2px 1px 8px;
   background: var(--overlay);

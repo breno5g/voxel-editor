@@ -28,7 +28,8 @@ Pendências da v0.6:
 
 - [ ] Gravar os slots de câmera em `rCAM` (falta a matriz base `M0` de `_angle`, ver [RE §4.4](magicavoxel-re.md))
 - [ ] Câmera livre girando em torno do olho (hoje orbita o alvo)
-- [ ] Sombra (`Ctrl+W`), wireframe (`Ctrl+M`), cubo de vista e régua da câmera
+- [x] Sombra (`Ctrl+W`), contornos dos objetos (`Ctrl+M`), AO, sombreamento constante, esmaecer o fundo, cores de fundo/grade/aresta/seleção e grade do chão do modelo (`rm_space`), com os padrões do MagicaVoxel
+- [ ] Cubo de vista e régua da câmera
 - [ ] `Ctrl+N`, `Ctrl+T` e `Ctrl+W` são reservados pelo navegador: só chegam ao editor numa janela própria (PWA ou app desktop)
 
 ## v0.7: pincéis (feito)
@@ -104,4 +105,3 @@ Pendências da v0.7:
 - [ ] Câmera: FOV, projeções, profundidade de campo, exposição, vinheta, ACES, bloom
 - [ ] Display: chão, grade, arestas, fundo transparente, escala do voxel, primitivas (cubo, lego, MC, argila, esfera, cilindro)
 - [ ] Imagem final, turntable e animação; amostragem (`pt_bounce_*`, `pt_spp`, ...)
-- [ ] Opções do viewport: AO, sombreamento constante, cores de fundo/grade/aresta/seleção
