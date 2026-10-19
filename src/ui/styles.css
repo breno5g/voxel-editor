@@ -767,6 +767,17 @@ body {
   font: 12px ui-monospace, monospace;
 }
 
+.help-note {
+  margin: 12px 0 0;
+  max-width: 64ch;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.help-note a {
+  color: inherit;
+}
+
 .help form {
   margin-top: 12px;
   text-align: right;
