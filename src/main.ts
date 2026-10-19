@@ -38,6 +38,7 @@ import { bindToolbar } from './ui/toolbar.ts';
 import { bindViewportPanel } from './ui/viewport-panel.ts';
 import { bindViewCube } from './ui/view-cube.ts';
 import { bindRenderPanel } from './ui/render-panel.ts';
+import { bindRenderImage } from './ui/render-image.ts';
 
 const editor = createEditor();
 const viewport = createViewport(element('viewport', HTMLElement));
@@ -51,6 +52,7 @@ const { focusCamera } = bindViewportPanel(editor, viewport, commands, { placePat
 const cameras = bindCameraPanel(editor, viewport);
 const materials = createMaterialCommands(editor);
 const renderer = bindRenderPanel(editor, viewport, materials);
+bindRenderImage(editor, viewport, renderer.session);
 bindViewCube(viewport);
 
 bindStatusBar(editor);
@@ -79,7 +81,7 @@ bindShortcuts(editor, commands, models, files, {
   selectCameraSlot: cameras.selectSlot,
   fly: viewport.camera.fly,
   openHelp: bindHelp().open,
-}, keys, patterns, renderer);
+}, keys, patterns, renderer.shortcuts);
 bindPlayback(editor);
 const autosave = bindAutosave(editor);
 

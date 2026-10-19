@@ -89,6 +89,8 @@ export function createPathTracer(container: HTMLElement) {
   let width = 0;
   let height = 0;
   const resize = (nextWidth: number, nextHeight: number) => {
+    const limit = Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE), gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
+    if (nextWidth > limit || nextHeight > limit) throw new Error(`A GPU renderiza até ${limit}×${limit} pixels`);
     width = nextWidth;
     height = nextHeight;
     canvas.width = width;
@@ -258,8 +260,11 @@ export function createPathTracer(container: HTMLElement) {
 
     reset,
 
-    /** Adds one sample per pixel and shows the result, at the canvas's CSS size unless `size` is given (final images). */
-    trace(view: TraceView, size?: { width: number; height: number }) {
+    /**
+     * Adds one sample per pixel and shows the result, at the canvas's CSS size unless `size` is given (final
+     * images). With `moving`, a changed view keeps accumulating: each sample may come from another camera (motion blur).
+     */
+    trace(view: TraceView, size?: { width: number; height: number }, moving = false) {
       if (!settings) return;
       const nextWidth = Math.max(1, Math.round(size?.width ?? canvas.clientWidth));
       const nextHeight = Math.max(1, Math.round(size?.height ?? canvas.clientHeight));
@@ -269,10 +274,8 @@ export function createPathTracer(container: HTMLElement) {
       }
       gl.useProgram(traceProgram);
       const viewKey = applyCamera(view, settings.lens);
-      if (viewKey !== lastView) {
-        lastView = viewKey;
-        reset();
-      }
+      if (viewKey !== lastView && !moving) reset();
+      lastView = viewKey;
       if (samples >= MAX_SAMPLES) return;
       applySettings(settings);
       gl.uniform1i(at(traceProgram, 'u_shadows'), Number(options.shadows));

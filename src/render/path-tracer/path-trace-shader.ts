@@ -361,12 +361,20 @@ void main() {
         continue;
       }
     }
-    /* MagicaVoxel's horizon: the ground fades into the sky with distance. */
-    bool faded = surface.hit && surface.ground && u_horizon > 0.0 && random() > exp(-u_horizon * surface.t);
-    if (!surface.hit || faded) {
+    if (!surface.hit) {
       if (depth == 0 && u_flatBackground) coverage = 0.0;
       else radiance += throughput * escape(direction, showSun);
       break;
+    }
+
+    /* MagicaVoxel's horizon: the ground fades into the sky (or the flat background) with distance. */
+    if (surface.ground && u_horizon > 0.0) {
+      float fade = 1.0 - exp(-u_horizon * surface.t);
+      if (depth == 0 && u_flatBackground) coverage = 1.0 - fade;
+      else {
+        radiance += throughput * fade * escape(direction, showSun);
+        throughput *= 1.0 - fade;
+      }
     }
 
     vec3 normal = surface.normal;

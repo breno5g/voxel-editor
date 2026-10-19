@@ -6,13 +6,22 @@ import type { RenderSettings } from '../format/render-settings.ts';
 import { parseHdr } from '../render/path-tracer/hdr-image.ts';
 import { materialTable } from '../render/path-tracer/material-table.ts';
 import { createPathTracer, MAX_SAMPLES } from '../render/path-tracer/path-tracer.ts';
-import type { PathTracer } from '../render/path-tracer/path-tracer.ts';
+import type { PathTracer, TraceView } from '../render/path-tracer/path-tracer.ts';
 import { bakeSceneVolume } from '../render/path-tracer/scene-volume.ts';
 import type { Viewport } from '../render/viewport.ts';
 import { element } from './dom.ts';
 import { buildRenderFields, RENDER_PANELS } from './render-fields.ts';
 
 export type RenderShortcuts = { toggle: () => void; keys: [string, () => void][] };
+/** What final images need from the live renderer. */
+export type RenderSession = {
+  /** The tracer with the current scene, palette and materials uploaded; null when the GPU cannot path trace. */
+  prepare: () => PathTracer | null;
+  /** The live view: the editor camera and the lens focus. */
+  view: () => TraceView;
+  /** While a final image renders, the live view stops tracing. */
+  setBusy: (busy: boolean) => void;
+};
 
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -21,7 +30,7 @@ const errorMessage = (error: unknown) => (error instanceof Error ? error.message
  * nothing changes, the side panels switch to the render settings, and the left button stops editing:
  * it sets the focus depth (with a fixed focus) or, with Alt, picks the colour (and material) under it.
  */
-export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: MaterialCommands): RenderShortcuts {
+export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: MaterialCommands): { shortcuts: RenderShortcuts; session: RenderSession } {
   const { state } = editor;
   const container = element('viewport', HTMLElement);
   const toggleButton = element('render-toggle', HTMLButtonElement);
@@ -38,6 +47,7 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
   let sceneStale = true;
   let paletteStale = true;
   let frameQueued = false;
+  let busy = false;
   /** The `.hdr` file the tracer holds; the document only stores a file name, which the browser cannot open. */
   let loadedIbl: string | null = null;
 
@@ -58,18 +68,24 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
   };
   const focusDistance = () => (fixFocusCheck.checked ? Number(focusInput.value) || 0 : viewport.camera.distance());
 
+  const view = (): TraceView => ({ camera: viewport.camera.camera(), focusDistance: focusDistance() });
+  /** Uploads whatever changed since the last sample. */
+  const upload = (target: PathTracer) => {
+    if (sceneStale) target.setVolume(bakeSceneVolume(state.instances, state.vox.models));
+    sceneStale = false;
+    if (paletteStale) {
+      target.setPalette(state.vox.palette);
+      target.setMaterials(materialTable(state.vox.materials));
+    }
+    paletteStale = false;
+  };
+
   const frame = () => {
     frameQueued = false;
-    if (!state.rendering || !tracer) return;
+    if (!state.rendering || !tracer || busy) return;
     try {
-      if (sceneStale) tracer.setVolume(bakeSceneVolume(state.instances, state.vox.models));
-      sceneStale = false;
-      if (paletteStale) {
-        tracer.setPalette(state.vox.palette);
-        tracer.setMaterials(materialTable(state.vox.materials));
-      }
-      paletteStale = false;
-      tracer.trace({ camera: viewport.camera.camera(), focusDistance: focusDistance() });
+      upload(tracer);
+      tracer.trace(view());
     } catch (error) {
       return fail(error);
     }
@@ -179,7 +195,20 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
   const toggleShow = (key: 'edge' | 'grid' | 'ground' | 'backgroundColor') => () => {
     if (state.rendering) write({ ...settings, show: { ...settings.show, [key]: !settings.show[key] } });
   };
-  return {
+  const session: RenderSession = {
+    prepare() {
+      const target = ensureTracer();
+      if (target) upload(target);
+      return target;
+    },
+    view,
+    setBusy(next) {
+      busy = next;
+      tracer?.reset();
+      requestFrame();
+    },
+  };
+  const shortcuts: RenderShortcuts = {
     toggle,
     keys: [
       ['ctrl+r', materials.resetMaterial],
@@ -192,4 +221,5 @@ export function bindRenderPanel(editor: Editor, viewport: Viewport, materials: M
       ['ctrl+w', () => shadowsCheck.click()],
     ],
   };
+  return { shortcuts, session };
 }
