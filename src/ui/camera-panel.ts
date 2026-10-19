@@ -1,6 +1,6 @@
 import type { Editor } from '../editor/editor.ts';
 import { isCameraMode, isWheelZoom } from '../render/camera-rig.ts';
-import type { CameraState } from '../render/camera-rig.ts';
+import { cameraFromDict, cameraToDict } from '../render/camera-chunk.ts';
 import type { Viewport } from '../render/viewport.ts';
 import { bindButtonGroup, element } from './dom.ts';
 
@@ -28,15 +28,13 @@ function storeWheelZoom(value: string) {
 export type CameraPanel = ReturnType<typeof bindCameraPanel>;
 
 /**
- * Camera mode switch and the ten camera slots (MagicaVoxel `cam_mode`, `cam save`, `cam load`, `cam_slot`).
- * ponytail: slots last for the session; writing them to rCAM waits on confirming the base matrix of `_angle`
- * (docs/magicavoxel-re.md), so files from MagicaVoxel keep their cameras untouched.
+ * Camera mode switch and the ten camera slots (MagicaVoxel `cam_mode`, `cam save`, `cam load`, `cam_slot`),
+ * kept in the document's rCAM chunks like MagicaVoxel, so they travel with the file.
  */
 export function bindCameraPanel(editor: Editor, viewport: Viewport) {
   const { camera } = viewport;
   const modeButtons = [...element('camera-options', HTMLDivElement).querySelectorAll<HTMLButtonElement>('[data-camera-mode]')];
   const slotSelect = element('camera-slot', HTMLSelectElement);
-  const slots = new Map<number, CameraState>();
   const slot = () => Number(slotSelect.value);
 
   const syncModes = () => modeButtons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.cameraMode === camera.mode())));
@@ -51,11 +49,13 @@ export function bindCameraPanel(editor: Editor, viewport: Viewport) {
   slotSelect.append(...Array.from({ length: SLOT_COUNT }, (_unused, index) => new Option(String(index), String(index))));
 
   const save = () => {
-    slots.set(slot(), camera.state());
+    editor.state.vox.cameras.set(slot(), cameraToDict(camera.state()));
+    editor.state.dirty = true;
     editor.status(`Câmera salva no slot ${slot()}`);
   };
   const load = () => {
-    const saved = slots.get(slot());
+    const stored = editor.state.vox.cameras.get(slot());
+    const saved = stored && cameraFromDict(stored);
     if (!saved) return editor.status(`O slot de câmera ${slot()} está vazio`, 'error');
     camera.restore(saved);
     syncModes();

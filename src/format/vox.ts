@@ -25,8 +25,10 @@ export type VoxDocument = {
   materials: Map<number, Dict>;
   /** NOTE: MagicaVoxel's palette notes, one per row of eight colours. */
   notes: string[];
+  /** rCAM: MagicaVoxel's camera slots (`_mode`, `_focus`, `_angle`, `_radius`, `_frustum`, `_fov`) by slot id. */
+  cameras: Map<number, Dict>;
   meta: Dict;
-  /** Chunks this editor does not model (rOBJ, rCAM, IMAP, ...), written back verbatim. */
+  /** Chunks this editor does not model (rOBJ, IMAP, ...), written back verbatim. */
   extras: RawChunk[];
 };
 

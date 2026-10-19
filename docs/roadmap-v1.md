@@ -26,7 +26,7 @@ Depois da v1 o editor diverge livremente; até lá, atalhos e semântica seguem 
 
 Pendências da v0.6:
 
-- [ ] Gravar os slots de câmera em `rCAM` (falta a matriz base `M0` de `_angle`, ver [RE §4.4](magicavoxel-re.md))
+- [x] Slots de câmera lidos e gravados em `rCAM` (matriz base `M0` confirmada, ver [RE §4.4](magicavoxel-re.md))
 - [x] Câmera livre girando em torno do olho; `X` + clique centraliza a órbita num voxel
 - [x] Sombra (`Ctrl+W`), contornos dos objetos (`Ctrl+M`), AO, sombreamento constante, esmaecer o fundo, cores de fundo/grade/aresta/seleção e grade do chão do modelo (`rm_space`), com os padrões do MagicaVoxel
 - [ ] Cubo de vista e régua da câmera

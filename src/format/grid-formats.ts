@@ -72,7 +72,7 @@ export function documentFromModels(models: PlacedModel[], palette: Uint8Array): 
     transform.keys = [{ frame: 0, rotation: 4, translation: [position[0] + Math.floor(model.size[0] / 2), position[1] + Math.floor(model.size[1] / 2), position[2] + Math.floor(model.size[2] / 2)] }];
     if (name) transform.attrs.set('_name', name);
   });
-  return { models: models.map(({ model }) => model), nodes, palette, layers: [], materials: new Map(), notes: [], meta: new Map(), extras: [] };
+  return { models: models.map(({ model }) => model), nodes, palette, layers: [], materials: new Map(), notes: [], cameras: new Map(), meta: new Map(), extras: [] };
 }
 
 /** XRAW (MagicaVoxel's raw format): 8-bit indices over a 256-colour RGBA palette; index 0 is empty. */
