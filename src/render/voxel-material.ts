@@ -9,6 +9,8 @@ const VERTEX_SHADER = /* glsl */ `
   attribute vec2 voxel;
   uniform sampler2D palette;
   varying vec3 vColor;
+  varying vec3 vLocal;
+  varying float vFace;
 
   const vec3 SUN_DIRECTION = vec3(0.4243, -0.5657, 0.7071);
 
@@ -28,14 +30,35 @@ const VERTEX_SHADER = /* glsl */ `
     float sun = max(dot(normal, SUN_DIRECTION), 0.0);
     float sky = 0.5 + 0.5 * normal.z;
     vColor = albedo * (0.3 + 0.3 * sky + 0.5 * sun);
+    vLocal = position;
+    vFace = voxel.x;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
 
+/**
+ * Every quad is exactly one voxel face, so the fractional local position spans 0..1
+ * across it: the outline is where it nears 0 or 1 on the face's two in-plane axes.
+ * `fade` blends background objects toward the viewport colour (MagicaVoxel `rm_b_fade`).
+ */
 const SOLID_FRAGMENT = /* glsl */ `
+  uniform float edges;
+  uniform float fade;
+  uniform vec3 fadeColor;
   varying vec3 vColor;
+  varying vec3 vLocal;
+  varying float vFace;
+
+  float edgeLine() {
+    int axis = int(vFace + 0.5) / 2;
+    vec2 uv = axis == 0 ? vLocal.yz : axis == 1 ? vLocal.xz : vLocal.xy;
+    vec2 pixels = min(fract(uv), 1.0 - fract(uv)) / fwidth(uv);
+    return 1.0 - clamp(min(pixels.x, pixels.y), 0.0, 1.0);
+  }
+
   void main() {
-    gl_FragColor = vec4(vColor, 1.0);
+    vec3 color = mix(vColor, vColor * 0.55, edges * edgeLine());
+    gl_FragColor = vec4(mix(color, fadeColor, fade), 1.0);
   }
 `;
 
@@ -47,13 +70,20 @@ const GHOST_FRAGMENT = /* glsl */ `
   }
 `;
 
-export function createVoxelMaterial() {
+const BACKGROUND_FADE = 0.6;
+
+export function createVoxelMaterial(background: THREE.Color) {
   const texels = new Uint8Array(PALETTE_SIZE * 4);
   const paletteTexture = new THREE.DataTexture(texels, PALETTE_SIZE, 1);
-  const uniforms = { palette: { value: paletteTexture } };
-  const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERTEX_SHADER, fragmentShader: SOLID_FRAGMENT });
+  const shared = {
+    palette: { value: paletteTexture },
+    edges: { value: 0 },
+    fadeColor: { value: background },
+  };
+  const solid = (fade: number) =>
+    new THREE.ShaderMaterial({ uniforms: { ...shared, fade: { value: fade } }, vertexShader: VERTEX_SHADER, fragmentShader: SOLID_FRAGMENT });
   const ghostMaterial = new THREE.ShaderMaterial({
-    uniforms,
+    uniforms: shared,
     vertexShader: VERTEX_SHADER,
     fragmentShader: GHOST_FRAGMENT,
     transparent: true,
@@ -66,5 +96,11 @@ export function createVoxelMaterial() {
     paletteTexture.needsUpdate = true;
   };
 
-  return { material, ghostMaterial, setPalette };
+  return {
+    material: solid(0),
+    backgroundMaterial: solid(BACKGROUND_FADE),
+    ghostMaterial,
+    setPalette,
+    setEdges: (visible: boolean) => (shared.edges.value = visible ? 1 : 0),
+  };
 }

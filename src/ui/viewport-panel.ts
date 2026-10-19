@@ -78,22 +78,31 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
     syncGhost();
   };
 
+  const syncFocus = () => viewport.setFocus(state.mode === 'model' ? state.selected : null);
+
+  viewport.setDisplay(state.display);
   editor.subscribe((event) => {
     if (event.type === 'document') {
       viewport.reset();
       viewport.setPalette(state.vox.palette);
       syncInstances();
       viewport.setSelection(state.selected);
+      syncFocus();
       frameScene();
       return;
     }
+    if (event.type === 'display') return viewport.setDisplay(state.display);
     if (event.type === 'scene' || event.type === 'frame') return syncInstances();
     if (event.type === 'voxels') return viewport.refreshModel(event.model, event.chunks);
     if (event.type === 'palette') return viewport.setPalette(state.vox.palette);
     if (event.type === 'tool') return syncGhost();
-    if (event.type === 'mode') return viewport.showHover(null);
+    if (event.type === 'mode') {
+      viewport.showHover(null);
+      return syncFocus();
+    }
     if (event.type === 'selection') {
       viewport.setSelection(state.selected);
+      syncFocus();
       syncGhost();
     }
   });

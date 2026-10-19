@@ -1,4 +1,4 @@
-import type { BrushMode, BrushType, Editor, Mode } from '../editor/editor.ts';
+import type { BrushMode, BrushType, DisplayOption, Editor, Mode } from '../editor/editor.ts';
 import type { ObjectCommands } from '../editor/object-commands.ts';
 import type { Axis } from '../format/rotation.ts';
 import type { Vec3 } from '../format/vox.ts';
@@ -37,6 +37,7 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, files: F
   const brushType = (type: BrushType) => () => editor.setBrushType(type);
   const move = (delta: Vec3) => () => commands.moveSelected(delta);
   const rotate = (axis: Axis, direction: 1 | -1) => () => commands.rotateSelected(axis, direction);
+  const toggle = (option: DisplayOption) => () => editor.toggleDisplay(option);
 
   const global: Keymap = new Map([
     ['ctrl+z', undo],
@@ -55,6 +56,9 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, files: F
     ['ctrl+shift+Comma', () => commands.stepKey(-1, true)],
     ['ctrl+shift+Period', () => commands.stepKey(1, true)],
     ['Digit5', actions.focusCamera],
+    ['ctrl+e', toggle('edges')],
+    ['ctrl+g', toggle('grid')],
+    ['ctrl+b', toggle('backgroundObjects')],
     ['o', () => editor.setOnionSkin(!state.onionSkin)],
     ['?', actions.openHelp],
     ['shift+?', actions.openHelp],
@@ -68,6 +72,7 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, files: F
       ['t', brushType('attach')],
       ['r', brushType('erase')],
       ['g', brushType('paint')],
+      ['ctrl+f', toggle('frame')],
     ]),
     world: new Map([
       ['ctrl+n', commands.addObject],

@@ -15,6 +15,10 @@ export type BrushType = (typeof BRUSH_TYPES)[number];
 /** MagicaVoxel `b_mode`: `vox` follows the pointer, `box` fills the cells between press and release. */
 export const BRUSH_MODES = ['vox', 'box'] as const;
 export type BrushMode = (typeof BRUSH_MODES)[number];
+/** MagicaVoxel `rm_b_grid`, `rm_b_frame`, `rm_b_edge`, `rm_b_bo`. */
+export const DISPLAY_OPTIONS = ['grid', 'frame', 'edges', 'backgroundObjects'] as const;
+export type DisplayOption = (typeof DISPLAY_OPTIONS)[number];
+export type Display = Record<DisplayOption, boolean>;
 export type StatusTone = 'info' | 'error';
 
 export type EditorEvent =
@@ -27,6 +31,7 @@ export type EditorEvent =
   | { type: 'color' }
   | { type: 'tool' }
   | { type: 'mode' }
+  | { type: 'display' }
   | { type: 'playback' }
   | { type: 'voxels'; model: VoxModel; chunks: Set<number> }
   | { type: 'status'; message: string; tone: StatusTone };
@@ -49,6 +54,7 @@ export type EditorState = {
   color: number;
   /** Shows the previous model frame translucent while editing frame-by-frame animation. */
   onionSkin: boolean;
+  display: Display;
 };
 
 export type Editor = ReturnType<typeof createEditor>;
@@ -66,6 +72,7 @@ const isOneOf =
 export const isMode = isOneOf(MODES);
 export const isBrushType = isOneOf(BRUSH_TYPES);
 export const isBrushMode = isOneOf(BRUSH_MODES);
+export const isDisplayOption = isOneOf(DISPLAY_OPTIONS);
 
 /**
  * Single source of editor state. Mutations go through these methods, which
@@ -90,6 +97,7 @@ export function createEditor() {
     brushMode: 'vox',
     color: DEFAULT_COLOR,
     onionSkin: false,
+    display: { grid: true, frame: true, edges: false, backgroundObjects: true },
   };
 
   const emit = (event: EditorEvent) => listeners.forEach((listener) => listener(event));
@@ -192,6 +200,11 @@ export function createEditor() {
     setBrushMode(brushMode: BrushMode) {
       state.brushMode = brushMode;
       emit({ type: 'tool' });
+    },
+
+    toggleDisplay(option: DisplayOption) {
+      state.display = { ...state.display, [option]: !state.display[option] };
+      emit({ type: 'display' });
     },
 
     setOnionSkin(enabled: boolean) {

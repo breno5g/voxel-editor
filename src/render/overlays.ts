@@ -58,5 +58,8 @@ export function createOverlays(scene: THREE.Scene) {
     setVisible(visible: boolean) {
       root.visible = visible;
     },
+    setGridVisible(visible: boolean) {
+      grid.visible = visible;
+    },
   };
 }

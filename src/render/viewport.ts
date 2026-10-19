@@ -14,6 +14,7 @@ export type Viewport = ReturnType<typeof createViewport>;
 export type ViewportPick = { transformId: number; hit: VoxelHit };
 
 type ObjectView = { group: THREE.Group; model: VoxModel | null };
+export type ViewportDisplay = { grid: boolean; frame: boolean; edges: boolean; backgroundObjects: boolean };
 type Ghost = { transformId: number; model: VoxModel };
 type ModelRay = { origin: Vec3; direction: Vec3 };
 
@@ -50,7 +51,10 @@ export function createViewport(container: HTMLElement) {
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
 
-  const { material, ghostMaterial, setPalette } = createVoxelMaterial();
+  // Raw sRGB components: the shader writes its output without colour management, like the clear colour appears.
+  const { material, backgroundMaterial, ghostMaterial, setPalette, setEdges } = createVoxelMaterial(
+    new THREE.Color().setHex(BACKGROUND, THREE.LinearSRGBColorSpace),
+  );
   const modelCache = createModelCache();
   const overlays = createOverlays(scene);
   const views = new Map<number, ObjectView>();
@@ -61,6 +65,10 @@ export function createViewport(container: HTMLElement) {
   scene.add(ghostGroup);
   let ghost: Ghost | null = null;
   let selectedId: number | null = null;
+  /** The object being edited in model mode; every other object is background. */
+  let focusId: number | null = null;
+  let display: ViewportDisplay = { grid: true, frame: true, edges: false, backgroundObjects: true };
+  let exporting = false;
   let renderQueued = false;
 
   const render = () => renderer.render(scene, camera);
@@ -90,9 +98,19 @@ export function createViewport(container: HTMLElement) {
     }
   };
 
-  const showModel = (view: ObjectView, model: VoxModel) => {
+  /** Background objects are faded, or hidden when `backgroundObjects` is off; exports draw everything plainly. */
+  const styleView = (transformId: number, view: ObjectView) => {
+    const isBackground = !exporting && focusId !== null && transformId !== focusId;
+    view.group.visible = !isBackground || display.backgroundObjects;
+    view.group.children.forEach((child) => {
+      if (child instanceof THREE.Mesh) child.material = isBackground ? backgroundMaterial : material;
+    });
+  };
+
+  const showModel = (transformId: number, view: ObjectView, model: VoxModel) => {
     view.model = model;
     fillGroup(view.group, model, material);
+    styleView(transformId, view);
   };
 
   /** Keeps the onion-skin ghost on its object's current pose. */
@@ -104,9 +122,16 @@ export function createViewport(container: HTMLElement) {
     ghostGroup.matrixWorldNeedsUpdate = true;
   };
 
+  /** The selection box doubles as the model frame in model mode, where `frame` toggles it. */
   const updateSelection = () => {
-    const view = selectedId === null ? undefined : views.get(selectedId);
+    const view = selectedId === null || (focusId !== null && !display.frame) ? undefined : views.get(selectedId);
     overlays.showSelection(view?.model ? view.group.matrix : null, view?.model?.size);
+  };
+
+  const restyle = () => {
+    views.forEach((view, transformId) => styleView(transformId, view));
+    updateSelection();
+    requestRender();
   };
 
   /** Points the raycaster through a client-space position. */
@@ -150,7 +175,7 @@ export function createViewport(container: HTMLElement) {
           views.set(instance.transformId, view);
         }
         const model = models[instance.model];
-        if (view.model !== model) showModel(view, model);
+        if (view.model !== model) showModel(instance.transformId, view, model);
         view.group.matrix.copy(poseMatrix(instance.pose));
         view.group.matrixWorldNeedsUpdate = true;
       }
@@ -166,8 +191,8 @@ export function createViewport(container: HTMLElement) {
 
     refreshModel(model: VoxModel, chunks: Iterable<number>) {
       modelCache.update(model, chunks);
-      views.forEach((view) => {
-        if (view.model === model) showModel(view, model);
+      views.forEach((view, transformId) => {
+        if (view.model === model) showModel(transformId, view, model);
       });
       if (ghost?.model === model) fillGroup(ghostGroup, model, ghostMaterial);
       requestRender();
@@ -183,6 +208,19 @@ export function createViewport(container: HTMLElement) {
       ghost = next;
       placeGhost();
       requestRender();
+    },
+
+    /** Model mode edits `transformId` and treats the rest as background; null is world mode. */
+    setFocus(transformId: number | null) {
+      focusId = transformId;
+      restyle();
+    },
+
+    setDisplay(next: ViewportDisplay) {
+      display = { ...next };
+      overlays.setGridVisible(display.grid);
+      setEdges(display.edges);
+      restyle();
     },
 
     reset() {
@@ -226,7 +264,7 @@ export function createViewport(container: HTMLElement) {
     pick(clientX: number, clientY: number, only?: number): ViewportPick | null {
       let nearest: ViewportPick | null = null;
       for (const [transformId, view] of views) {
-        if (only !== undefined && transformId !== only) continue;
+        if ((only !== undefined && transformId !== only) || !view.group.visible) continue;
         const ray = view.model && modelRay(view, clientX, clientY);
         const hit = ray && view.model ? raycastVoxels(view.model, ray.origin, ray.direction) : null;
         if (hit && (!nearest || hit.distance < nearest.hit.distance)) nearest = { transformId, hit };
@@ -253,6 +291,8 @@ export function createViewport(container: HTMLElement) {
       camera,
       setOverlaysVisible: (visible: boolean) => {
         overlays.setVisible(visible);
+        exporting = !visible;
+        views.forEach((view, transformId) => styleView(transformId, view));
         if (visible) placeGhost();
         else ghostGroup.visible = false;
       },

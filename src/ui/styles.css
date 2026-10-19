@@ -331,3 +331,18 @@ label.track-shape {
 .viewport canvas:focus-visible {
   outline-offset: -2px;
 }
+
+.view-options {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  z-index: 1;
+}
+
+.view-options button {
+  padding: 2px 8px;
+  font-size: 12px;
+  background: rgba(46, 49, 56, 0.85);
+}

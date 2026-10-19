@@ -5,6 +5,7 @@ import { createObjectCommands } from './editor/object-commands.ts';
 import { bindPlayback } from './editor/playback.ts';
 import { createDocument } from './format/defaults.ts';
 import { createViewport } from './render/viewport.ts';
+import { bindDisplayPanel } from './ui/display-panel.ts';
 import { element } from './ui/dom.ts';
 import { createFileActions } from './ui/file-actions.ts';
 import { bindHelp } from './ui/help.ts';
@@ -25,6 +26,7 @@ const { frameScene } = bindViewportPanel(editor, viewport, commands);
 
 bindStatusBar(editor);
 bindToolbar(editor, files, commands, frameScene);
+bindDisplayPanel(editor);
 bindPalettePanel(editor);
 bindObjectsPanel(editor, commands);
 bindObjectInspector(editor, commands);
