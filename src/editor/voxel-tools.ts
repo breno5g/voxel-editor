@@ -3,7 +3,7 @@ import { cellOf, EMPTY_VOXEL, isInside, voxelIndex } from '../format/vox.ts';
 import type { Vec3, VoxModel } from '../format/vox.ts';
 import { chunksTouching } from '../geometry/mesher.ts';
 import type { Viewport } from '../render/viewport.ts';
-import { addScaled, alongAxes, axisOf, cellsBetween, faceRegion, lineCells, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
+import { addScaled, alongAxes, axisOf, cellsBetween, centeredShape, faceRegion, lineCells, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
 import type { Editor } from './editor.ts';
 
 /** A brush cell and the face plane it was found on; attach strokes keep that plane while dragging. */
@@ -12,7 +12,19 @@ type Target = { cell: Vec3; axis: Axis; plane: number };
 type Changes = Map<number, [number, number]>;
 /** A face stroke: the region picked at press, and the screen direction its normal points to. */
 type FaceStroke = { region: Vec3[]; normal: Vec3; start: [number, number]; screenNormal: [number, number]; layers: number };
-type Stroke = { model: VoxModel; transformId: number; anchor: Target; last: Target; changes: Changes; face: FaceStroke | null };
+type Stroke = {
+  model: VoxModel;
+  transformId: number;
+  anchor: Target;
+  last: Target;
+  changes: Changes;
+  face: FaceStroke | null;
+  /** Client position of the press, for lines projected onto the surface. */
+  start: [number, number];
+};
+
+/** Screen pixels between surface samples of a projected line. */
+const PROJECTION_STEP = 2;
 
 /** Pixels of vertical drag per layer when the face normal points at the camera. */
 const PIXELS_PER_LAYER = 12;
@@ -28,7 +40,9 @@ const regionBounds = (region: Vec3[]): [Vec3, Vec3] => [
  *   stroke stays on the plane where it started instead of stacking toward the camera;
  * - `face` works on the flat face region under the pointer: attach extrudes it and erase digs
  *   into it by as many layers as the drag along the normal, paint recolours it;
- * - `box` previews the box between press and pointer live, reverting and redrawing it.
+ * - `box` previews the box between press and pointer live, reverting and redrawing it;
+ * - `geo` previews a line, square or circle on the plane where the drag started (a projected
+ *   line instead follows the surface under the dragged screen segment).
  * Every stroke goes through axis mode and mirror, and is one undo step. Alt+click picks a colour.
  */
 export function createVoxelTools(editor: Editor, viewport: Viewport) {
@@ -45,7 +59,7 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
 
   const targetAt = (clientX: number, clientY: number, model: VoxModel, transformId: number): Target | null => {
     const { brushType } = state;
-    const locked = stroke && brushType === 'attach' ? stroke.anchor : null;
+    const locked = stroke && (brushType === 'attach' || state.brushMode === 'geo') ? stroke.anchor : null;
     if (locked) {
       const cell = viewport.planeCell(clientX, clientY, transformId, locked.axis, locked.plane, locked.cell[locked.axis]);
       return cell && { ...locked, cell };
@@ -75,8 +89,9 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
    * (both lie on the locked plane, so fast drags leave no gaps); erase and paint only stamp the
    * surface under the pointer, never the inside a straight line would cut through.
    */
-  const brushCells = (active: Stroke, target: Target): Iterable<Vec3> => {
+  const brushCells = (active: Stroke, target: Target, pointer: [number, number]): Iterable<Vec3> => {
     if (state.brushMode === 'box') return cellsBetween(active.anchor.cell, target.cell);
+    if (state.brushMode === 'geo') return geoCells(active, target, pointer);
     const path = state.brushType === 'attach' ? lineCells(active.last.cell, target.cell) : [target.cell];
     return path.flatMap((cell) => stamp({ ...target, cell }));
   };
@@ -107,11 +122,32 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
     changes.clear();
   };
 
-  /** Box strokes are previews: the previous box is reverted before the new one is drawn. */
-  const draw = (active: Stroke, target: Target) => {
+  /** Cells under the screen segment from the press to the pointer, attach ones on the hit face. */
+  const surfacePath = (active: Stroke, clientX: number, clientY: number): Vec3[] => {
+    const [startX, startY] = active.start;
+    const samples = Math.max(1, Math.ceil(Math.hypot(clientX - startX, clientY - startY) / PROJECTION_STEP));
+    const cells = new Map<string, Vec3>();
+    for (let sample = 0; sample <= samples; sample++) {
+      const t = sample / samples;
+      const hit = viewport.pick(startX + (clientX - startX) * t, startY + (clientY - startY) * t, active.transformId)?.hit;
+      if (!hit) continue;
+      const cell = state.brushType === 'attach' ? addScaled(hit.voxel, hit.normal, 1) : hit.voxel;
+      cells.set(`${cell}`, cell);
+    }
+    return [...cells.values()];
+  };
+
+  const geoCells = (active: Stroke, target: Target, pointer: [number, number]): Vec3[] => {
+    const { shape, project } = state.geoBrush;
+    if (shape === 'line') return project ? surfacePath(active, pointer[0], pointer[1]) : lineCells(active.anchor.cell, target.cell);
+    return centeredShape(shape, active.anchor.cell, target.cell, active.anchor.axis, state.geoBrush);
+  };
+
+  /** Box and geometry strokes are previews: the previous shape is reverted before the new one is drawn. */
+  const draw = (active: Stroke, target: Target, pointer: [number, number]) => {
     const chunks = new Set<number>();
-    if (state.brushMode === 'box') revert(active, chunks);
-    apply(active, brushCells(active, target), chunks);
+    if (state.brushMode === 'box' || state.brushMode === 'geo') revert(active, chunks);
+    apply(active, brushCells(active, target, pointer), chunks);
     active.last = target;
     if (chunks.size > 0) editor.voxelsChanged(active.model, chunks);
   };
@@ -160,7 +196,7 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
     const axis = axisOf(hit.normal);
     const target: Target = { cell: hit.voxel, axis, plane: facePlane(hit.voxel, hit.normal, axis) };
     const face: FaceStroke = { region, normal: hit.normal, start: [clientX, clientY], screenNormal: [to[0] - from[0], to[1] - from[1]], layers: 1 };
-    stroke = { ...object, anchor: target, last: target, changes: new Map(), face };
+    stroke = { ...object, anchor: target, last: target, changes: new Map(), face, start: [clientX, clientY] };
     drawFace(stroke, face);
   };
 
@@ -204,8 +240,8 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
       if (object && state.brushMode === 'face') return beginFace(object, clientX, clientY);
       const target = object && targetAt(clientX, clientY, object.model, object.transformId);
       if (!object || !target) return;
-      stroke = { ...object, anchor: target, last: target, changes: new Map(), face: null };
-      draw(stroke, target);
+      stroke = { ...object, anchor: target, last: target, changes: new Map(), face: null, start: [clientX, clientY] };
+      draw(stroke, target, [clientX, clientY]);
     },
 
     move(clientX: number, clientY: number) {
@@ -220,7 +256,7 @@ export function createVoxelTools(editor: Editor, viewport: Viewport) {
       const target = object && targetAt(clientX, clientY, object.model, object.transformId);
       if (stroke?.anchor && state.brushMode === 'box') viewport.showHover(stroke.transformId, stroke.anchor.cell, target?.cell ?? stroke.anchor.cell);
       else viewport.showHover(object && target ? object.transformId : null, target?.cell);
-      if (stroke && target) draw(stroke, target);
+      if (stroke && target) draw(stroke, target, [clientX, clientY]);
     },
 
     end() {

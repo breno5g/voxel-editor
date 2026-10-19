@@ -6,6 +6,7 @@ import { createObjectCommands } from './editor/object-commands.ts';
 import { bindPlayback } from './editor/playback.ts';
 import { createDocument } from './format/defaults.ts';
 import { createViewport } from './render/viewport.ts';
+import { bindBrushPanel } from './ui/brush-panel.ts';
 import { bindCameraPanel } from './ui/camera-panel.ts';
 import { bindDisplayPanel } from './ui/display-panel.ts';
 import { element } from './ui/dom.ts';
@@ -31,6 +32,7 @@ const cameras = bindCameraPanel(editor, viewport);
 
 bindStatusBar(editor);
 bindToolbar(editor, files, commands, focusCamera);
+bindBrushPanel(editor);
 bindDisplayPanel(editor);
 bindPalettePanel(editor);
 bindObjectsPanel(editor, commands);

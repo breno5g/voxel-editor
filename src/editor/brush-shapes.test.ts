@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createModel, voxelIndex } from '../format/vox.ts';
 import type { Vec3 } from '../format/vox.ts';
-import { alongAxes, cellsBetween, faceRegion, lineCells, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
+import { alongAxes, cellsBetween, centeredShape, faceRegion, lineCells, stampCells, stampOutward, withMirrors } from './brush-shapes.ts';
 
 describe('stampCells', () => {
   it('is the centre cell at size 1', () => {
@@ -52,6 +52,28 @@ describe('faceRegion', () => {
 
   it('is empty when the clicked face is covered', () => {
     expect(faceRegion(slab(), [2, 2, 0], [0, 0, 1], { byColor: false, neighbors: 4 })).toEqual([]);
+  });
+});
+
+describe('centeredShape', () => {
+  it('draws a filled square or its outline on the face plane', () => {
+    const filled = centeredShape('square', [5, 5, 2], [7, 4, 2], 2, { fill: true, even: false });
+    expect(filled).toHaveLength(25);
+    expect(filled.every((cell) => cell[2] === 2)).toBe(true);
+    expect(centeredShape('square', [5, 5, 2], [7, 4, 2], 2, { fill: false, even: false })).toHaveLength(16);
+  });
+
+  it('makes even-width squares when centred on a corner', () => {
+    const square = centeredShape('square', [5, 5, 0], [6, 5, 0], 2, { fill: true, even: true });
+    expect(square).toHaveLength(4);
+    expect(square).toContainEqual([6, 6, 0]);
+  });
+
+  it('draws a circle reaching the edge cell, rounder than the square', () => {
+    const circle = centeredShape('circle', [5, 5, 0], [8, 5, 0], 2, { fill: true, even: false });
+    expect(circle).toContainEqual([8, 5, 0]);
+    expect(circle).not.toContainEqual([8, 8, 0]);
+    expect(circle.length).toBeLessThan(49);
   });
 });
 

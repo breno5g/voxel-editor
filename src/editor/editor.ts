@@ -5,7 +5,7 @@ import { clampFrame, DEFAULT_RANGE, formatRange, parseRange, RANGE_META_KEY } fr
 import type { FrameRange } from '../scene/keyframes.ts';
 import { evaluateScene } from '../scene/scene-graph.ts';
 import type { Instance } from '../scene/scene-graph.ts';
-import type { FaceConnectivity, StampShape } from './brush-shapes.ts';
+import type { CenterOptions, FaceConnectivity, GeoShape, StampShape } from './brush-shapes.ts';
 import { createHistory } from './history.ts';
 
 /** MagicaVoxel's editors: `model` edits the selected object's voxels, `world` arranges objects. */
@@ -16,9 +16,9 @@ export const BRUSH_TYPES = ['attach', 'erase', 'paint'] as const;
 export type BrushType = (typeof BRUSH_TYPES)[number];
 /**
  * MagicaVoxel `b_mode`: `vox` stamps under the pointer, `face` works on the flat face region
- * under it, `box` fills the cells between press and release.
+ * under it, `box` fills the cells between press and release, `geo` draws lines and shapes.
  */
-export const BRUSH_MODES = ['vox', 'face', 'box'] as const;
+export const BRUSH_MODES = ['vox', 'face', 'box', 'geo'] as const;
 export type BrushMode = (typeof BRUSH_MODES)[number];
 /** MagicaVoxel `rm_b_grid`, `rm_b_frame`, `rm_b_edge`, `rm_b_bo`. */
 export const DISPLAY_OPTIONS = ['grid', 'frame', 'edges', 'backgroundObjects'] as const;
@@ -28,6 +28,8 @@ export type Display = Record<DisplayOption, boolean>;
 export type VoxBrush = { size: number; shape: StampShape; volume: boolean };
 /** Face brush options: MagicaVoxel `b_face_pal` (new voxels take the palette colour, else the face's), plus connectivity. */
 export type FaceBrush = FaceConnectivity & { usePalette: boolean };
+/** Geometry brush options: MagicaVoxel `b_geo`, `b_line_proj` (the line follows the surface), `b_center_fill`, `b_center_even`. */
+export type GeoBrush = CenterOptions & { shape: GeoShape; project: boolean };
 export const MAX_BRUSH_SIZE = 64;
 export type StatusTone = 'info' | 'error';
 
@@ -67,6 +69,7 @@ export type EditorState = {
   axes: [boolean, boolean, boolean];
   voxBrush: VoxBrush;
   faceBrush: FaceBrush;
+  geoBrush: GeoBrush;
   color: number;
   /** Shows the previous model frame translucent while editing frame-by-frame animation. */
   onionSkin: boolean;
@@ -91,9 +94,6 @@ const isOneOf =
   <T extends string>(values: readonly T[]) =>
   (value: unknown): value is T =>
     values.some((candidate) => candidate === value);
-export const isMode = isOneOf(MODES);
-export const isBrushType = isOneOf(BRUSH_TYPES);
-export const isBrushMode = isOneOf(BRUSH_MODES);
 export const isDisplayOption = isOneOf(DISPLAY_OPTIONS);
 
 /**
@@ -121,6 +121,7 @@ export function createEditor() {
     axes: [false, false, false],
     voxBrush: { size: 1, shape: 'cube', volume: true },
     faceBrush: { usePalette: true, byColor: false, neighbors: 4 },
+    geoBrush: { shape: 'line', project: false, fill: true, even: false },
     color: DEFAULT_COLOR,
     onionSkin: false,
     display: { grid: true, frame: true, edges: false, backgroundObjects: true },
@@ -235,6 +236,11 @@ export function createEditor() {
 
     toggleAxis(axis: Axis) {
       state.axes = toggled(state.axes, axis);
+      emit({ type: 'tool' });
+    },
+
+    setGeoBrush(changes: Partial<GeoBrush>) {
+      state.geoBrush = { ...state.geoBrush, ...changes };
       emit({ type: 'tool' });
     },
 

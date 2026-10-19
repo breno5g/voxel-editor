@@ -16,3 +16,18 @@ export function downloadBlob(blob: Blob, fileName: string): void {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
+
+/**
+ * A group of buttons that each carry a `data-value`: clicking one chooses its parsed value.
+ * Returns the function that marks the button of the current value as pressed.
+ */
+export function bindButtonGroup<T>(groupId: string, parse: (raw: string | undefined) => T | undefined, choose: (value: T) => void) {
+  const buttons = [...element(groupId, HTMLElement).querySelectorAll('button')];
+  buttons.forEach((button) =>
+    button.addEventListener('click', () => {
+      const value = parse(button.dataset.value);
+      if (value !== undefined) choose(value);
+    }),
+  );
+  return (current: T) => buttons.forEach((button) => button.setAttribute('aria-pressed', String(parse(button.dataset.value) === current)));
+}

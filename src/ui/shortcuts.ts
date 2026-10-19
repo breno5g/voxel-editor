@@ -99,6 +99,7 @@ export function bindShortcuts(editor: Editor, commands: ObjectCommands, models: 
       ['v', brushMode('vox')],
       ['f', brushMode('face')],
       ['b', brushMode('box')],
+      ['l', brushMode('geo')],
       ['t', brushType('attach')],
       ['r', brushType('erase')],
       ['g', brushType('paint')],

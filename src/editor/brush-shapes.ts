@@ -76,6 +76,41 @@ export function lineCells(from: Vec3, to: Vec3): Vec3[] {
   });
 }
 
+/** Geometry brush shapes, MagicaVoxel `b_geo`. */
+export const GEO_SHAPES = ['line', 'square', 'circle'] as const;
+export type GeoShape = (typeof GEO_SHAPES)[number];
+/** `b_center_fill` keeps the inside, else only the outline; `b_center_even` centres on a cell corner for even widths. */
+export type CenterOptions = { fill: boolean; even: boolean };
+
+/**
+ * A square or circle on the plane across `axis`, centred on `center` and reaching `edge`.
+ * The outline is one cell thick: the cells with a 4-neighbour outside the shape.
+ */
+export function centeredShape(shape: 'square' | 'circle', center: Vec3, edge: Vec3, axis: Axis, { fill, even }: CenterOptions): Vec3[] {
+  const [u, v] = AXES.filter((other) => other !== axis);
+  const offset = even ? 0.5 : 0;
+  const reach = [Math.abs(edge[u] - center[u] - offset), Math.abs(edge[v] - center[v] - offset)];
+  const half = shape === 'square' ? Math.max(...reach) : Math.hypot(reach[0], reach[1]) + 0.5;
+  const inside = (du: number, dv: number) => {
+    const [a, b] = [Math.abs(du - offset), Math.abs(dv - offset)];
+    return shape === 'square' ? Math.max(a, b) <= half : a * a + b * b <= half * half;
+  };
+  const span = Math.ceil(half) + 1;
+  const cells: Vec3[] = [];
+  for (let dv = -span; dv <= span; dv++) {
+    for (let du = -span; du <= span; du++) {
+      if (!inside(du, dv)) continue;
+      const isBorder = !inside(du + 1, dv) || !inside(du - 1, dv) || !inside(du, dv + 1) || !inside(du, dv - 1);
+      if (!fill && !isBorder) continue;
+      const cell: Vec3 = [center[0], center[1], center[2]];
+      cell[u] += du;
+      cell[v] += dv;
+      cells.push(cell);
+    }
+  }
+  return cells;
+}
+
 /**
  * Where to centre a stamp so it starts at `cell` and grows away from the face it was attached to
  * (`outward` +1 or -1 along `axis`), instead of sinking half into the surface.

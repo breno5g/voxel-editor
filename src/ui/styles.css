@@ -388,3 +388,17 @@ label.track-shape {
   border: 1px solid var(--border);
   border-radius: 4px;
 }
+
+.brush-options {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.sidebar .brush-options .field {
+  margin-top: 0;
+}
+
+#vox-size {
+  width: 4em;
+}

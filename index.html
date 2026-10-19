@@ -13,8 +13,8 @@
       <input id="file-input" type="file" accept=".vox" hidden />
       <span class="separator" aria-hidden="true"></span>
       <div id="modes" class="tools" role="group" aria-label="Editor (Tab no viewport ou duplo clique alterna)">
-        <button type="button" data-mode="model" title="Editar os voxels do objeto selecionado (Tab)">Modelo</button>
-        <button type="button" data-mode="world" title="Organizar e animar objetos (Tab)">Mundo</button>
+        <button type="button" data-value="model" title="Editar os voxels do objeto selecionado (Tab)">Modelo</button>
+        <button type="button" data-value="world" title="Organizar e animar objetos (Tab)">Mundo</button>
       </div>
       <span class="separator" aria-hidden="true"></span>
       <button id="add-object" type="button" title="Novo objeto 32³ (Ctrl+N no modo Mundo)">Novo objeto</button>
@@ -34,19 +34,60 @@
       <section aria-labelledby="brush-title" data-only-mode="model">
         <h2 id="brush-title">Pincel</h2>
         <div id="brush-modes" class="tools" role="group" aria-label="Pincel">
-          <button type="button" data-brush-mode="vox" title="Voxel: tamanho com - e +; Adicionar desenha no plano onde começou (V)">Voxel</button>
-          <button type="button" data-brush-mode="face" title="Face: a região plana sob o cursor; arraste para extrudar ou cavar camadas (F)">Face</button>
-          <button type="button" data-brush-mode="box" title="Caixa: arraste para aplicar numa caixa (B)">Caixa</button>
+          <button type="button" data-value="vox" title="Voxel: tamanho com - e +; Adicionar desenha no plano onde começou (V)">Voxel</button>
+          <button type="button" data-value="face" title="Face: a região plana sob o cursor; arraste para extrudar ou cavar camadas (F)">Face</button>
+          <button type="button" data-value="box" title="Caixa: arraste para aplicar numa caixa (B)">Caixa</button>
+          <button type="button" data-value="geo" title="Geometria: linha, quadrado ou círculo no plano onde o arrasto começou (L)">Geometria</button>
         </div>
         <div id="brush-types" class="tools" role="group" aria-label="Ação do pincel">
-          <button type="button" data-brush-type="attach" title="Adicionar voxels (T)">Adicionar</button>
-          <button type="button" data-brush-type="erase" title="Apagar voxels (R)">Apagar</button>
-          <button type="button" data-brush-type="paint" title="Pintar voxels (G)">Pintar</button>
+          <button type="button" data-value="attach" title="Adicionar voxels (T)">Adicionar</button>
+          <button type="button" data-value="erase" title="Apagar voxels (R)">Apagar</button>
+          <button type="button" data-value="paint" title="Pintar voxels (G)">Pintar</button>
         </div>
         <div id="mirror" class="tools" role="group" aria-label="Espelho do pincel">
           <button type="button" data-axis="0" title="Espelhar o pincel em X (1)">↔X</button>
           <button type="button" data-axis="1" title="Espelhar o pincel em Y (2)">↔Y</button>
           <button type="button" data-axis="2" title="Espelhar o pincel em Z (3)">↔Z</button>
+        </div>
+        <div id="axes" class="tools" role="group" aria-label="Modo eixo: o traço atravessa o modelo">
+          <button type="button" data-axis="0" title="Atravessar o modelo em X (Ctrl+1)">⇥X</button>
+          <button type="button" data-axis="1" title="Atravessar o modelo em Y (Ctrl+2)">⇥Y</button>
+          <button type="button" data-axis="2" title="Atravessar o modelo em Z (Ctrl+3)">⇥Z</button>
+        </div>
+        <div class="brush-options" data-brush-options="vox">
+          <label class="field">Tamanho <input id="vox-size" type="number" min="1" max="64" /></label>
+          <div id="vox-shape" class="tools" role="group" aria-label="Forma do pincel voxel">
+            <button type="button" data-value="cube">Cubo</button>
+            <button type="button" data-value="sphere">Esfera</button>
+          </div>
+          <div id="vox-volume" class="tools" role="group" aria-label="Volume do pincel voxel">
+            <button type="button" data-value="3d" title="Volume inteiro">3D</button>
+            <button type="button" data-value="2d" title="Só no plano da face sob o cursor">2D</button>
+          </div>
+        </div>
+        <div class="brush-options" data-brush-options="face">
+          <div id="face-color" class="tools" role="group" aria-label="Cor dos voxels extrudados">
+            <button type="button" data-value="palette">Cor da paleta</button>
+            <button type="button" data-value="voxel">Cor do voxel</button>
+          </div>
+          <div id="face-connect" class="tools" role="group" aria-label="Conexão da região">
+            <button type="button" data-value="geometry" title="Toda a face plana">Geometria</button>
+            <button type="button" data-value="color" title="Só voxels da mesma cor">Mesma cor</button>
+          </div>
+          <div id="face-neighbors" class="tools" role="group" aria-label="Vizinhança">
+            <button type="button" data-value="4">4 vizinhos</button>
+            <button type="button" data-value="8">8 vizinhos</button>
+          </div>
+        </div>
+        <div class="brush-options" data-brush-options="geo">
+          <div id="geo-shape" class="tools" role="group" aria-label="Forma">
+            <button type="button" data-value="line">Linha</button>
+            <button type="button" data-value="square">Quadrado</button>
+            <button type="button" data-value="circle">Círculo</button>
+          </div>
+          <label class="field"><input id="geo-project" type="checkbox" /> Projetar na superfície</label>
+          <label class="field"><input id="geo-fill" type="checkbox" /> Preencher centro</label>
+          <label class="field"><input id="geo-even" type="checkbox" /> Tamanho par</label>
         </div>
       </section>
     </aside>
@@ -160,7 +201,7 @@
           <tr><th scope="row">Key anterior / próxima (primeira / última)</th><td><kbd>Ctrl+,</kbd> <kbd>Ctrl+.</kbd> (+<kbd>Shift</kbd>)</td></tr>
           <tr><th scope="row">Onion skin</th><td><kbd>O</kbd></td></tr>
           <tr><th scope="row" colspan="2" class="group">Modo Modelo</th></tr>
-          <tr><th scope="row">Pincel voxel / face / caixa</th><td><kbd>V</kbd> / <kbd>F</kbd> / <kbd>B</kbd></td></tr>
+          <tr><th scope="row">Pincel voxel / face / caixa / geometria</th><td><kbd>V</kbd> / <kbd>F</kbd> / <kbd>B</kbd> / <kbd>L</kbd></td></tr>
           <tr><th scope="row">Tamanho do pincel voxel</th><td><kbd>-</kbd> / <kbd>+</kbd></td></tr>
           <tr><th scope="row">Modo eixo X / Y / Z (atravessa o modelo)</th><td><kbd>Ctrl+1</kbd> / <kbd>Ctrl+2</kbd> / <kbd>Ctrl+3</kbd></td></tr>
           <tr><th scope="row">Adicionar / apagar / pintar</th><td><kbd>T</kbd> / <kbd>R</kbd> / <kbd>G</kbd></td></tr>
