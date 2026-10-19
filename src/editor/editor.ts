@@ -6,6 +6,7 @@ import { clampFrame, DEFAULT_RANGE, formatRange, parseRange, RANGE_META_KEY } fr
 import type { FrameRange } from '../scene/keyframes.ts';
 import { evaluateScene } from '../scene/scene-graph.ts';
 import type { Instance } from '../scene/scene-graph.ts';
+import { childOfGroup, parentMap, rootLevel } from '../scene/scene-tree.ts';
 import type { CenterOptions, FaceConnectivity, GeoShape, RegionOptions, StampShape } from './brush-shapes.ts';
 import { createHistory } from './history.ts';
 import type { VoxelSelection } from './voxel-selection.ts';
@@ -23,6 +24,9 @@ export type BrushType = (typeof BRUSH_TYPES)[number];
 /** MagicaVoxel `b_msel`: the marquee selects by screen rectangle, by brush stroke, or by box. */
 export const MARQUEE_MODES = ['rect', 'brush', 'box'] as const;
 export type MarqueeMode = (typeof MARQUEE_MODES)[number];
+/** MagicaVoxel `b_obj`: the world editor's pointer tool (`patt` waits for patterns). */
+export const OBJECT_TOOLS = ['move', 'msel', 'wrap'] as const;
+export type ObjectTool = (typeof OBJECT_TOOLS)[number];
 /** MagicaVoxel `b_xform`: what dragging the selection does. */
 export const TRANSFORM_TOOLS = ['move', 'scale', 'wrap', 'rotate'] as const;
 export type TransformTool = (typeof TRANSFORM_TOOLS)[number];
@@ -72,8 +76,12 @@ export type EditorState = {
   /** Visible objects at `frame`, recomputed whenever the frame or the scene changes. */
   instances: Instance[];
   mode: Mode;
-  /** Transform node id of the selected object; in model mode, the object being edited. */
+  /** The primary selected transform (the last one picked); in model mode, the object being edited. */
   selected: number | null;
+  /** Every selected transform, children of the `level` group, in selection order (`selected` is the last). */
+  selection: number[];
+  /** MagicaVoxel `olevel`: the group whose children the world editor picks; null is the scene's root group. */
+  level: number | null;
   brushType: BrushType;
   brushMode: BrushMode;
   /** MagicaVoxel `b_mirror_x/y/z`: strokes are repeated across the model's centre on each enabled axis. */
@@ -85,6 +93,7 @@ export type EditorState = {
   geoBrush: GeoBrush;
   regionBrush: RegionOptions;
   marquee: MarqueeMode;
+  objectTool: ObjectTool;
   transformTool: TransformTool;
   /** MagicaVoxel `b_wrap_space_x/y/z`: empty cells between wrapped copies. */
   wrapSpacing: Vec3;
@@ -116,6 +125,12 @@ const isOneOf =
     values.some((candidate) => candidate === value);
 export const isDisplayOption = isOneOf(DISPLAY_OPTIONS);
 
+/** A transform holding a model (an object), as opposed to one holding a group. */
+export const isObject = (vox: VoxDocument, transformId: number) => {
+  const node = vox.nodes[transformId];
+  return node?.kind === 'transform' && vox.nodes[node.child]?.kind === 'shape';
+};
+
 /**
  * Single source of editor state. Mutations go through these methods, which
  * emit events; panels and the viewport subscribe instead of calling each other.
@@ -135,6 +150,8 @@ export function createEditor() {
     instances: [],
     mode: 'model',
     selected: null,
+    selection: [],
+    level: null,
     brushType: 'attach',
     brushMode: 'vox',
     mirror: [false, false, false],
@@ -144,6 +161,7 @@ export function createEditor() {
     geoBrush: { shape: 'line', project: false, fill: true, even: false },
     regionBrush: { connected: true, byColor: true, neighbors: 6 },
     marquee: 'rect',
+    objectTool: 'move',
     transformTool: 'move',
     wrapSpacing: [0, 0, 0],
     voxelSelection: null,
@@ -168,7 +186,20 @@ export function createEditor() {
 
   const status = (message: string, tone: StatusTone = 'info') => emit({ type: 'status', message, tone });
 
-  return {
+  /** Leaving the selection without an object leaves model mode, which always edits one object. */
+  const setSelection = (transformIds: number[], force = false) => {
+    const next = [...new Set(transformIds)];
+    if (!force && next.length === state.selection.length && next.every((id, index) => id === state.selection[index])) return;
+    state.selection = next;
+    state.selected = next.at(-1) ?? null;
+    emit({ type: 'selection' });
+    if (state.mode === 'model' && (state.selected === null || !isObject(state.vox, state.selected))) {
+      state.mode = 'world';
+      emit({ type: 'mode' });
+    }
+  };
+
+  const editorApi = {
     state,
     history,
 
@@ -181,8 +212,12 @@ export function createEditor() {
       Object.assign(state, { vox, fileName: name, dirty: false, playing: false, voxelSelection: null, range: parseRange(vox.meta.get(RANGE_META_KEY)) });
       state.frame = state.range[0];
       evaluate();
-      state.selected = state.instances[0]?.transformId ?? null;
-      state.mode = state.selected === null ? 'world' : 'model';
+      const first = state.instances[0]?.transformId;
+      const top = first === undefined ? null : childOfGroup(vox, parentMap(vox), first, rootLevel(vox) ?? -1);
+      state.level = null;
+      state.selection = top === null ? [] : [top];
+      state.selected = top;
+      state.mode = top !== null && isObject(vox, top) ? 'model' : 'world';
       history.clear();
       emit({ type: 'document' });
     },
@@ -226,20 +261,31 @@ export function createEditor() {
       emit({ type: 'saved' });
     },
 
-    /** Clearing the selection leaves model mode, which always edits one object. */
     select(transformId: number | null) {
-      if (state.selected === transformId) return;
-      state.selected = transformId;
-      emit({ type: 'selection' });
-      if (transformId === null && state.mode === 'model') {
-        state.mode = 'world';
-        emit({ type: 'mode' });
-      }
+      setSelection(transformId === null ? [] : [transformId]);
+    },
+
+    setSelection,
+
+    /** Enters group `groupId` (null: the root group), selecting `selection` among its children. */
+    setLevel(groupId: number | null, selection: number[] = []) {
+      state.level = groupId === rootLevel(state.vox) ? null : groupId;
+      state.selection = [];
+      setSelection(selection, true);
+    },
+
+    /** Selects object `transformId` wherever it sits, entering the group that holds it. */
+    focusObject(transformId: number) {
+      const parent = parentMap(state.vox).get(transformId);
+      if (parent === undefined) return;
+      if (parent === (state.level ?? rootLevel(state.vox))) return setSelection([transformId]);
+      editorApi.setLevel(parent, [transformId]);
     },
 
     setMode(mode: Mode) {
       if (state.mode === mode) return;
       if (mode === 'model' && state.selected === null) return status('Selecione um objeto para editar o modelo', 'error');
+      if (mode === 'model' && state.selected !== null && !isObject(state.vox, state.selected)) return status('Entre no grupo (Tab) para editar um dos seus objetos', 'error');
       state.mode = mode;
       emit({ type: 'mode' });
     },
@@ -266,6 +312,11 @@ export function createEditor() {
 
     setMarquee(marquee: MarqueeMode) {
       state.marquee = marquee;
+      emit({ type: 'tool' });
+    },
+
+    setObjectTool(objectTool: ObjectTool) {
+      state.objectTool = objectTool;
       emit({ type: 'tool' });
     },
 
@@ -348,4 +399,5 @@ export function createEditor() {
       status(`${context}: ${error instanceof Error ? error.message : String(error)}`, 'error');
     },
   };
+  return editorApi;
 }

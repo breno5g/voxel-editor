@@ -24,9 +24,9 @@ export function createOverlays(scene: THREE.Scene) {
   const root = new THREE.Group();
   const grid = new THREE.GridHelper(GRID_EXTENT, GRID_EXTENT / GRID_CELL, GRID_COLORS.axis, GRID_COLORS.line);
   grid.rotation.x = Math.PI / 2;
-  const selection = wireBox(SELECTION_COLOR);
+  const selectionBoxes = new THREE.Group();
   const hover = wireBox(HOVER_COLOR);
-  root.add(grid, selection, hover);
+  root.add(grid, selectionBoxes, hover);
   scene.add(root);
 
   const place = (box: THREE.LineSegments, matrix: THREE.Matrix4 | null) => {
@@ -47,9 +47,15 @@ export function createOverlays(scene: THREE.Scene) {
   };
 
   return {
-    /** `objectMatrix` is the object's world pose; the model pivot sits on it. */
-    showSelection(objectMatrix: THREE.Matrix4 | null, size: Vec3 = [1, 1, 1]) {
-      place(selection, objectMatrix && cellBox(objectMatrix, size, [0, 0, 0], [size[0] - 1, size[1] - 1, size[2] - 1]));
+    /** One box per selected object: `matrix` is its world pose, with the model pivot on it. */
+    showSelection(objects: { matrix: THREE.Matrix4; size: Vec3 }[]) {
+      while (selectionBoxes.children.length < objects.length) selectionBoxes.add(wireBox(SELECTION_COLOR));
+      selectionBoxes.children.forEach((box, index) => {
+        if (!(box instanceof THREE.LineSegments)) return;
+        const object = objects[index];
+        const { size } = object ?? { size: [1, 1, 1] };
+        place(box, object ? cellBox(object.matrix, size, [0, 0, 0], [size[0] - 1, size[1] - 1, size[2] - 1]) : null);
+      });
     },
     /** Highlights one cell, or the box between two cells while a box stroke is being dragged. */
     showHover(objectMatrix: THREE.Matrix4 | null, size: Vec3 = [1, 1, 1], from: Vec3 = [0, 0, 0], to: Vec3 = from) {

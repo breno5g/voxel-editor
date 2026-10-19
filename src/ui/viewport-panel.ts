@@ -7,6 +7,7 @@ import type { CameraDrag } from '../render/camera-rig.ts';
 import type { Viewport } from '../render/viewport.ts';
 import { isLooping, previousShapeModel } from '../scene/keyframes.ts';
 import { evaluateScene } from '../scene/scene-graph.ts';
+import { isUnder, parentMap } from '../scene/scene-tree.ts';
 import { isEditingText } from './dom.ts';
 
 const MAIN_BUTTON = 0;
@@ -71,13 +72,14 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
    * model itself the clicks are just brush strokes.
    */
   canvas.addEventListener('dblclick', ({ clientX, clientY }) => {
+    const hit = viewport.pick(clientX, clientY);
     if (state.mode === 'world') {
-      if (viewport.pick(clientX, clientY)) editor.setMode('model');
-      return;
+      if (!hit) return;
+      editor.focusObject(hit.transformId);
+      return editor.setMode('model');
     }
     if (isOnEditedModel(clientX, clientY)) return;
-    const other = viewport.pick(clientX, clientY);
-    if (other) editor.select(other.transformId);
+    if (hit) editor.focusObject(hit.transformId);
     else editor.setMode('world');
   });
   canvas.addEventListener('pointerleave', () => viewport.showHover(null));
@@ -108,6 +110,13 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
 
   const syncFocus = () => viewport.setFocus(state.mode === 'model' ? state.selected : null);
 
+  /** Outlines every object under the selected nodes (a selected group outlines its members). */
+  const syncSelection = () => {
+    const parents = parentMap(state.vox);
+    const ids = state.mode === 'model' ? [state.selected ?? -1] : state.selection;
+    viewport.setSelection(state.instances.filter((instance) => ids.some((id) => isUnder(parents, instance.transformId, id))).map((instance) => instance.transformId));
+  };
+
   /** Highlights the voxel selection while its model is the one being edited. */
   const syncVoxelSelection = () => {
     const instance = state.mode === 'model' ? editor.selectedInstance() : undefined;
@@ -122,7 +131,7 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
       viewport.reset();
       viewport.setPalette(state.vox.palette);
       syncInstances();
-      viewport.setSelection(state.selected);
+      syncSelection();
       syncFocus();
       syncVoxelSelection();
       frameScene();
@@ -131,6 +140,7 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
     if (event.type === 'display') return viewport.setDisplay(state.display);
     if (event.type === 'scene' || event.type === 'frame') {
       syncInstances();
+      syncSelection();
       return syncVoxelSelection();
     }
     if (event.type === 'voxelSelection') return syncVoxelSelection();
@@ -143,11 +153,12 @@ export function bindViewportPanel(editor: Editor, viewport: Viewport, commands: 
     if (event.type === 'tool') return syncGhost();
     if (event.type === 'mode') {
       viewport.showHover(null);
+      syncSelection();
       syncVoxelSelection();
       return syncFocus();
     }
     if (event.type === 'selection') {
-      viewport.setSelection(state.selected);
+      syncSelection();
       syncFocus();
       syncGhost();
       syncVoxelSelection();

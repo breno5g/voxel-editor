@@ -64,10 +64,13 @@ export function multiplyRows(a: Matrix3, b: Matrix3): Matrix3 {
   });
 }
 
+/** The inverse of a rotation matrix (orthonormal, so its transpose). */
+export const transposeRows = (rows: Matrix3): Matrix3 => [0, 3, 6, 1, 4, 7, 2, 5, 8].map((cell) => rows[cell]);
+
 /** Applies a quarter turn about a parent-space axis on top of an existing rotation. */
 export function turnRotation(rotation: number, axis: Axis, direction: 1 | -1): number {
   const turn = QUARTER_TURNS[axis];
-  const signedTurn = direction > 0 ? turn : [0, 3, 6, 1, 4, 7, 2, 5, 8].map((cell) => turn[cell]);
+  const signedTurn = direction > 0 ? turn : transposeRows(turn);
   return encodeRotation(multiplyRows(signedTurn, rotationRows(rotation)));
 }
 

@@ -1,12 +1,10 @@
-import { DEFAULT_MODEL_SIZE, objectTransform } from '../format/defaults.ts';
-import { applyRows, mirrorRotation, rotationRows, turnRotation } from '../format/rotation.ts';
-import type { Axis } from '../format/rotation.ts';
-import { cellOf, cloneModel, createModel, EMPTY_VOXEL, MAX_MODEL_SIZE, modelPivot, resizeModel } from '../format/vox.ts';
+import { applyRows, rotationRows } from '../format/rotation.ts';
+import { cellOf, cloneModel, EMPTY_VOXEL, MAX_MODEL_SIZE, modelPivot, resizeModel } from '../format/vox.ts';
 import type { ShapeNode, TransformNode, Vec3, VoxModel } from '../format/vox.ts';
-import { adjacentKeyFrame, evaluateShape, evaluateTransform, isLooping, removeKeyAt, setTransformAt, upsertKey } from '../scene/keyframes.ts';
-import type { TransformValue } from '../scene/keyframes.ts';
-import { isHidden, parentGroupOf, rootGroup } from '../scene/scene-graph.ts';
+import { adjacentKeyFrame, evaluateShape, evaluateTransform, isLooping, removeKeyAt, upsertKey } from '../scene/keyframes.ts';
 import type { Editor } from './editor.ts';
+import { sceneChange } from './scene-change.ts';
+import { createWorldCommands } from './world-commands.ts';
 
 export type ObjectCommands = ReturnType<typeof createObjectCommands>;
 export type Track = 'transform' | 'shape';
@@ -14,10 +12,9 @@ export type Track = 'transform' | 'shape';
 type Selection = { transformId: number; transform: TransformNode; shape: ShapeNode; model: number };
 
 const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const isZero = (vector: Vec3) => vector.every((axis) => axis === 0);
 const uniqueModels = (shape: ShapeNode) => [...new Set(shape.keys.map((key) => key.model))];
 
-/** Object-level edits (keys, transforms, size, lifecycle); every one is a single undo step. */
+/** Edits of the selected object (keys, size, name) plus the world commands on the whole selection; every one is a single undo step. */
 export function createObjectCommands(editor: Editor) {
   const { state } = editor;
 
@@ -33,34 +30,11 @@ export function createObjectCommands(editor: Editor) {
     return { transformId, transform, shape, model: evaluateShape(shape.keys, state.frame, isLooping(shape.attrs)) };
   };
 
-  const change = (redo: () => void, undo: () => void, message?: string) => {
-    redo();
-    editor.sceneChanged();
-    editor.history.push({
-      undo: () => {
-        undo();
-        editor.sceneChanged();
-      },
-      redo: () => {
-        redo();
-        editor.sceneChanged();
-      },
-    });
-    if (message) editor.status(message);
-  };
+  const change = sceneChange(editor);
 
   const commitKeys = <K>(node: { keys: K[] }, next: K[], message?: string) => {
     const before = node.keys;
     change(() => (node.keys = next), () => (node.keys = before), message);
-  };
-
-  /** Applies a transform edit at the current frame (in place for static objects, as a key for animated ones). */
-  const changeTransform = (edit: (current: TransformValue) => TransformValue, message?: string) => {
-    const selected = selection();
-    if (!selected) return;
-    const { transform } = selected;
-    const current = evaluateTransform(transform.keys, state.frame, isLooping(transform.attrs));
-    commitKeys(transform, setTransformAt(transform.keys, state.frame, edit(current)), message);
   };
 
   /**
@@ -134,6 +108,7 @@ export function createObjectCommands(editor: Editor) {
   };
 
   return {
+    ...createWorldCommands(editor),
     addTransformKey,
     addModelFrame,
     removeTransformKey,
@@ -149,53 +124,6 @@ export function createObjectCommands(editor: Editor) {
     removeKey() {
       if (state.mode === 'model') removeModelFrame();
       else removeTransformKey();
-    },
-
-    moveSelected(delta: Vec3) {
-      changeTransform((current) => ({ ...current, translation: add(current.translation, delta) }));
-    },
-
-    /**
-     * Live move for a pointer drag: `preview` repositions the object without touching
-     * history, `commit` records the whole drag as one undo step.
-     */
-    dragSelected() {
-      const selected = selection();
-      if (!selected) return null;
-      const { transform } = selected;
-      const before = transform.keys;
-      const start = evaluateTransform(before, state.frame, isLooping(transform.attrs));
-      return {
-        preview(delta: Vec3) {
-          transform.keys = isZero(delta) ? before : setTransformAt(before, state.frame, { ...start, translation: add(start.translation, delta) });
-          editor.sceneChanged();
-        },
-        commit() {
-          const after = transform.keys;
-          if (after !== before) change(() => (transform.keys = after), () => (transform.keys = before), 'Objeto movido');
-        },
-      };
-    },
-
-    /** MagicaVoxel `omove g`: drops the object until the bottom of its model box rests on z = 0. */
-    groundSelected() {
-      const selected = selection();
-      if (!selected) return;
-      const { size } = state.vox.models[selected.model];
-      const pivot = modelPivot(size);
-      changeTransform((current) => {
-        const rows = rotationRows(current.rotation);
-        const bottom = [0, 1, 2].reduce((sum, axis) => sum + Math.min(-rows[6 + axis] * pivot[axis], rows[6 + axis] * (size[axis] - pivot[axis])), 0);
-        return { ...current, translation: [current.translation[0], current.translation[1], -bottom] };
-      }, 'Objeto apoiado no chão');
-    },
-
-    rotateSelected(axis: Axis, direction: 1 | -1) {
-      changeTransform((current) => ({ ...current, rotation: turnRotation(current.rotation, axis, direction) }), 'Objeto girado 90°');
-    },
-
-    mirrorSelected(axis: Axis) {
-      changeTransform((current) => ({ ...current, rotation: mirrorRotation(current.rotation, axis) }), 'Objeto espelhado');
     },
 
     toggleLoop(track: 'transform' | 'shape') {
@@ -289,99 +217,5 @@ export function createObjectCommands(editor: Editor) {
       change(() => setAttr(attrs, '_name', after), () => setAttr(attrs, '_name', before));
     },
 
-    toggleHidden(transformId: number) {
-      const transform = state.vox.nodes[transformId];
-      if (transform?.kind !== 'transform') return;
-      const before = transform.attrs.get('_hidden') ?? null;
-      const after = isHidden(transform.attrs) ? null : '1';
-      change(() => setAttr(transform.attrs, '_hidden', after), () => setAttr(transform.attrs, '_hidden', before));
-    },
-
-    /** Unlinks the object from its group; the writer drops unreachable nodes, undo relinks it. */
-    deleteSelected() {
-      const selected = selection();
-      const group = selected && parentGroupOf(state.vox, selected.transformId);
-      if (!selected || !group) return;
-      const index = group.children.indexOf(selected.transformId);
-      change(
-        () => {
-          group.children.splice(index, 1);
-          editor.select(null);
-        },
-        () => {
-          group.children.splice(index, 0, selected.transformId);
-          editor.select(selected.transformId);
-        },
-        'Objeto apagado',
-      );
-    },
-
-    /** Deep copy (own models for every frame) placed next to the original. */
-    duplicateSelected() {
-      const selected = selection();
-      const group = selected && parentGroupOf(state.vox, selected.transformId);
-      if (!selected || !group) return;
-      const { transform, shape } = selected;
-      const ids = uniqueModels(shape);
-      const firstCopy = state.vox.models.length;
-      const copies = ids.map((id) => cloneModel(state.vox.models[id]));
-      const copyOf = new Map(ids.map((id, i) => [id, firstCopy + i]));
-      const transformId = state.vox.nodes.length;
-      const gap = state.vox.models[selected.model].size[0] + 1;
-      const attrs = new Map(transform.attrs);
-      const name = attrs.get('_name');
-      if (name) attrs.set('_name', `${name} cópia`);
-      const nodes: [TransformNode, ShapeNode] = [
-        {
-          ...transform,
-          attrs,
-          child: transformId + 1,
-          keys: transform.keys.map((key) => ({ ...key, translation: add(key.translation, [gap, 0, 0]) })),
-        },
-        { kind: 'shape', attrs: new Map(shape.attrs), keys: shape.keys.map((key) => ({ ...key, model: copyOf.get(key.model) ?? key.model })) },
-      ];
-      change(
-        () => {
-          state.vox.models.push(...copies);
-          state.vox.nodes.push(...nodes);
-          group.children.push(transformId);
-          editor.select(transformId);
-        },
-        () => {
-          group.children.pop();
-          state.vox.nodes.splice(transformId, nodes.length);
-          state.vox.models.splice(firstCopy, copies.length);
-          editor.select(selected.transformId);
-        },
-        'Objeto duplicado',
-      );
-    },
-
-    addObject() {
-      const group = rootGroup(state.vox);
-      if (!group) return editor.status('A cena não tem um grupo raiz para receber objetos', 'error');
-      const transformId = state.vox.nodes.length;
-      const model = createModel(DEFAULT_MODEL_SIZE);
-      const nodes: [TransformNode, ShapeNode] = [
-        objectTransform(transformId + 1, DEFAULT_MODEL_SIZE),
-        { kind: 'shape', attrs: new Map(), keys: [{ frame: 0, model: state.vox.models.length }] },
-      ];
-      const previous = state.selected;
-      change(
-        () => {
-          state.vox.models.push(model);
-          state.vox.nodes.push(...nodes);
-          group.children.push(transformId);
-          editor.select(transformId);
-        },
-        () => {
-          group.children.pop();
-          state.vox.nodes.splice(transformId, nodes.length);
-          state.vox.models.pop();
-          editor.select(previous);
-        },
-        'Objeto criado',
-      );
-    },
   };
 }

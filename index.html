@@ -172,6 +172,52 @@
           <label class="check"><input id="geo-even" type="checkbox" /> Tamanho par</label>
         </div>
       </section>
+      <section aria-labelledby="object-tool-title" data-only-mode="world">
+        <h2 id="object-tool-title">Ferramenta</h2>
+        <div id="object-tool" class="segmented" role="group" aria-label="Ferramenta do mundo">
+          <button type="button" data-value="move" title="Mover: clique seleciona, Shift soma, arrastar move; Ctrl move na vertical, Ctrl+Shift duplica">Mover</button>
+          <button type="button" data-value="msel" title="Selecionar por retângulo (M): Shift soma, Shift+Alt subtrai">Selecionar</button>
+        </div>
+        <div class="segmented" role="group" aria-label="Seleção de objetos">
+          <button type="button" data-world="selectAll" title="Selecionar tudo (Ctrl+A)">Tudo</button>
+          <button type="button" data-world="invertSelection" title="Inverter a seleção (Ctrl+I)">Inverter</button>
+          <button type="button" data-world="selectNone" title="Selecionar nada (Ctrl+D)">Nada</button>
+        </div>
+      </section>
+      <section aria-labelledby="arrange-title" data-only-mode="world">
+        <h2 id="arrange-title">Organizar</h2>
+        <div class="stack">
+          <div class="control-row">
+            <span class="label" id="align-max-label">Máximo</span>
+            <div class="segmented" role="group" aria-labelledby="align-max-label">
+              <button type="button" data-align="0 1">+X</button>
+              <button type="button" data-align="1 1">+Y</button>
+              <button type="button" data-align="2 1">+Z</button>
+            </div>
+          </div>
+          <div class="control-row">
+            <span class="label" id="align-center-label">Centro</span>
+            <div class="segmented" role="group" aria-labelledby="align-center-label">
+              <button type="button" data-align="0 0">cX</button>
+              <button type="button" data-align="1 0">cY</button>
+              <button type="button" data-align="2 0">cZ</button>
+            </div>
+          </div>
+          <div class="control-row">
+            <span class="label" id="align-min-label">Mínimo</span>
+            <div class="segmented" role="group" aria-labelledby="align-min-label">
+              <button type="button" data-align="0 -1">−X</button>
+              <button type="button" data-align="1 -1">−Y</button>
+              <button type="button" data-align="2 -1">−Z</button>
+            </div>
+          </div>
+          <div class="segmented" role="group" aria-label="Visibilidade">
+            <button type="button" data-world="hide" title="Ocultar a seleção (Ctrl+H alterna)">Ocultar</button>
+            <button type="button" data-world="show" title="Mostrar a seleção">Mostrar</button>
+            <button type="button" data-world="ground" title="Apoiar no chão (G)">Chão</button>
+          </div>
+        </div>
+      </section>
     </aside>
 
     <aside class="sidebar right" aria-label="Objetos">
@@ -436,6 +482,9 @@
           <tr><th scope="row" colspan="2" class="group">Modo Mundo</th></tr>
           <tr><th scope="row">Selecionar / desmarcar</th><td>clique / <kbd>Ctrl+D</kbd></td></tr>
           <tr><th scope="row">Editar o modelo / voltar ao mundo</th><td>duplo clique no objeto / no vazio</td></tr>
+          <tr><th scope="row">Somar objeto à seleção / selecionar por retângulo</th><td><kbd>Shift</kbd> + clique / <kbd>M</kbd> ou arrastar no vazio</td></tr>
+          <tr><th scope="row">Selecionar tudo / inverter / nada</th><td><kbd>Ctrl+A</kbd> / <kbd>Ctrl+I</kbd> / <kbd>Ctrl+D</kbd></td></tr>
+          <tr><th scope="row">Mover na vertical / duplicar arrastando</th><td><kbd>Ctrl</kbd> / <kbd>Ctrl+Shift</kbd> + arrastar</td></tr>
           <tr><th scope="row">Mover objeto</th><td>arrastar, setas, <kbd>PageUp</kbd> / <kbd>PageDown</kbd></td></tr>
           <tr><th scope="row">Apoiar no chão / ocultar</th><td><kbd>G</kbd> / <kbd>Ctrl+H</kbd></td></tr>
           <tr><th scope="row">Girar 90° em Z / em X</th><td><kbd>+</kbd> <kbd>-</kbd> / <kbd>9</kbd> <kbd>0</kbd></td></tr>

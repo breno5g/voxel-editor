@@ -68,7 +68,7 @@ export function createViewport(container: HTMLElement) {
   let selectionOwner: number | null = null;
   const marquee = Object.assign(document.createElement('div'), { className: 'marquee', hidden: true });
   container.append(marquee);
-  let selectedId: number | null = null;
+  let selectedIds: number[] = [];
   /** The object being edited in model mode; every other object is background. */
   let focusId: number | null = null;
   let display: ViewportDisplay = { grid: true, frame: true, edges: false, backgroundObjects: true };
@@ -133,8 +133,13 @@ export function createViewport(container: HTMLElement) {
 
   /** The selection box doubles as the model frame in model mode, where `frame` toggles it. */
   const updateSelection = () => {
-    const view = selectedId === null || (focusId !== null && !display.frame) ? undefined : views.get(selectedId);
-    overlays.showSelection(view?.model ? view.group.matrix : null, view?.model?.size);
+    const shown = focusId !== null && !display.frame ? [] : selectedIds;
+    overlays.showSelection(
+      shown.flatMap((transformId) => {
+        const view = views.get(transformId);
+        return view?.model && view.group.visible ? [{ matrix: view.group.matrix, size: view.model.size }] : [];
+      }),
+    );
   };
 
   const restyle = () => {
@@ -358,8 +363,9 @@ export function createViewport(container: HTMLElement) {
       rig.frame(bounds);
     },
 
-    setSelection(transformId: number | null) {
-      selectedId = transformId;
+    /** Outlines the model boxes of objects `transformIds` (the instances under the selected nodes). */
+    setSelection(transformIds: number[]) {
+      selectedIds = transformIds;
       updateSelection();
       requestRender();
     },
@@ -378,6 +384,26 @@ export function createViewport(container: HTMLElement) {
       aim(clientX, clientY);
       const point = raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), -z), new THREE.Vector3());
       return point && toVec3(point);
+    },
+
+    /** Where the pointer ray crosses the upright plane through `origin` that faces the camera, in world space. */
+    uprightPoint(clientX: number, clientY: number, origin: Vec3): Vec3 | null {
+      aim(clientX, clientY);
+      const facing = rig.camera().getWorldDirection(new THREE.Vector3()).setZ(0);
+      if (facing.lengthSq() < 1e-6) return null;
+      const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(facing.normalize(), new THREE.Vector3(...origin));
+      const point = raycaster.ray.intersectPlane(plane, new THREE.Vector3());
+      return point && toVec3(point);
+    },
+
+    /** Client-space centre of each drawn object's model box, for marquee selection of objects. */
+    objectCenters(): { transformId: number; point: [number, number] }[] {
+      return [...views].flatMap(([transformId, view]) => {
+        if (!view.model || !view.group.visible) return [];
+        const [x, y, z] = view.model.size;
+        const point = project(transformId, [x / 2, y / 2, z / 2]);
+        return point ? [{ transformId, point }] : [];
+      });
     },
 
     planeCell,
